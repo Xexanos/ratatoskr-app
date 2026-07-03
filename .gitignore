@@ -1,0 +1,30 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Android build outputs
+*.apk
+*.aab
+*.ap_
+*.dex
+release/
+captures/
+
+# Local configuration
+local.properties
+keystore.properties
+*.keystore
+*.jks
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+.DS_Store
+
+# Logs
+*.log
+
+# Generated API client (generated at build time from the OpenAPI contract; never committed)
+# Adjust the path to match the layout the agent settles on.
+app/build/generated/openapi/

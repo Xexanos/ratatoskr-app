@@ -1,0 +1,16 @@
+Ratatoskr plays your Audiobookshelf audiobooks on Sonos and IKEA SYMFONISK speakers,
+and keeps your listening progress in sync.
+
+This app is a remote for a Ratatoskr server running on your own network. Sign in with your
+Audiobookshelf account, browse your library, pick a speaker, and control playback. The
+audio streams directly from your Audiobookshelf server to the speaker, so your phone does
+not have to be the source: no drained battery, no interruption when a call comes in, and
+you can leave the room.
+
+On Android there is no native AirPlay and Sonos does not support Google Cast, so this is
+the missing link between Audiobookshelf and your speakers.
+
+Requires a running Ratatoskr server and an Audiobookshelf account.
+
+This is an independent project and is not affiliated with Sonos Inc. or the Audiobookshelf
+project.

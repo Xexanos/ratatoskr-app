@@ -1,0 +1,263 @@
+# Ratatoskr app — specification and implementation brief
+
+This document is the ground truth for implementing the Ratatoskr Android app. It captures
+the goal, the scope of the first version, and the decisions that are already fixed by the
+server and its API contract, so they do not have to be rediscovered.
+
+The app is the client end of the Ratatoskr project. The server's brief and API contract
+are the authoritative descriptions of the other side:
+
+- Server spec: `ratatoskr-server/docs/SPEC.md` (referenced below as "server section N").
+- API contract: `ratatoskr-server/contract/openapi.yaml` (OpenAPI 3.0.3). This is the
+  single source of truth for all client/server communication.
+
+Note: the technology stack and the screen/module structure were intentionally left open
+in the original brief. They have now been decided together with the implementing agent
+and are recorded in sections 12 and 13.
+
+## 1. Goal
+
+Give an Android user a simple remote for playing Audiobookshelf audiobooks on their Sonos
+speakers through the Ratatoskr server, with the listening progress synced back to
+Audiobookshelf. The app is deliberately thin: it holds no audio, no library logic, and no
+Sonos knowledge. It sends commands and shows state.
+
+## 2. Scope
+
+### In scope for v1
+- Connect to a Ratatoskr server by URL, establishing trust in its certificate
+  (see section 6).
+- Sign in with Audiobookshelf credentials via the server, and stay signed in across app
+  restarts using the stored refresh token.
+- Browse and search the library (the server's per-user projection).
+- List the Sonos speakers and groups the server discovered, and pick one.
+- Start a book on the chosen speaker; it resumes from the stored position automatically.
+- A now-playing view with play/pause, seek (absolute position within the book), and stop,
+  showing the current position and duration.
+- Reflect that there is exactly one active session at a time (server section 8).
+- Sign out (clear stored tokens).
+
+### Explicitly out of scope for v1
+- Playing audio on the phone itself. The app is a remote; audio is server-to-speaker only.
+- Offline use, downloads, or any local library cache beyond what a screen needs while open.
+- Chapter navigation UI, bookmarks, playback-speed control, sleep timers.
+- Podcasts, multiple simultaneous sessions, Ratatoskr-controlled multiroom grouping
+  (all out of scope on the server side too).
+- Widgets, Android Auto, Wear, media-session/notification transport controls. These are
+  natural later additions; do not build them now, but do not architect against them.
+
+## 3. Architecture and how it fits
+
+- The app talks ONLY to the Ratatoskr server, over HTTPS, using the API in the contract.
+  It never talks to Audiobookshelf or to the Sonos speakers directly.
+- All domain logic (position mapping, the sync loop, Sonos control) lives in the server.
+  The app maps server responses to what the screens show, and user actions to API calls.
+- Playback state is owned by the server. The app is not the source of truth for position;
+  it displays the session the server reports and may advance the displayed position locally
+  between polls for smoothness, correcting to the server's value when it arrives.
+- Single active session: the UI treats "what is playing" as one server-owned session,
+  fetched from `/v1/sessions/current` (which is 404 when nothing plays).
+
+## 4. API client
+
+- The Kotlin client is generated from `contract/openapi.yaml` with openapi-generator. It is
+  never hand-edited, and the domain/UI layer depends on a thin wrapper over it, not on the
+  generated types directly, so a contract change is absorbed in one place.
+- The contract is consumed via a git submodule of the server repository
+  (`https://github.com/Xexanos/ratatoskr-server`), pinned to a tag or commit, and the
+  client is generated from it at Gradle build time. F-Droid's build server supports
+  submodules (`submodules: yes` in the fdroiddata recipe), which keeps the build hermetic
+  and deterministic — unlike jitpack, which F-Droid's inclusion policy rejects. The
+  submodule pointer is only ever moved deliberately (reviewing the contract diff), never
+  automatically during a build. Do not depend on a private or authenticated package
+  registry (that breaks F-Droid's build server). A human-readable rendering of the
+  contract on the server repo's GitHub Pages is welcome documentation but is not part of
+  the build.
+- The generated client's HTTP stack must be free software; the decision is Retrofit on
+  OkHttp (section 12). No proprietary dependencies, no Google Play Services (server
+  section 12, F-Droid).
+- Treat unknown response fields leniently: an older app must keep working against a newer
+  server (server section 6). Do not fail deserialization on unexpected fields.
+
+## 5. Authentication
+
+Auth is per-user and backed by Audiobookshelf, proxied through Ratatoskr (server section 8).
+
+- Sign-in collects the Audiobookshelf username and password and posts them to
+  `POST /v1/auth/login`. The server returns an access token, a refresh token, and the
+  identified user. The password is never stored.
+- The access token is sent as a bearer token on every request. It is short-lived; when it
+  is rejected, exchange the refresh token via `POST /v1/auth/refresh` and retry once. A
+  single-flight guard must prevent concurrent refreshes from racing.
+- Tokens are stored encrypted at rest (Android Keystore-backed storage, for example
+  EncryptedSharedPreferences or DataStore with a Keystore key), never in plain preferences
+  or logs.
+- Sign-out clears the stored tokens.
+
+### Refresh-token rotation (decided; requires a contract addition on the server side)
+
+Audiobookshelf rotates the refresh token on every use, and the server holds the listening
+user's tokens in memory for the active session (server section 8 and the known-risks note
+in server section 14). The app and the server must not both consume the same refresh token
+independently. The agreed coordination scheme:
+
+- The `Session` schema gains optional `accessToken` and `refreshToken` fields (an additive,
+  non-breaking contract change, proposed to the server repo). They are present only when
+  the server has rotated the caller's tokens since the last response; the client must adopt
+  them immediately and discard the previous pair. Because every playback response
+  (`getCurrentSession`, `startSession`, `pauseSession`, `resumeSession`, `seekSession`)
+  returns a `Session`, rotated tokens reach the app through the polling it does anyway.
+- While a session is active, the app never calls `POST /v1/auth/refresh` on its own. It
+  hands its refresh token to the server in `startSession` and from then on only adopts
+  tokens arriving in `Session` responses. A 401 on a non-session call during an active
+  session first triggers an immediate `getCurrentSession` (to pick up a rotated token);
+  only if that yields nothing new does the app fall back to a regular `/auth/refresh`.
+- Immediately before `stopSession`, the app calls `getCurrentSession` once to adopt the
+  final token state before the server discards its in-memory copy. The residual risk of a
+  rotation in the narrow window between that poll and the stop is accepted and recovered
+  by a single `/auth/refresh` attempt after the session ends; if that also fails, the app
+  asks the user to sign in again rather than looping.
+
+Until the contract addition lands on the server, the app's session logic must not assume
+the fields exist (unknown-field tolerance already covers the reverse direction).
+
+## 6. Server connection and certificate trust
+
+The server serves HTTPS with a self-signed certificate or a local CA (server section 14).
+There is no public CA in the chain, and each user's server has its own certificate, so the
+certificate cannot be pinned at build time.
+
+- The user enters the server's URL (host and port). There is no discovery in v1.
+- Establish trust on first connection: fetch the server certificate, show its fingerprint,
+  and ask the user to confirm it (trust-on-first-use). Persist the confirmed fingerprint
+  and pin it for all later connections; warn loudly if it ever changes.
+- Decided mechanics: the connect screen fetches the certificate chain with a short-lived
+  OkHttp client whose trust manager accepts anything but is used ONLY to read the chain —
+  never for real requests. It shows the leaf certificate's SHA-256 fingerprint plus
+  subject, issuer, and validity; on confirmation the app persists
+  `{host, port, sha256 fingerprint}`. All real requests go through a custom
+  `X509TrustManager` (in `core-network`) that first tries the platform trust chain — which
+  covers the reverse-proxy-with-public-CA case — and only on its failure compares the leaf
+  fingerprint against the stored pin. Matching neither is a hard failure with a loud
+  "certificate changed" warning and an explicit re-trust flow (settings → forget
+  certificate).
+- This runtime, user-confirmed pinning is implemented with the platform TLS stack and
+  OkHttp only, so it survives a reproducible F-Droid build. A build-time
+  network-security-config pin cannot express a per-user certificate and must not be relied
+  on as the mechanism.
+
+## 7. User-provided configuration
+
+The app stores, per install: the server URL, the confirmed server-certificate fingerprint,
+and the auth tokens (encrypted). It does not store the Audiobookshelf password. A settings
+screen exposes the server URL, a re-trust/forget action for the certificate, and sign-out.
+
+## 8. Distribution constraints (F-Droid and Play Store)
+
+- License is GPL-3.0-or-later (matches the whole project).
+- `applicationId` is `io.github.xexanos.ratatoskr`.
+- Free-software dependencies only: no Google Play Services, no proprietary SDKs, no
+  analytics or tracking libraries. F-Droid will reject non-free dependencies and flag
+  anti-features.
+- Aim for a reproducible build. Keep the dependency set small and the build free of
+  non-deterministic steps.
+- Provide F-Droid metadata under `fastlane/metadata/android/<locale>/` (title, short and
+  full description, changelogs, images). The F-Droid build recipe itself lives in F-Droid's
+  `fdroiddata` repository, not here.
+- Choose a reasonable `minSdk` that covers the encrypted-storage and TLS requirements; the
+  agent proposes the exact value.
+
+## 9. Testing
+
+- Unit-test the auth/token logic: attaching the bearer token, the refresh-on-401 flow, the
+  single-flight refresh guard, and secure storage read/write (with the platform pieces
+  faked).
+- Unit-test the mapping between generated contract types and the domain/UI models, including
+  tolerance to unknown fields.
+- A small number of UI tests for the critical flows (connect and trust, sign in, start
+  playback, the now-playing controls) are welcome but not the priority for v1.
+
+## 10. Definition of done for v1
+
+- A user can, from a clean install: enter a server URL, confirm its certificate, sign in
+  with Audiobookshelf credentials, search and browse the library, pick a speaker, start a
+  book that resumes at the right spot, pause/resume/seek/stop, and see the reached position
+  reflected in Audiobookshelf afterward.
+- The session survives closing and reopening the app (it is re-fetched from the server).
+- The app stays signed in across restarts and refreshes its access token transparently.
+- Builds from source with only free-software dependencies; README and this spec match what
+  was built.
+
+## 11. Coding constraints for the implementing agent
+
+- The app holds no domain logic that belongs on the server. If a feature needs Sonos or
+  Audiobookshelf knowledge, it is a server concern reached through the contract.
+- Do not hand-edit generated client or type code; wrap it.
+- No proprietary dependencies, no Google Play Services, no trackers (section 8).
+- Never log tokens, passwords, or Authorization headers.
+- License headers, where used, are GPL-3.0-or-later.
+
+## 12. Technology stack
+
+Decided with the implementing agent. Rationale in brief, so it is not re-litigated.
+
+- **Language / UI:** Kotlin, Jetpack Compose, Material 3.
+- **Asynchrony and state:** coroutines and Flow; one ViewModel per screen; unidirectional
+  data flow (immutable UI state exposed as a `StateFlow`).
+- **Dependency injection:** manual constructor injection via a single `AppContainer`
+  created in the `Application` class. No Hilt/Koin — the app is too small to pay for a
+  framework, and the container keeps wiring in one visible place.
+- **API client:** openapi-generator with the Kotlin `jvm-retrofit2` template on Retrofit +
+  OkHttp, generated at Gradle build time from the contract git submodule (section 4).
+  Retrofit's Kotlin generator template is the maturest option, supports suspend functions
+  natively, and OkHttp accepts a runtime-configured `X509TrustManager`/`SSLSocketFactory`,
+  which is exactly what the TOFU pinning in section 6 needs — without touching generated
+  code.
+- **JSON:** tolerant deserialization (unknown fields ignored) as section 4 requires; the
+  serialization library is whatever the chosen generator template uses (Moshi for
+  `jvm-retrofit2`), configured leniently.
+- **Token storage:** Keystore-backed DataStore (encrypted at rest, section 5).
+- **`minSdk` 26** (Android 8.0): safely covers the Keystore-backed encrypted storage and
+  TLS requirements and provides `java.time` (for `Session.updatedAt`) without core-library
+  desugaring. Raising coverage to older devices (minSdk 23 + desugaring) is possible but
+  not planned.
+- Keep the door open for Kotlin Multiplatform later (this repo is `ratatoskr-app`, not
+  `-android`), but no KMP structure in v1.
+
+## 13. Screen and module structure
+
+Decided with the implementing agent. Two Gradle modules — the app is too small for more,
+but the "generated client only behind a wrapper" rule (section 4) is enforced
+architecturally, not by convention: UI code cannot import generated types because they
+live in `core-network` and only the wrapper's domain models are exposed.
+
+```
+ratatoskr-app/
+├── app/                    # Compose UI, ViewModels, navigation, AppContainer
+│   ├── connect/             #   connect-and-trust screen (URL entry, fingerprint confirm)
+│   ├── auth/                #   sign-in screen
+│   ├── library/             #   browse and search
+│   ├── speakers/            #   speaker picker
+│   ├── nowplaying/          #   play/pause/seek/stop, position display
+│   └── settings/            #   server URL, certificate re-trust/forget, sign-out
+│
+└── core-network/           # everything that talks to the server; app depends on this
+    ├── generated/           #   openapi-generator output — NEVER hand-edited
+    ├── api/                 #   thin wrapper over the generated client: maps generated
+    │                        #   DTOs to domain models, absorbs contract changes in one
+    │                        #   place, tolerant to unknown fields
+    ├── tls/                 #   TOFU trust manager and certificate-fetch helper (section 6)
+    └── auth/                #   Keystore-backed token store, bearer/refresh interceptors,
+                             #   single-flight refresh guard, session-aware refresh
+                             #   coordination (section 5)
+```
+
+- Single activity; Compose Navigation with a sealed route graph. Start destination is
+  chosen at launch: no stored server → connect; no stored tokens → sign-in; otherwise
+  library.
+- One package per screen under `app/`, each with its composable screen, ViewModel, and
+  UI-state type. The now-playing screen polls `getCurrentSession`, advances the displayed
+  position locally between polls, and corrects to the server's value on each response
+  (section 3).
+- Domain models (library item, speaker, session, tokens) live in `core-network`'s wrapper
+  layer and are the only types the `app` module sees.
