@@ -1,6 +1,10 @@
+/*
+ * Ratatoskr Android app
+ * Copyright (C) 2026  Ratatoskr contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
 package io.github.xexanos.ratatoskr.ui.theme
 
-import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -12,33 +16,46 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
+    primary = RustPrimaryDark,
+    onPrimary = RustOnPrimaryDark,
+    primaryContainer = RustContainerDark,
+    onPrimaryContainer = RustOnContainerDark,
+    secondary = BrownSecondaryDark,
+    secondaryContainer = BrownContainerDark,
+    onSecondaryContainer = BrownOnContainerDark,
+    background = BackgroundDark,
+    onBackground = OnBackgroundDark,
+    surface = BackgroundDark,
+    onSurface = OnBackgroundDark,
+    surfaceVariant = SurfaceVariantDark,
+    onSurfaceVariant = OnSurfaceVariantDark,
+    outline = OutlineDark,
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    primary = RustPrimaryLight,
+    onPrimary = RustOnPrimaryLight,
+    primaryContainer = RustContainerLight,
+    onPrimaryContainer = RustOnContainerLight,
+    secondary = BrownSecondaryLight,
+    secondaryContainer = BrownContainerLight,
+    onSecondaryContainer = BrownOnContainerLight,
+    background = BackgroundLight,
+    onBackground = OnBackgroundLight,
+    surface = BackgroundLight,
+    onSurface = OnBackgroundLight,
+    surfaceVariant = SurfaceVariantLight,
+    onSurfaceVariant = OnSurfaceVariantLight,
+    outline = OutlineLight,
 )
 
 @Composable
 fun RatatoskrTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
-    content: @Composable () -> Unit
+    // Off by default so the Ratatoskr brand palette shows consistently. Callers can opt into
+    // Material You dynamic color (Android 12+) if desired.
+    dynamicColor: Boolean = false,
+    content: @Composable () -> Unit,
 ) {
     val colorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
@@ -53,6 +70,6 @@ fun RatatoskrTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,
-        content = content
+        content = content,
     )
 }

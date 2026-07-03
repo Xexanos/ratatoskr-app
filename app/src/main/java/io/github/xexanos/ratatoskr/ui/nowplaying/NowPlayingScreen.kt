@@ -5,17 +5,24 @@
  */
 package io.github.xexanos.ratatoskr.ui.nowplaying
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -23,14 +30,20 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.xexanos.ratatoskr.data.ConnectionManager
 import io.github.xexanos.ratatoskr.network.domain.ApiResult
 import io.github.xexanos.ratatoskr.network.domain.PlaybackState
+import io.github.xexanos.ratatoskr.network.domain.RatatoskrError
 import io.github.xexanos.ratatoskr.network.domain.Session
 import io.github.xexanos.ratatoskr.ui.toMessage
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -69,7 +82,7 @@ class NowPlayingViewModel(
         when (val result = client.currentSession()) {
             is ApiResult.Success -> applySession(result.data)
             is ApiResult.Failure -> when (result.error) {
-                is io.github.xexanos.ratatoskr.network.domain.RatatoskrError.NoActiveSession ->
+                is RatatoskrError.NoActiveSession ->
                     _uiState.value = _uiState.value.copy(loading = false, session = null)
                 else ->
                     _uiState.value = _uiState.value.copy(loading = false, error = result.error.toMessage())
@@ -136,24 +149,75 @@ fun NowPlayingScreen(
     }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 24.dp, vertical = 16.dp),
     ) {
+        Text(
+            text = "NOW PLAYING",
+            style = MaterialTheme.typography.labelMedium,
+            letterSpacing = 2.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(8.dp))
+
         val session = state.session
         when {
-            state.loading -> CircularProgressIndicator()
-            session == null -> Text(state.error ?: "Nothing is playing.")
-            else -> NowPlayingContent(session, viewModel)
+            state.loading ->
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+
+            session == null ->
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        state.error ?: "Nothing is playing right now.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+
+            else -> NowPlayingContent(session, state.error, viewModel)
         }
-        state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
     }
 }
 
 @Composable
-private fun NowPlayingContent(session: Session, viewModel: NowPlayingViewModel) {
-    Text(session.item?.title ?: session.itemId, style = MaterialTheme.typography.headlineSmall)
-    session.item?.author?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
-    Text("State: ${session.state.name.lowercase()}")
+private fun androidx.compose.foundation.layout.ColumnScope.NowPlayingContent(
+    session: Session,
+    error: String?,
+    viewModel: NowPlayingViewModel,
+) {
+    Spacer(Modifier.height(16.dp))
+    CoverArt(title = session.item?.title ?: session.itemId)
+
+    Spacer(Modifier.height(28.dp))
+    Text(
+        text = session.item?.title ?: session.itemId,
+        style = MaterialTheme.typography.headlineSmall,
+        fontWeight = FontWeight.SemiBold,
+        textAlign = TextAlign.Center,
+        maxLines = 2,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    session.item?.author?.let {
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = it,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+    Spacer(Modifier.height(12.dp))
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        StateChip(session.state)
+    }
+
+    // Push transport controls into the thumb zone (bottom third).
+    Spacer(Modifier.weight(1f))
 
     var sliderPosition by remember(session.positionSeconds) {
         mutableFloatStateOf(session.positionSeconds.toFloat())
@@ -164,17 +228,136 @@ private fun NowPlayingContent(session: Session, viewModel: NowPlayingViewModel) 
         onValueChange = { sliderPosition = it },
         onValueChangeFinished = { viewModel.seek(sliderPosition.toDouble()) },
         valueRange = 0f..duration,
+        colors = SliderDefaults.colors(),
         modifier = Modifier.fillMaxWidth(),
     )
-    Text("${formatTime(sliderPosition.toDouble())} / ${formatTime(session.durationSeconds)}")
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        TimeLabel(sliderPosition.toDouble(), MaterialTheme.colorScheme.onSurface)
+        TimeLabel(session.durationSeconds, MaterialTheme.colorScheme.onSurfaceVariant)
+    }
 
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        if (session.state == PlaybackState.PLAYING) {
-            Button(onClick = { viewModel.pause() }) { Text("Pause") }
-        } else {
-            Button(onClick = { viewModel.resume() }) { Text("Resume") }
+    Spacer(Modifier.height(24.dp))
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        val playing = session.state == PlaybackState.PLAYING
+        CircleControl(
+            glyph = if (playing) "⏸" else "▶",
+            size = 76.dp,
+            glyphSize = 30.sp,
+            container = MaterialTheme.colorScheme.primary,
+            content = MaterialTheme.colorScheme.onPrimary,
+            elevation = 6.dp,
+            onClick = { if (playing) viewModel.pause() else viewModel.resume() },
+        )
+        CircleControl(
+            glyph = "⏹",
+            size = 56.dp,
+            glyphSize = 22.sp,
+            container = MaterialTheme.colorScheme.surfaceVariant,
+            content = MaterialTheme.colorScheme.onSurfaceVariant,
+            elevation = 0.dp,
+            onClick = { viewModel.stop() },
+        )
+    }
+
+    error?.let {
+        Spacer(Modifier.height(12.dp))
+        Text(
+            it,
+            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+    Spacer(Modifier.height(8.dp))
+}
+
+@Composable
+private fun CoverArt(title: String) {
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        Surface(
+            modifier = Modifier.size(260.dp),
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.secondaryContainer,
+            shadowElevation = 8.dp,
+            tonalElevation = 2.dp,
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(
+                    text = title.trim().firstOrNull()?.uppercase() ?: "♪",
+                    style = MaterialTheme.typography.displayLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
+            }
         }
-        OutlinedButton(onClick = { viewModel.stop() }) { Text("Stop") }
+    }
+}
+
+@Composable
+private fun StateChip(state: PlaybackState) {
+    val (label, dot) = when (state) {
+        PlaybackState.PLAYING -> "Playing" to MaterialTheme.colorScheme.primary
+        PlaybackState.PAUSED -> "Paused" to MaterialTheme.colorScheme.onSurfaceVariant
+        PlaybackState.BUFFERING -> "Buffering" to MaterialTheme.colorScheme.onSurfaceVariant
+        PlaybackState.FINISHED -> "Finished" to MaterialTheme.colorScheme.primary
+        PlaybackState.STOPPED -> "Stopped" to MaterialTheme.colorScheme.onSurfaceVariant
+        PlaybackState.UNKNOWN -> "—" to MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(Modifier.size(8.dp).background(dot, CircleShape))
+            Text(
+                label,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun TimeLabel(seconds: Double, color: androidx.compose.ui.graphics.Color) {
+    Text(
+        text = formatTime(seconds),
+        style = MaterialTheme.typography.labelLarge,
+        fontFamily = FontFamily.Monospace,
+        color = color,
+    )
+}
+
+@Composable
+private fun CircleControl(
+    glyph: String,
+    size: androidx.compose.ui.unit.Dp,
+    glyphSize: androidx.compose.ui.unit.TextUnit,
+    container: androidx.compose.ui.graphics.Color,
+    content: androidx.compose.ui.graphics.Color,
+    elevation: androidx.compose.ui.unit.Dp,
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.size(size),
+        shape = CircleShape,
+        color = container,
+        contentColor = content,
+        shadowElevation = elevation,
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(glyph, fontSize = glyphSize)
+        }
     }
 }
 
