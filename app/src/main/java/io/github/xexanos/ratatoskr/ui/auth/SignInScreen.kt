@@ -14,6 +14,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -23,12 +24,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.xexanos.ratatoskr.data.ConnectionManager
 import io.github.xexanos.ratatoskr.network.domain.ApiResult
+import io.github.xexanos.ratatoskr.ui.theme.RatatoskrTheme
 import io.github.xexanos.ratatoskr.ui.toMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -72,12 +75,21 @@ fun SignInScreen(
     onSignedIn: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    var username by rememberSaveable { mutableStateOf("") }
-    var password by rememberSaveable { mutableStateOf("") }
 
     LaunchedEffect(state) {
         if (state is SignInUiState.Success) onSignedIn()
     }
+
+    SignInContent(state = state, onSignIn = viewModel::signIn)
+}
+
+@Composable
+private fun SignInContent(
+    state: SignInUiState,
+    onSignIn: (String, String) -> Unit,
+) {
+    var username by rememberSaveable { mutableStateOf("") }
+    var password by rememberSaveable { mutableStateOf("") }
 
     Column(
         modifier = Modifier
@@ -111,11 +123,25 @@ fun SignInScreen(
             else -> Unit
         }
         Button(
-            onClick = { viewModel.signIn(username, password) },
+            onClick = { onSignIn(username, password) },
             enabled = state !is SignInUiState.Submitting,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text("Sign in")
         }
     }
+}
+
+// --- Previews (render in Android Studio without a running server) --------------------------
+
+@Preview(name = "Sign in — idle", widthDp = 360, heightDp = 800)
+@Composable
+private fun SignInIdlePreview() = RatatoskrTheme {
+    Surface { SignInContent(SignInUiState.Idle) { _, _ -> } }
+}
+
+@Preview(name = "Sign in — error", widthDp = 360, heightDp = 800)
+@Composable
+private fun SignInErrorPreview() = RatatoskrTheme {
+    Surface { SignInContent(SignInUiState.Error("Sign-in expired. Please sign in again.")) { _, _ -> } }
 }

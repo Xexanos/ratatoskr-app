@@ -13,16 +13,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.xexanos.ratatoskr.data.ConnectionManager
+import io.github.xexanos.ratatoskr.ui.theme.RatatoskrTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -76,6 +79,19 @@ fun SettingsScreen(
     LaunchedEffect(state.certForgotten) { if (state.certForgotten) onReTrust() }
     LaunchedEffect(state.signedOut) { if (state.signedOut) onSignedOut() }
 
+    SettingsContent(
+        state = state,
+        onForgetCertificate = viewModel::forgetCertificate,
+        onSignOut = viewModel::signOut,
+    )
+}
+
+@Composable
+private fun SettingsContent(
+    state: SettingsUiState,
+    onForgetCertificate: () -> Unit,
+    onSignOut: () -> Unit,
+) {
     Column(
         modifier = Modifier.fillMaxSize().padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -85,16 +101,30 @@ fun SettingsScreen(
         Text(state.serverUrl ?: "Not configured")
 
         OutlinedButton(
-            onClick = { viewModel.forgetCertificate() },
+            onClick = onForgetCertificate,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text("Forget certificate and re-trust")
         }
         Button(
-            onClick = { viewModel.signOut() },
+            onClick = onSignOut,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text("Sign out")
         }
+    }
+}
+
+// --- Previews (render in Android Studio without a running server) --------------------------
+
+@Preview(name = "Settings", widthDp = 360, heightDp = 800)
+@Composable
+private fun SettingsPreview() = RatatoskrTheme {
+    Surface {
+        SettingsContent(
+            state = SettingsUiState(serverUrl = "https://ratatoskr.home:8080"),
+            onForgetCertificate = {},
+            onSignOut = {},
+        )
     }
 }
