@@ -72,6 +72,8 @@ dependencies {
     api(libs.moshi.kotlin)
     api(libs.moshi.adapters)
     api(libs.kotlinx.coroutines.core)
+    implementation(libs.androidx.datastore.preferences)
 
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.core)
 }
