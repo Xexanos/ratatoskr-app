@@ -53,6 +53,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlin.coroutines.coroutineContext
+import kotlin.time.Duration.Companion.milliseconds
 
 data class NowPlayingUiState(
     val loading: Boolean = true,
@@ -72,7 +73,7 @@ class NowPlayingViewModel(
         viewModelScope.launch {
             while (coroutineContext.isActive) {
                 refresh()
-                delay(POLL_INTERVAL_MS)
+                delay(POLL_INTERVAL_MS.milliseconds)
             }
         }
     }

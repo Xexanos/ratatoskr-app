@@ -22,9 +22,9 @@ keystore.properties
 *.iml
 .DS_Store
 
-# Installed agent skills (local tooling, not project code)
-.agents/
+# Installed agent/skills (local tooling, not project code)
 skills-lock.json
+.claude/skills/
 
 # Logs
 *.log
