@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
@@ -42,9 +43,11 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.xexanos.ratatoskr.data.ConnectionManager
 import io.github.xexanos.ratatoskr.network.domain.ApiResult
+import io.github.xexanos.ratatoskr.network.domain.LibraryItemSummary
 import io.github.xexanos.ratatoskr.network.domain.PlaybackState
 import io.github.xexanos.ratatoskr.network.domain.RatatoskrError
 import io.github.xexanos.ratatoskr.network.domain.Session
+import io.github.xexanos.ratatoskr.ui.theme.RatatoskrTheme
 import io.github.xexanos.ratatoskr.ui.toMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -54,6 +57,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlin.coroutines.coroutineContext
 import kotlin.time.Duration.Companion.milliseconds
+import java.time.OffsetDateTime
 
 data class NowPlayingUiState(
     val loading: Boolean = true,
@@ -179,7 +183,14 @@ fun NowPlayingScreen(
                     )
                 }
 
-            else -> NowPlayingContent(session, state.error, viewModel)
+            else -> NowPlayingContent(
+                session = session,
+                error = state.error,
+                onPause = viewModel::pause,
+                onResume = viewModel::resume,
+                onSeek = viewModel::seek,
+                onStop = viewModel::stop,
+            )
         }
     }
 }
@@ -188,7 +199,10 @@ fun NowPlayingScreen(
 private fun androidx.compose.foundation.layout.ColumnScope.NowPlayingContent(
     session: Session,
     error: String?,
-    viewModel: NowPlayingViewModel,
+    onPause: () -> Unit,
+    onResume: () -> Unit,
+    onSeek: (Double) -> Unit,
+    onStop: () -> Unit,
 ) {
     Spacer(Modifier.height(16.dp))
     CoverArt(title = session.item?.title ?: session.itemId)
@@ -227,7 +241,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.NowPlayingContent(
     Slider(
         value = sliderPosition.coerceIn(0f, duration),
         onValueChange = { sliderPosition = it },
-        onValueChangeFinished = { viewModel.seek(sliderPosition.toDouble()) },
+        onValueChangeFinished = { onSeek(sliderPosition.toDouble()) },
         valueRange = 0f..duration,
         colors = SliderDefaults.colors(),
         modifier = Modifier.fillMaxWidth(),
@@ -251,7 +265,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.NowPlayingContent(
             container = MaterialTheme.colorScheme.primary,
             content = MaterialTheme.colorScheme.onPrimary,
             elevation = 6.dp,
-            onClick = { if (playing) viewModel.pause() else viewModel.resume() },
+            onClick = { if (playing) onPause() else onResume() },
         )
         CircleControl(
             glyph = "⏹",
@@ -260,7 +274,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.NowPlayingContent(
             container = MaterialTheme.colorScheme.surfaceVariant,
             content = MaterialTheme.colorScheme.onSurfaceVariant,
             elevation = 0.dp,
-            onClick = { viewModel.stop() },
+            onClick = onStop,
         )
     }
 
@@ -369,3 +383,72 @@ private fun formatTime(seconds: Double): String {
     val s = total % 60
     return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
 }
+
+// --- Previews (render in Android Studio without a running server) --------------------------
+
+private fun previewSession(state: PlaybackState) = Session(
+    itemId = "1",
+    item = LibraryItemSummary(
+        id = "1",
+        title = "The Hobbit",
+        author = "J. R. R. Tolkien",
+        durationSeconds = 39_600.0,
+        coverUrl = null,
+        progress = null,
+    ),
+    speakerId = "living-room",
+    state = state,
+    positionSeconds = 12_600.0,
+    durationSeconds = 39_600.0,
+    updatedAt = OffsetDateTime.parse("2026-07-04T12:00:00Z"),
+)
+
+@Composable
+private fun NowPlayingPreviewScaffold(
+    session: Session?,
+    error: String? = null,
+    loading: Boolean = false,
+) {
+    RatatoskrTheme {
+        Surface {
+            Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp)) {
+                Text(
+                    text = "NOW PLAYING",
+                    style = MaterialTheme.typography.labelMedium,
+                    letterSpacing = 2.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
+                when {
+                    loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                    session == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            error ?: "Nothing is playing right now.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                    else -> NowPlayingContent(session, error, {}, {}, {}, {})
+                }
+            }
+        }
+    }
+}
+
+@Preview(name = "Now playing — playing", widthDp = 360, heightDp = 800)
+@Composable
+private fun NowPlayingPlayingPreview() =
+    NowPlayingPreviewScaffold(previewSession(PlaybackState.PLAYING))
+
+@Preview(name = "Now playing — paused", widthDp = 360, heightDp = 800)
+@Composable
+private fun NowPlayingPausedPreview() =
+    NowPlayingPreviewScaffold(previewSession(PlaybackState.PAUSED))
+
+@Preview(name = "Now playing — nothing playing", widthDp = 360, heightDp = 800)
+@Composable
+private fun NowPlayingEmptyPreview() =
+    NowPlayingPreviewScaffold(session = null)
