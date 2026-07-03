@@ -25,6 +25,7 @@ keystore.properties
 # Logs
 *.log
 
-# Generated API client (generated at build time from the OpenAPI contract; never committed)
-# Adjust the path to match the layout the agent settles on.
-app/build/generated/openapi/
+# Generated API client (generated at build time from the OpenAPI contract; never
+# committed — see SPEC section 4). Lives under core-network/build, already covered by
+# the build/ rule above; listed explicitly for clarity.
+core-network/build/generated/openapi/
