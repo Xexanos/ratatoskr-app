@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark-mode counterpart; keeps the system splash screen and the pre-Compose
+         window background in sync with the Compose dark theme. -->
+    <style name="Theme.Ratatoskr" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#1A120F</item>
+    </style>
+</resources>

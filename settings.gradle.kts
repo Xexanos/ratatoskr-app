@@ -25,3 +25,4 @@ dependencyResolutionManagement {
 rootProject.name = "Ratatoskr"
 include(":app")
 include(":core-network")
+include(":tools:logo")

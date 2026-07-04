@@ -16,13 +16,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
-    primary = RustPrimaryDark,
-    onPrimary = RustOnPrimaryDark,
-    primaryContainer = RustContainerDark,
-    onPrimaryContainer = RustOnContainerDark,
-    secondary = BrownSecondaryDark,
-    secondaryContainer = BrownContainerDark,
-    onSecondaryContainer = BrownOnContainerDark,
+    primary = CopperPrimaryDark,
+    onPrimary = CopperOnPrimaryDark,
+    primaryContainer = CopperContainerDark,
+    onPrimaryContainer = CopperOnContainerDark,
+    secondary = AshSecondaryDark,
+    secondaryContainer = AshContainerDark,
+    onSecondaryContainer = AshOnContainerDark,
     background = BackgroundDark,
     onBackground = OnBackgroundDark,
     surface = BackgroundDark,
@@ -33,13 +33,13 @@ private val DarkColorScheme = darkColorScheme(
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = RustPrimaryLight,
-    onPrimary = RustOnPrimaryLight,
-    primaryContainer = RustContainerLight,
-    onPrimaryContainer = RustOnContainerLight,
-    secondary = BrownSecondaryLight,
-    secondaryContainer = BrownContainerLight,
-    onSecondaryContainer = BrownOnContainerLight,
+    primary = CopperPrimaryLight,
+    onPrimary = CopperOnPrimaryLight,
+    primaryContainer = CopperContainerLight,
+    onPrimaryContainer = CopperOnContainerLight,
+    secondary = AshSecondaryLight,
+    secondaryContainer = AshContainerLight,
+    onSecondaryContainer = AshOnContainerLight,
     background = BackgroundLight,
     onBackground = OnBackgroundLight,
     surface = BackgroundLight,
