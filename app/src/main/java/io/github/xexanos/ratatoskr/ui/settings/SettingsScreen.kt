@@ -5,12 +5,24 @@
  */
 package io.github.xexanos.ratatoskr.ui.settings
 
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -18,7 +30,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -92,27 +106,97 @@ private fun SettingsContent(
     onForgetCertificate: () -> Unit,
     onSignOut: () -> Unit,
 ) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Text("Settings", style = MaterialTheme.typography.headlineSmall)
-        Text("Server", style = MaterialTheme.typography.labelLarge)
-        Text(state.serverUrl ?: "Not configured")
+    Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+        Text(
+            "Settings",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(top = 16.dp),
+        )
+        Spacer(Modifier.height(24.dp))
 
+        SectionLabel("Server")
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 1.dp,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Surface(
+                    modifier = Modifier.size(40.dp),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Default.Home,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        )
+                    }
+                }
+                Spacer(Modifier.width(16.dp))
+                Column {
+                    Text(
+                        state.serverUrl ?: "Not configured",
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    Text(
+                        if (state.serverUrl != null) "Connected over HTTPS" else "Connect from the start screen",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(32.dp))
+        SectionLabel("Security")
         OutlinedButton(
             onClick = onForgetCertificate,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().height(52.dp),
         ) {
+            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
             Text("Forget certificate and re-trust")
         }
-        Button(
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Removes the pinned certificate. You will confirm the server's fingerprint again on the next connection.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 4.dp),
+        )
+
+        Spacer(Modifier.height(32.dp))
+        SectionLabel("Account")
+        OutlinedButton(
             onClick = onSignOut,
-            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.outlinedButtonColors(
+                contentColor = MaterialTheme.colorScheme.error,
+            ),
+            modifier = Modifier.fillMaxWidth().height(52.dp),
         ) {
+            Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
             Text("Sign out")
         }
     }
+}
+
+@Composable
+private fun SectionLabel(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.secondary,
+        fontWeight = FontWeight.Medium,
+        modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+    )
 }
 
 // --- Previews (render in Android Studio without a running server) --------------------------
@@ -123,6 +207,18 @@ private fun SettingsPreview() = RatatoskrTheme {
     Surface {
         SettingsContent(
             state = SettingsUiState(serverUrl = "https://ratatoskr.home:8080"),
+            onForgetCertificate = {},
+            onSignOut = {},
+        )
+    }
+}
+
+@Preview(name = "Settings — not configured", widthDp = 360, heightDp = 800)
+@Composable
+private fun SettingsUnconfiguredPreview() = RatatoskrTheme {
+    Surface {
+        SettingsContent(
+            state = SettingsUiState(serverUrl = null),
             onForgetCertificate = {},
             onSignOut = {},
         )
