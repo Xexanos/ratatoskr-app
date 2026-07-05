@@ -21,6 +21,8 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.tryPerformAccessibilityChecks
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.google.android.apps.common.testing.accessibility.framework.AccessibilityCheckResult
+import com.google.android.apps.common.testing.accessibility.framework.integrations.espresso.AccessibilityValidator
 import io.github.xexanos.ratatoskr.ui.auth.SignInErrorPreview
 import io.github.xexanos.ratatoskr.ui.auth.SignInIdlePreview
 import io.github.xexanos.ratatoskr.ui.connect.ConnectConfirmPreview
@@ -59,15 +61,13 @@ class AccessibilityChecksTest {
     @get:Rule
     val compose = createAndroidComposeRule<ComponentActivity>()
 
-    // The default validator fails on ERROR-severity results. Raising it to WARNING
-    // (AccessibilityValidator().setThrowExceptionFor(WARNING)) currently reports two
-    // known construction sites and should become the default once they are fixed:
-    // - Sign-in: the "Sign in" button's speakable text duplicates the heading.
-    // - Connect (confirm certificate, dark theme): one text element's contrast
-    //   ratio is 3.05 against the required 4.50.
+    // Stricter than the default (which only fails on ERROR-severity results): WARNING
+    // also catches contrast findings, which is where most of the real issues showed up.
     private fun runChecks(content: @Composable () -> Unit) {
         compose.setContent(content)
-        compose.enableAccessibilityChecks()
+        val validator = AccessibilityValidator()
+            .setThrowExceptionFor(AccessibilityCheckResult.AccessibilityCheckResultType.WARNING)
+        compose.enableAccessibilityChecks(validator)
         compose.onRoot().tryPerformAccessibilityChecks()
     }
 
