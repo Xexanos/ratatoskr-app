@@ -47,6 +47,11 @@ jobs:
           api-level: 36
           arch: x86_64
           target: default
+          # Pin a 420dpi phone profile: the runner's default AVD is a small low-density
+          # screen where full-screen previews scroll and ATF measures clipped elements
+          # (false contrast findings). This matches the profile the suite is verified
+          # against locally.
+          profile: pixel_6
           disable-animations: true
           script: |
             adb shell cmd uimode night no
