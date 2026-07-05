@@ -207,6 +207,9 @@ private fun SpeakerRow(speaker: Speaker, onClick: () -> Unit) {
                 },
             ) {
                 Box(contentAlignment = Alignment.Center) {
+                    // Decorative avatar glyph: the "Group"/"Speaker" caption below carries
+                    // the meaning. Out of the semantics tree, so TalkBack skips it and the
+                    // thin anti-aliased strokes don't trip the text-contrast check.
                     Text(
                         if (speaker.isGroup) "⧉" else "◉",
                         style = MaterialTheme.typography.titleMedium,
@@ -215,6 +218,7 @@ private fun SpeakerRow(speaker: Speaker, onClick: () -> Unit) {
                         } else {
                             MaterialTheme.colorScheme.onPrimaryContainer
                         },
+                        modifier = Modifier.clearAndSetSemantics {},
                     )
                 }
             }
