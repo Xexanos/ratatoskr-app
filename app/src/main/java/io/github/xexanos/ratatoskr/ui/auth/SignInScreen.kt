@@ -125,13 +125,14 @@ private fun SignInContent(
         )
         Spacer(Modifier.height(24.dp))
         Text(
-            "Sign in",
+            "Sign in to Audiobookshelf",
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            "Use your Audiobookshelf username and password.",
+            "Use your existing username and password.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,

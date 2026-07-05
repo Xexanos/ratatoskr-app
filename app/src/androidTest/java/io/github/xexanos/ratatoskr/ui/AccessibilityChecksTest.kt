@@ -60,9 +60,8 @@ class AccessibilityChecksTest {
     val compose = createAndroidComposeRule<ComponentActivity>()
 
     // The default validator fails on ERROR-severity results. Raising it to WARNING
-    // (AccessibilityValidator().setThrowExceptionFor(WARNING)) currently reports two
-    // known construction sites and should become the default once they are fixed:
-    // - Sign-in: the "Sign in" button's speakable text duplicates the heading.
+    // (AccessibilityValidator().setThrowExceptionFor(WARNING)) currently reports one
+    // known construction site and should become the default once it is fixed:
     // - Now playing: the transport controls draw emoji glyphs ("▶"/"⏸"/"⏹")
     //   as text, whose fixed emoji colors defeat the text-contrast check (and TalkBack
     //   labeling) — they should become icons with contentDescriptions.
