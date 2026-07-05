@@ -321,7 +321,7 @@ private val previewItems = listOf(
 
 @Preview(name = "Library — loaded", widthDp = 360, heightDp = 800)
 @Composable
-private fun LibraryLoadedPreview() = RatatoskrTheme {
+internal fun LibraryLoadedPreview() = RatatoskrTheme {
     Surface {
         LibraryContent(
             state = LibraryUiState(items = previewItems),
@@ -336,7 +336,7 @@ private fun LibraryLoadedPreview() = RatatoskrTheme {
 
 @Preview(name = "Library — empty", widthDp = 360, heightDp = 800)
 @Composable
-private fun LibraryEmptyPreview() = RatatoskrTheme {
+internal fun LibraryEmptyPreview() = RatatoskrTheme {
     Surface {
         LibraryContent(
             state = LibraryUiState(items = emptyList()),
@@ -351,7 +351,7 @@ private fun LibraryEmptyPreview() = RatatoskrTheme {
 
 @Preview(name = "Library — loading", widthDp = 360, heightDp = 800)
 @Composable
-private fun LibraryLoadingPreview() = RatatoskrTheme {
+internal fun LibraryLoadingPreview() = RatatoskrTheme {
     Surface {
         LibraryContent(
             state = LibraryUiState(loading = true),
