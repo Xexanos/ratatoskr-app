@@ -26,6 +26,11 @@ keystore.properties
 skills-lock.json
 .claude/skills/
 
+# Font cache of the logo generator. The Norse font license forbids
+# redistributing the font FILE, so it is downloaded from the author's
+# site on demand and must never be committed.
+tools/logo/.fontcache/
+
 # Logs
 *.log
 
