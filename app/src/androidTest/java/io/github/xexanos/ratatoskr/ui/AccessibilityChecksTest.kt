@@ -63,9 +63,8 @@ class AccessibilityChecksTest {
     // (AccessibilityValidator().setThrowExceptionFor(WARNING)) currently reports two
     // known construction sites and should become the default once they are fixed:
     // - Sign-in: the "Sign in" button's speakable text duplicates the heading.
-    // - Now playing: the transport controls draw emoji glyphs ("▶"/"⏸"/"⏹")
-    //   as text, whose fixed emoji colors defeat the text-contrast check (and TalkBack
-    //   labeling) — they should become icons with contentDescriptions.
+    // - Connect (confirm certificate, dark theme): one text element's contrast
+    //   ratio is 3.05 against the required 4.50.
     private fun runChecks(content: @Composable () -> Unit) {
         compose.setContent(content)
         compose.enableAccessibilityChecks()
