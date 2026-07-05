@@ -1,5 +1,12 @@
 # Ratatoskr (Android app)
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/logo/ratatoskr-logo-dark.svg">
+    <img src="docs/logo/ratatoskr-logo.svg" alt="Ratatoskr logo" width="160">
+  </picture>
+</p>
+
 The Android client for [Ratatoskr](https://github.com/Xexanos/ratatoskr-server), a
 companion service that plays [Audiobookshelf](https://www.audiobookshelf.org/)
 audiobooks on [Sonos](https://www.sonos.com/) speakers and keeps your listening
@@ -18,6 +25,11 @@ Yggdrasil, carrying messages between the eagle at the crown and the serpent at t
 - a quick messenger between two parties that cannot talk directly. That is what the
 project does between Audiobookshelf and your Sonos speakers. This repository is the phone
 end of that link.
+
+The logo tells the same story: a copper squirrel, its tail fading as if it had just darted
+off, framed by a woven ring in the style of Norse knotwork. The frame's ash-leaf green
+(`#4F6B35`) is a nod to Yggdrasil, which is an ash tree, and together with the copper it
+forms the color palette the app's theme is built from (see `docs/logo/README.md`).
 
 ## Why an app at all, on Android
 
