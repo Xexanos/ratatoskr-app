@@ -167,7 +167,10 @@ private fun ConnectContent(
             onValueChange = { url = it },
             label = { Text("Server URL") },
             singleLine = true,
-            enabled = state is ConnectUiState.Idle || state is ConnectUiState.Error,
+            // readOnly, not disabled: while inspecting/confirming the certificate the URL
+            // must stay legible (disabled text is 38% alpha and fails contrast checks),
+            // it just must not change under the certificate being confirmed.
+            readOnly = !(state is ConnectUiState.Idle || state is ConnectUiState.Error),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier.fillMaxWidth(),
