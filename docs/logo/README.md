@@ -3,8 +3,10 @@
 Working directory for the logo design. GPL-3.0-or-later; derived from CC0
 artwork (see `upstream/README.md`).
 
-- `ratatoskr-mark.svg` — the squirrel mark (tail as wave bands). Hand-edited in
-  Inkscape; **source of truth**, never overwritten by the generator.
+- `ratatoskr-mark.svg` — the squirrel mark. The tail is drawn as sound waves
+  (the messenger carries audio), and the fade encodes sound growing quieter
+  with distance. Hand-edited in Inkscape; **source of truth**, never
+  overwritten by the generator.
 - `ratatoskr-knot-woven.svg` — the frame: single-strand (2,9) torus-knot ring
   with the over/under weave carved in as real geometry (transparent gaps).
   Generated; shape tweaks go through the parameters in `GenerateLogo.kt`.

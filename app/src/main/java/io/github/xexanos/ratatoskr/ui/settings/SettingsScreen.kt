@@ -119,7 +119,7 @@ private fun SettingsContent(
 
 @Preview(name = "Settings", widthDp = 360, heightDp = 800)
 @Composable
-private fun SettingsPreview() = RatatoskrTheme {
+internal fun SettingsPreview() = RatatoskrTheme {
     Surface {
         SettingsContent(
             state = SettingsUiState(serverUrl = "https://ratatoskr.home:8080"),

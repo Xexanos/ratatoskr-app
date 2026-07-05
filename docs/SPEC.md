@@ -176,6 +176,10 @@ screen exposes the server URL, a re-trust/forget action for the certificate, and
   tolerance to unknown fields.
 - A small number of UI tests for the critical flows (connect and trust, sign in, start
   playback, the now-playing controls) are welcome but not the priority for v1.
+- Automated accessibility checks: an instrumented suite (`AccessibilityChecksTest`) runs
+  the Accessibility Test Framework over every screen preview and fails on violations.
+  Instrumented on purpose — the checks need the real accessibility node tree and pass
+  vacuously on the JVM; a canary test guards against that.
 
 ## 10. Definition of done for v1
 

@@ -26,10 +26,12 @@ Yggdrasil, carrying messages between the eagle at the crown and the serpent at t
 project does between Audiobookshelf and your Sonos speakers. This repository is the phone
 end of that link.
 
-The logo tells the same story: a copper squirrel, its tail fading as if it had just darted
-off, framed by a woven ring in the style of Norse knotwork. The frame's ash-leaf green
-(`#4F6B35`) is a nod to Yggdrasil, which is an ash tree, and together with the copper it
-forms the color palette the app's theme is built from (see `docs/logo/README.md`).
+The logo tells the same story: a copper squirrel whose tail is drawn as sound waves —
+audio is what this messenger carries — fading outward the way sound grows quieter with
+distance, framed by a woven ring in the style of Norse knotwork. The frame's ash-leaf
+green (`#4F6B35`) is a nod to Yggdrasil, which is an ash tree, and together with the
+copper it forms the color palette the app's theme is built from (see
+`docs/logo/README.md`).
 
 ## Why an app at all, on Android
 
@@ -58,6 +60,10 @@ Open the project in Android Studio and build the `app` module, or build from the
 line with Gradle. The app is designed to build reproducibly from source with only
 free-software dependencies, so it can be published on F-Droid; it is also intended for the
 Play Store.
+
+Unit tests run with `gradlew :app:testDebugUnitTest`. With an emulator or device attached,
+`gradlew :app:connectedDebugAndroidTest` additionally runs the accessibility checks
+(Accessibility Test Framework) over every screen.
 
 ## API
 

@@ -163,18 +163,18 @@ private val previewSpeakers = listOf(
 
 @Preview(name = "Speakers — loaded", widthDp = 360, heightDp = 800)
 @Composable
-private fun SpeakersLoadedPreview() = RatatoskrTheme {
+internal fun SpeakersLoadedPreview() = RatatoskrTheme {
     Surface { SpeakersContent(SpeakersUiState(loading = false, speakers = previewSpeakers)) {} }
 }
 
 @Preview(name = "Speakers — empty", widthDp = 360, heightDp = 800)
 @Composable
-private fun SpeakersEmptyPreview() = RatatoskrTheme {
+internal fun SpeakersEmptyPreview() = RatatoskrTheme {
     Surface { SpeakersContent(SpeakersUiState(loading = false)) {} }
 }
 
 @Preview(name = "Speakers — loading", widthDp = 360, heightDp = 800)
 @Composable
-private fun SpeakersLoadingPreview() = RatatoskrTheme {
+internal fun SpeakersLoadingPreview() = RatatoskrTheme {
     Surface { SpeakersContent(SpeakersUiState(loading = true)) {} }
 }
