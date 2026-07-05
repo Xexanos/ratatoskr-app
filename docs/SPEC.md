@@ -94,32 +94,39 @@ Auth is per-user and backed by Audiobookshelf, proxied through Ratatoskr (server
   or logs.
 - Sign-out clears the stored tokens.
 
-### Refresh-token rotation (decided; requires a contract addition on the server side)
+### Refresh-token rotation (contract 1.1.0)
 
 Audiobookshelf rotates the refresh token on every use, and the server holds the listening
-user's tokens in memory for the active session (server section 8 and the known-risks note
-in server section 14). The app and the server must not both consume the same refresh token
-independently. The agreed coordination scheme:
+user's tokens in memory for the active session (server section 8 and section 14). The app
+and the server must not both consume the same refresh token independently. This is resolved
+in contract 1.1.0 and mirrors the server's section 8; the app's obligations:
 
-- The `Session` schema gains optional `accessToken` and `refreshToken` fields (an additive,
-  non-breaking contract change, proposed to the server repo). They are present only when
-  the server has rotated the caller's tokens since the last response; the client must adopt
-  them immediately and discard the previous pair. Because every playback response
-  (`getCurrentSession`, `startSession`, `pauseSession`, `resumeSession`, `seekSession`)
-  returns a `Session`, rotated tokens reach the app through the polling it does anyway.
+- The `Session` schema carries an optional `rotatedTokens` object (`accessToken` +
+  `refreshToken`, both or neither). It is present only when the server has rotated the
+  caller's tokens since the last `Session` it returned; the app must adopt the pair
+  immediately, discard the previous one, and send the new access token on its next request.
+  Because every playback response (`getCurrentSession`, `startSession`, `pauseSession`,
+  `resumeSession`, `seekSession`) returns a `Session`, rotated tokens reach the app through
+  the polling it does anyway. The app must tolerate the fields being absent (an older server
+  never sends them).
 - While a session is active, the app never calls `POST /v1/auth/refresh` on its own. It
   hands its refresh token to the server in `startSession` and from then on only adopts
-  tokens arriving in `Session` responses. A 401 on a non-session call during an active
-  session first triggers an immediate `getCurrentSession` (to pick up a rotated token);
-  only if that yields nothing new does the app fall back to a regular `/auth/refresh`.
-- Immediately before `stopSession`, the app calls `getCurrentSession` once to adopt the
-  final token state before the server discards its in-memory copy. The residual risk of a
-  rotation in the narrow window between that poll and the stop is accepted and recovered
-  by a single `/auth/refresh` attempt after the session ends; if that also fails, the app
-  asks the user to sign in again rather than looping.
-
-Until the contract addition lands on the server, the app's session logic must not assume
-the fields exist (unknown-field tolerance already covers the reverse direction).
+  tokens arriving in `Session` responses (including the 200 body from `stopSession`, below).
+  The server confirms delivery by *adoption*: it keeps including `rotatedTokens` until the
+  app authenticates with the new access token, so a dropped or half-read response cannot
+  strand the app.
+- A 401 on a non-session call during an active session first triggers an immediate
+  `getCurrentSession` to pick up a rotated pair; only if none is offered does the app fall
+  back to a regular `/auth/refresh`. This re-fetch is guaranteed to authenticate because
+  Audiobookshelf access tokens are stateless (validated by signature and expiry only) and
+  the app's current one stays valid until its own expiry even after rotation — the server
+  refreshes proactively, before that expiry, precisely to leave this window open.
+- `stopSession` returns 200 with a final `Session` (instead of 204) when a rotated pair is
+  still pending, so the app adopts it as the session ends; the app treats any 2xx from
+  `stopSession` as success and adopts `rotatedTokens` if the body carries it. The one
+  irreducible residual — the single stop response that carries the final pair being lost in
+  transit — is recovered by asking the user to sign in again; the app must not loop
+  `/auth/refresh` on a token the server has already rotated away.
 
 ## 6. Server connection and certificate trust
 
