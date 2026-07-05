@@ -21,7 +21,7 @@ import io.github.xexanos.ratatoskr.network.generated.model.LoginRequest
 import io.github.xexanos.ratatoskr.network.generated.model.SeekRequest
 import io.github.xexanos.ratatoskr.network.generated.model.StartSessionRequest
 import io.github.xexanos.ratatoskr.network.generated.model.Error as GenError
-import io.github.xexanos.ratatoskr.network.persist.TokenStore
+import io.github.xexanos.ratatoskr.network.persist.TokenAccess
 import com.squareup.moshi.Moshi
 import retrofit2.Response
 import java.io.IOException
@@ -41,7 +41,7 @@ class RatatoskrClient internal constructor(
     private val speakersApi: SpeakersApi,
     private val libraryApi: LibraryApi,
     private val playbackApi: PlaybackApi,
-    private val tokenStore: TokenStore,
+    private val tokenStore: TokenAccess,
     private val moshi: Moshi,
 ) {
 

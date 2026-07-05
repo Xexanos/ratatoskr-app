@@ -6,7 +6,7 @@
 package io.github.xexanos.ratatoskr.network.api
 
 import io.github.xexanos.ratatoskr.network.domain.AuthSession
-import io.github.xexanos.ratatoskr.network.persist.TokenStore
+import io.github.xexanos.ratatoskr.network.persist.TokenAccess
 import kotlinx.coroutines.runBlocking
 import okhttp3.Authenticator
 import okhttp3.Interceptor
@@ -21,7 +21,7 @@ fun interface TokenRefresher {
 
 /** Attaches the bearer access token to every request except the unauthenticated auth endpoints. */
 class BearerAuthInterceptor(
-    private val tokenStore: TokenStore,
+    private val tokenStore: TokenAccess,
 ) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
@@ -47,7 +47,7 @@ class BearerAuthInterceptor(
  * so the app can re-fetch the session (which carries any rotated token) instead.
  */
 class TokenRefreshAuthenticator(
-    private val tokenStore: TokenStore,
+    private val tokenStore: TokenAccess,
     private val refresher: TokenRefresher,
     private val refreshSuppressed: () -> Boolean = { false },
 ) : Authenticator {

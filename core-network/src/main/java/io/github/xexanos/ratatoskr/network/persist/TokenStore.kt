@@ -25,9 +25,9 @@ import kotlinx.coroutines.runBlocking
 class TokenStore(
     private val dataStore: DataStore<Preferences>,
     private val crypto: KeystoreCrypto,
-) {
+) : TokenAccess {
 
-    suspend fun authSession(): AuthSession? {
+    override suspend fun authSession(): AuthSession? {
         val prefs = dataStore.data.first()
         val access = prefs[ACCESS_TOKEN]?.let(crypto::decrypt) ?: return null
         val refresh = prefs[REFRESH_TOKEN]?.let(crypto::decrypt) ?: return null
@@ -36,7 +36,7 @@ class TokenStore(
         return AuthSession(access, refresh, AuthUser(userId, username))
     }
 
-    suspend fun save(session: AuthSession) {
+    override suspend fun save(session: AuthSession) {
         dataStore.edit { prefs ->
             prefs[ACCESS_TOKEN] = crypto.encrypt(session.accessToken)
             prefs[REFRESH_TOKEN] = crypto.encrypt(session.refreshToken)
@@ -46,17 +46,17 @@ class TokenStore(
     }
 
     /** Replace just the token pair after a refresh or a server-side rotation (SPEC section 5). */
-    suspend fun updateTokens(accessToken: String, refreshToken: String) {
+    override suspend fun updateTokens(accessToken: String, refreshToken: String) {
         dataStore.edit { prefs ->
             prefs[ACCESS_TOKEN] = crypto.encrypt(accessToken)
             prefs[REFRESH_TOKEN] = crypto.encrypt(refreshToken)
         }
     }
 
-    suspend fun refreshToken(): String? =
+    override suspend fun refreshToken(): String? =
         dataStore.data.first()[REFRESH_TOKEN]?.let(crypto::decrypt)
 
-    suspend fun clear() {
+    override suspend fun clear() {
         dataStore.edit { it.clear() }
     }
 
@@ -65,7 +65,7 @@ class TokenStore(
      * on a background thread and cannot suspend. DataStore keeps values in memory after the
      * first read, so this is cheap.
      */
-    fun currentAccessTokenBlocking(): String? = runBlocking {
+    override fun currentAccessTokenBlocking(): String? = runBlocking {
         dataStore.data.first()[ACCESS_TOKEN]?.let(crypto::decrypt)
     }
 

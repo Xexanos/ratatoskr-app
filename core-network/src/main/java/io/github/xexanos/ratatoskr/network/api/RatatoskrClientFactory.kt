@@ -11,7 +11,7 @@ import io.github.xexanos.ratatoskr.network.generated.api.SpeakersApi
 import io.github.xexanos.ratatoskr.network.generated.api.SystemApi
 import io.github.xexanos.ratatoskr.network.generated.infrastructure.Serializer
 import io.github.xexanos.ratatoskr.network.generated.model.RefreshRequest
-import io.github.xexanos.ratatoskr.network.persist.TokenStore
+import io.github.xexanos.ratatoskr.network.persist.TokenAccess
 import io.github.xexanos.ratatoskr.network.tls.PinnedTrustManager
 import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
@@ -33,7 +33,7 @@ object RatatoskrClientFactory {
     fun create(
         baseUrl: String,
         fingerprint: String?,
-        tokenStore: TokenStore,
+        tokenStore: TokenAccess,
         sessionActive: () -> Boolean = { false },
     ): RatatoskrClient {
         val trustManager = PinnedTrustManager(fingerprint)
