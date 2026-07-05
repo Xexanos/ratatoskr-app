@@ -22,9 +22,11 @@ keystore.properties
 *.iml
 .DS_Store
 
-# Installed agent/skills (local tooling, not project code)
+# Installed skills (third-party local tooling, not project code). Our own project
+# skills and agents ARE committed — installed skills are re-excluded per entry below.
 skills-lock.json
-.claude/skills/
+.claude/skills/*
+!.claude/skills/ux-review/
 
 # Font cache of the logo generator. The Norse font license forbids
 # redistributing the font FILE, so it is downloaded from the author's
