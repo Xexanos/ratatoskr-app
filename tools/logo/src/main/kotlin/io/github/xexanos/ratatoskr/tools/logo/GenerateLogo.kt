@@ -51,6 +51,7 @@ import kotlin.math.sin
 // --- parameters (identical to the Python tool) ----------------------------------------
 
 const val DARK = "#4F6B35"   // knot strand (E1 "Eschenlaub"; fallback E2 #3A5230)
+const val COPPER = "#A93B28" // squirrel body (Kupfer) - used for the spinner overlay
 
 const val R = 100.0          // ring radius
 const val A = 14.0           // wave amplitude
@@ -232,6 +233,59 @@ fun wovenKnotPath(): String {
     return "<path d=\"$d\" fill=\"$DARK\" fill-rule=\"evenodd\" stroke=\"none\"/>"
 }
 
+// --- spinner: the real knot as a static background + an animated squirrel overlay --------
+//
+// A self-contained loading indicator. The background is the SAME woven knot as the logo
+// frame (wovenKnotPath); nothing about it is recoloured or cut. On top, a copper "squirrel"
+// and a short comet trail run the strand's own centreline - the exact curve the ribbon is
+// buffered from (knotSegments), not an approximation. Animation is embedded via SMIL so the
+// file animates as a plain SVG in a browser; the Android app reimplements the same motion in
+// Compose because VectorDrawable does not support SMIL.
+
+/** The strand centreline as one continuous cubic-Bezier path (the ribbon's own spine). */
+fun centerlinePath(): String {
+    val f = { v: Double -> "%.2f".format(Locale.ROOT, v) }
+    val segs = knotSegments()
+    val sb = StringBuilder("M${f(segs.first().p0.x)},${f(segs.first().p0.y)} ")
+    for (c in segs) sb.append("C${f(c.c1.x)},${f(c.c1.y)} ${f(c.c2.x)},${f(c.c2.y)} ${f(c.p3.x)},${f(c.p3.y)} ")
+    return sb.append("Z").toString()
+}
+
+fun spinnerSvg(): String {
+    val dur = "2.4s"
+    val k = 6                 // comet layers; overlap fades bright head -> faint tail
+    val trail = 220           // trail length, in the route's normalised pathLength units (1000)
+    val route = centerlinePath()
+
+    // Comet: layered dashes on the centreline, all sharing the moving leading edge (the head).
+    // pathLength="1000" lets the dash maths ignore the true arc length; dashoffset shifts by a
+    // full period each loop, so it repeats seamlessly. calcMode="paced" on the dot below keeps
+    // the squirrel at that same head (both are linear in real arc length).
+    val layers = (1..k).joinToString("\n") { i ->
+        val len = trail * i / k
+        "  <use href=\"#ratatoskr-route\" stroke=\"$COPPER\" stroke-width=\"7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.30\" stroke-dasharray=\"$len ${1000 - len}\">\n" +
+            "    <animate attributeName=\"stroke-dashoffset\" dur=\"$dur\" repeatCount=\"indefinite\" calcMode=\"linear\" values=\"$len;${len - 1000}\"/>\n" +
+            "  </use>"
+    }
+    val runner =
+        "  <circle class=\"rat-runner\" r=\"12\" fill=\"$COPPER\" opacity=\"0.22\">\n" +
+            "    <animateMotion dur=\"$dur\" repeatCount=\"indefinite\" calcMode=\"paced\"><mpath href=\"#ratatoskr-route\"/></animateMotion>\n" +
+            "  </circle>\n" +
+            "  <circle class=\"rat-runner\" r=\"6.5\" fill=\"$COPPER\">\n" +
+            "    <animateMotion dur=\"$dur\" repeatCount=\"indefinite\" calcMode=\"paced\"><mpath href=\"#ratatoskr-route\"/></animateMotion>\n" +
+            "  </circle>"
+
+    return "  <style>\n" +
+        "    @media (prefers-reduced-motion: reduce) { .rat-spin { display: none; } }\n" +
+        "  </style>\n" +
+        "  " + wovenKnotPath() + "\n" +
+        "  <defs><path id=\"ratatoskr-route\" d=\"$route\" fill=\"none\" pathLength=\"1000\"/></defs>\n" +
+        "  <g class=\"rat-spin\">\n" +
+        layers + "\n" +
+        runner + "\n" +
+        "  </g>"
+}
+
 // --- wordmark: Norse Bold outlines, regenerated on demand ------------------------------
 
 const val WORDMARK_TEXT = "Ratatoskr"
@@ -342,6 +396,7 @@ fun main(args: Array<String>) {
 
     write("ratatoskr-knot-woven.svg", woven, "-8 -8 272 272")
     write("ratatoskr-logo.svg", woven + markGroup, "-8 -8 272 272")
+    write("ratatoskr-spinner.svg", spinnerSvg(), "-8 -8 272 272")
     write(
         "ratatoskr-lockup.svg",
         "<g transform=\"translate(8,8)\">$woven$markGroup</g>" +
