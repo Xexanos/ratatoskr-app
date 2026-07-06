@@ -51,6 +51,31 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # Cache the created AVD + its warm snapshot across runs so we skip the ~3–6 min
+      # cold boot. Keyed on the emulator params below — bump the key when any change.
+      - name: Cache the AVD snapshot
+        uses: actions/cache@v4
+        id: avd-cache
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-api36-x86_64-default-pixel_6
+
+      # On a cache miss, create the AVD once and let it save a snapshot (no -no-snapshot-save).
+      - name: Warm the AVD snapshot
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          arch: x86_64
+          target: default
+          profile: pixel_6
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: false
+          script: echo "Warmed the AVD snapshot for caching."
+
       - name: Run the accessibility checks in light and dark mode
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -62,6 +87,10 @@ jobs:
           # (false contrast findings). This matches the profile the suite is verified
           # against locally.
           profile: pixel_6
+          # Restore the cached AVD (don't recreate it) and boot from the snapshot without
+          # rewriting it; params must match the warm step above for the snapshot to load.
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: |
             adb shell cmd uimode night no
