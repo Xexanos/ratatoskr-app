@@ -315,18 +315,18 @@ private val previewCert = CertificateInfo(
 
 @Preview(name = "Connect — idle", widthDp = 360, heightDp = 800)
 @Composable
-private fun ConnectIdlePreview() = RatatoskrTheme {
+internal fun ConnectIdlePreview() = RatatoskrTheme {
     Surface { ConnectContent(ConnectUiState.Idle, {}, { _, _ -> }, {}) }
 }
 
 @Preview(name = "Connect — confirm certificate", widthDp = 360, heightDp = 800)
 @Composable
-private fun ConnectConfirmPreview() = RatatoskrTheme {
+internal fun ConnectConfirmPreview() = RatatoskrTheme {
     Surface { ConnectContent(ConnectUiState.Confirm("https://ratatoskr.home:8080", previewCert), {}, { _, _ -> }, {}) }
 }
 
 @Preview(name = "Connect — error", widthDp = 360, heightDp = 800)
 @Composable
-private fun ConnectErrorPreview() = RatatoskrTheme {
+internal fun ConnectErrorPreview() = RatatoskrTheme {
     Surface { ConnectContent(ConnectUiState.Error("Could not read the server certificate."), {}, { _, _ -> }, {}) }
 }

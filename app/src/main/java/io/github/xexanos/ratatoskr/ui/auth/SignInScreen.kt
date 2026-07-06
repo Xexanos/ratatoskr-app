@@ -218,13 +218,13 @@ private fun SignInContent(
 
 @Preview(name = "Sign in — idle", widthDp = 360, heightDp = 800)
 @Composable
-private fun SignInIdlePreview() = RatatoskrTheme {
+internal fun SignInIdlePreview() = RatatoskrTheme {
     Surface { SignInContent(SignInUiState.Idle) { _, _ -> } }
 }
 
 @Preview(name = "Sign in — error", widthDp = 360, heightDp = 800)
 @Composable
-private fun SignInErrorPreview() = RatatoskrTheme {
+internal fun SignInErrorPreview() = RatatoskrTheme {
     Surface { SignInContent(SignInUiState.Error("Sign-in expired. Please sign in again.")) { _, _ -> } }
 }
 

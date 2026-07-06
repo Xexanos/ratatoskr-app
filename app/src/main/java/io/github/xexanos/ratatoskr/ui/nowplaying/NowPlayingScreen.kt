@@ -476,15 +476,15 @@ private fun NowPlayingPreviewScaffold(
 
 @Preview(name = "Now playing — playing", widthDp = 360, heightDp = 800)
 @Composable
-private fun NowPlayingPlayingPreview() =
+internal fun NowPlayingPlayingPreview() =
     NowPlayingPreviewScaffold(previewSession(PlaybackState.PLAYING))
 
 @Preview(name = "Now playing — paused", widthDp = 360, heightDp = 800)
 @Composable
-private fun NowPlayingPausedPreview() =
+internal fun NowPlayingPausedPreview() =
     NowPlayingPreviewScaffold(previewSession(PlaybackState.PAUSED))
 
 @Preview(name = "Now playing — nothing playing", widthDp = 360, heightDp = 800)
 @Composable
-private fun NowPlayingEmptyPreview() =
+internal fun NowPlayingEmptyPreview() =
     NowPlayingPreviewScaffold(session = null)
