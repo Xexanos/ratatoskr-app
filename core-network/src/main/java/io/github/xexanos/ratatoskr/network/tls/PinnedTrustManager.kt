@@ -16,8 +16,15 @@ import javax.net.ssl.X509TrustManager
 /**
  * Trust-on-first-use trust manager (SPEC section 6): platform validation first — which
  * covers a reverse proxy with a publicly trusted certificate — then, only if that fails,
- * the user-confirmed pinned SHA-256 fingerprint. Trusting neither is a hard failure, so a
- * changed certificate is rejected loudly rather than silently accepted.
+ * the user-confirmed pinned SHA-256 fingerprint. Trusting neither is a hard failure.
+ *
+ * Scope of the "changed certificate is rejected" guarantee (SPEC section 6, deliberate
+ * trade-off): it holds for the self-signed / local-CA deployment, where the platform chain
+ * fails and the stored pin therefore always decides. When the server presents a *publicly
+ * trusted* certificate the platform chain validates and the pin is not consulted, so a
+ * different but validly issued certificate for the same host is accepted without
+ * re-confirmation — trust is delegated to the public CA. Enforcing the pin there too would
+ * reject every routine renewal (e.g. Let's Encrypt) and force a manual re-trust each time.
  *
  * Runs entirely on the platform TLS stack, so it survives a reproducible F-Droid build; no
  * build-time network-security-config pin is involved.
