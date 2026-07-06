@@ -4,11 +4,21 @@
 # real accessibility node tree, which only exists on a device (see the test's kdoc) —
 # so this boots a headless emulator on the KVM-enabled GitHub runner. Contrast is
 # theme-dependent, so the suite runs twice: once in light mode, once in dark mode.
+#
+# paths-ignore skips this (expensive, ~45 min emulator) run when a PR changes only
+# docs/metadata that can't affect the UI. Denylist, not allowlist: any other path still
+# triggers it, so a UI change can never silently skip the accessibility check.
 
 name: Accessibility
 
 on:
   pull_request:
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'fastlane/**'
+      - '.gitignore'
+      - 'LICENSE'
   workflow_dispatch:
 
 concurrency:
