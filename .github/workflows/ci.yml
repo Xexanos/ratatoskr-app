@@ -1,7 +1,8 @@
 name: CI
 
-# Builds the app and runs the unit tests on pushes to the mainline branches and on
-# every pull request, so a change can't merge without compiling and passing tests.
+# Builds the app and runs the unit tests on every push and every pull request, so a
+# change can't merge without compiling and passing tests. No branch filter: pushes to any
+# branch run too, so work on stacked/feature branches (and PRs targeting them) is covered.
 # Free-software toolchain only (SPEC section 8): official GitHub-hosted runner, Temurin
 # JDK, Gradle wrapper — no proprietary SDKs.
 #
@@ -12,7 +13,6 @@ name: CI
 # protection, a docs-only PR would show no CI run; use a companion always-pass job then.)
 on:
   push:
-    branches: [main, scaffolding]
     paths-ignore: &docs-only
       - '**/*.md'
       - 'docs/**'
@@ -26,8 +26,10 @@ permissions:
   contents: read
 
 concurrency:
-  # Cancel superseded runs for the same ref so a rapid push sequence doesn't queue up.
-  group: ci-${{ github.ref }}
+  # Key on the head branch (not the ref) so a branch's push event and its pull_request
+  # event collapse into one group — cancel-in-progress then keeps a single run instead of
+  # building the same commit twice now that there is no branch filter.
+  group: ci-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
