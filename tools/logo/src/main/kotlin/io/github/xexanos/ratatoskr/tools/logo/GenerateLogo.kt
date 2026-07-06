@@ -21,8 +21,9 @@
  *                              ratatoskr-wordmark.svg, so the normal run stays
  *                              offline and deterministic.
  *   ratatoskr-logo-dark.svg / ratatoskr-lockup-dark.svg
- *                            - the same artwork recolored for dark backgrounds
- *                              (see DARK_COLORS).
+ *                            - the same artwork generated for dark backgrounds: the frame
+ *                              swaps to FRAME_DARK and the mark is painted from the shifted
+ *                              copper ramp (see COPPER_RAMP / DARK_SHIFT).
  *
  * It also writes the framed logo into the app as vector drawables, so the in-app
  * logo has the same single source as the SVGs:
@@ -62,23 +63,23 @@ import kotlin.math.sin
 const val FRAME_LIGHT = "#4F6B35"   // knot strand (E1 "Eschenlaub"; fallback E2 #3A5230)
 const val FRAME_DARK = "#8CAB64"    // knot strand on dark backgrounds
 
-// Dark-background palette: the frame swaps to FRAME_DARK, and the mark's copper ramp
-// (body, then the tail fade inner -> outer) shifts two steps toward the light end, so
-// the tail keeps fading on dark backgrounds. Several colors are both source and target,
-// so recoloring must happen in a single pass over the fragment.
-val DARK_COLORS = mapOf(
-    FRAME_LIGHT to FRAME_DARK,
-    "#A93B28" to "#CF7B60",   // body
-    "#C56A4F" to "#D98C71",   // tail fade, inner -> outer
-    "#CF7B60" to "#E29D82",
-    "#D98C71" to "#EBAE93",
-    "#E29D82" to "#F1BEA4",
-    "#EBAE93" to "#F5CDB5",
-    "#F1BEA4" to "#F8DCC6",
+// The mark's copper ramp, darkest (body) to lightest (tail tip). The artwork is generated
+// for both themes straight from this one ramp: each mark path in ratatoskr-mark.svg carries
+// a data-ramp index i, painted COPPER_RAMP[i] on light backgrounds and
+// COPPER_RAMP[i + DARK_SHIFT] on dark ones, so the tail keeps fading. Generating both from
+// the ramp means there is no light -> dark color map (and none of its source-is-also-target
+// aliasing) to keep in sync.
+val COPPER_RAMP = listOf(
+    "#A93B28", "#C56A4F", "#CF7B60", "#D98C71", "#E29D82",
+    "#EBAE93", "#F1BEA4", "#F5CDB5", "#F8DCC6",
 )
+const val DARK_SHIFT = 2   // steps toward the light end of the ramp on dark backgrounds
 
-fun recolor(fragment: String): String =
-    Regex("#[0-9A-Fa-f]{6}").replace(fragment) { DARK_COLORS[it.value.uppercase(Locale.ROOT)] ?: it.value }
+// A theme is the frame color plus the ramp shift applied to the mark.
+data class Theme(val frame: String, val shift: Int)
+
+val LIGHT = Theme(FRAME_LIGHT, 0)
+val DARK = Theme(FRAME_DARK, DARK_SHIFT)
 
 const val R = 100.0          // ring radius
 const val A = 14.0           // wave amplitude
@@ -324,23 +325,37 @@ fun wordmarkPaths(font: File): String {
 
 // --- shared mark parsing --------------------------------------------------------------
 //
-// One parse of an SVG mark into its paths, shared by the SVG composition (which re-emits
-// each path verbatim via `raw`, so the SVGs stay byte-for-byte identical) and the
-// VectorDrawable emitter (which reads `fill`/`evenOdd`/`d`). Parsing once with a single set
-// of assumptions keeps the two outputs from drifting: a path the parser can't read -- e.g.
-// Inkscape moved the fill into a style= attribute, or rewrote <path/> as <path></path> --
-// fails here instead of silently vanishing from one output while erroring in the other.
+// One parse of the mark into its paths, shared by the SVG composition (paintMarkSvg) and
+// the VectorDrawable emitter. Parsing once with a single set of assumptions keeps the two
+// outputs from drifting: a path the parser can't read -- e.g. Inkscape rewrote <path/> as
+// <path></path>, or dropped the data-ramp index -- fails here instead of silently vanishing
+// from one output while erroring in the other. Each path carries only its ramp index; its
+// color is chosen per theme from COPPER_RAMP (see rampColor).
 
-data class MarkPath(val raw: String, val fill: String, val evenOdd: Boolean, val d: String)
+data class MarkPath(val raw: String, val ramp: Int, val evenOdd: Boolean, val d: String)
 
 fun parseMark(svg: String): List<MarkPath> =
     Regex("<path\\b[^>]*>").findAll(svg).map { m ->
         fun attr(name: String) = Regex("$name=\"([^\"]*)\"").find(m.value)?.groupValues?.get(1)
-        val fill = attr("fill")
-            ?: Regex("fill:\\s*(#[0-9A-Fa-f]{6})").find(attr("style") ?: "")?.groupValues?.get(1)
-            ?: error("mark path has no fill (checked fill= and style=): ${m.value}")
-        MarkPath(m.value, fill, attr("fill-rule") == "evenodd", attr("d") ?: error("mark path has no d: ${m.value}"))
+        val ramp = (attr("data-ramp") ?: error("mark path has no data-ramp index: ${m.value}"))
+            .toIntOrNull() ?: error("mark path has a non-integer data-ramp: ${m.value}")
+        MarkPath(m.value, ramp, attr("fill-rule") == "evenodd", attr("d") ?: error("mark path has no d: ${m.value}"))
     }.toList()
+
+// The ramp color for a path under a theme. An out-of-range index (data-ramp too large for
+// the shift, or negative) throws, so a mis-indexed source fails loudly rather than shipping
+// a wrong or unpainted mark.
+fun rampColor(path: MarkPath, theme: Theme): String = COPPER_RAMP[path.ramp + theme.shift]
+
+// Paint the parsed mark as an SVG fragment for a theme: each path is re-emitted with its
+// data-ramp index dropped and its placeholder fill replaced by the ramp color, leaving the
+// hand-authored geometry (and its exact formatting) untouched.
+fun paintMarkSvg(mark: List<MarkPath>, theme: Theme): String =
+    mark.joinToString("") { p ->
+        p.raw
+            .replace(" data-ramp=\"${p.ramp}\"", "")
+            .replace(Regex("fill=\"[^\"]*\""), "fill=\"${rampColor(p, theme)}\"")
+    }
 
 // --- Android vector drawable ------------------------------------------------------------
 //
@@ -354,21 +369,21 @@ val DRAWABLE_HEADER = """
          edit by hand. -->
 """.trimIndent() + "\n"
 
-fun vectorDrawable(knotD: String, mark: List<MarkPath>, sc: Double, tx: Double, ty: Double): String {
+fun vectorDrawable(knotD: String, mark: List<MarkPath>, sc: Double, tx: Double, ty: Double, theme: Theme): String {
     fun fmt(v: Double) = "%.1f".format(Locale.ROOT, v)
     fun path(indent: String, fill: String, evenOdd: Boolean, d: String) =
         "$indent<path android:fillColor=\"$fill\"" +
             (if (evenOdd) " android:fillType=\"evenOdd\"" else "") +
             " android:pathData=\"$d\"/>\n"
 
-    val markPaths = mark.joinToString("") { path("            ", it.fill, it.evenOdd, it.d) }
+    val markPaths = mark.joinToString("") { path("            ", rampColor(it, theme), it.evenOdd, it.d) }
 
     return "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" + DRAWABLE_HEADER +
         "<vector xmlns:android=\"http://schemas.android.com/apk/res/android\"\n" +
         "    android:width=\"272dp\" android:height=\"272dp\"\n" +
         "    android:viewportWidth=\"272\" android:viewportHeight=\"272\">\n" +
         "    <group android:translateX=\"8\" android:translateY=\"8\">\n" +
-        path("        ", FRAME_LIGHT, true, knotD) +
+        path("        ", theme.frame, true, knotD) +
         "        <group android:scaleX=\"$sc\" android:scaleY=\"$sc\" " +
         "android:translateX=\"${fmt(tx)}\" android:translateY=\"${fmt(ty)}\">\n" +
         markPaths +
@@ -410,9 +425,7 @@ fun main(args: Array<String>) {
     }
 
     val knotD = wovenKnotD()
-    val woven = "<path d=\"$knotD\" fill=\"$FRAME_LIGHT\" fill-rule=\"evenodd\" stroke=\"none\"/>"
     val markPaths = parseMark(File(out, "ratatoskr-mark.svg").readText())
-    val mark = markPaths.joinToString("") { it.raw }
     // The wordmark's paths inherit their fill from the enclosing <g fill=...>, so they carry
     // no per-path fill and are only ever embedded verbatim (never turned into a drawable).
     val wordmark = Regex("<path[^>]*/>").findAll(File(out, "ratatoskr-wordmark.svg").readText())
@@ -421,21 +434,23 @@ fun main(args: Array<String>) {
     val sc = 0.55
     val tx = 128 - sc * 128
     val ty = 128 - sc * 130
-    val markGroup = "<g transform=\"translate(%.1f,%.1f) scale(%s)\">%s</g>"
-        .format(Locale.ROOT, tx, ty, sc.toString(), mark)
 
-    val logo = woven + markGroup
-    val lockup = "<g transform=\"translate(8,8)\">$logo</g>" +
-        "<g fill=\"$FRAME_LIGHT\" transform=\"translate(36,330)\">$wordmark</g>"
+    // The framed logo and the wordmark lockup, generated per theme straight from the ramp.
+    fun woven(theme: Theme) = "<path d=\"$knotD\" fill=\"${theme.frame}\" fill-rule=\"evenodd\" stroke=\"none\"/>"
+    fun logo(theme: Theme) = woven(theme) +
+        "<g transform=\"translate(%.1f,%.1f) scale(%s)\">%s</g>"
+            .format(Locale.ROOT, tx, ty, sc.toString(), paintMarkSvg(markPaths, theme))
+    fun lockup(theme: Theme) = "<g transform=\"translate(8,8)\">${logo(theme)}</g>" +
+        "<g fill=\"${theme.frame}\" transform=\"translate(36,330)\">$wordmark</g>"
 
-    write("ratatoskr-knot-woven.svg", woven, "-8 -8 272 272")
-    write("ratatoskr-logo.svg", logo, "-8 -8 272 272")
-    write("ratatoskr-logo-dark.svg", recolor(logo), "-8 -8 272 272")
-    write("ratatoskr-lockup.svg", lockup, "0 0 272 350", HEADER + WORDMARK_HEADER)
-    write("ratatoskr-lockup-dark.svg", recolor(lockup), "0 0 272 350", HEADER + WORDMARK_HEADER)
+    write("ratatoskr-knot-woven.svg", woven(LIGHT), "-8 -8 272 272")
+    write("ratatoskr-logo.svg", logo(LIGHT), "-8 -8 272 272")
+    write("ratatoskr-logo-dark.svg", logo(DARK), "-8 -8 272 272")
+    write("ratatoskr-lockup.svg", lockup(LIGHT), "0 0 272 350", HEADER + WORDMARK_HEADER)
+    write("ratatoskr-lockup-dark.svg", lockup(DARK), "0 0 272 350", HEADER + WORDMARK_HEADER)
 
-    val drawable = vectorDrawable(knotD, markPaths, sc, tx, ty)
-    for ((qualifier, xml) in listOf("drawable" to drawable, "drawable-night" to recolor(drawable))) {
+    for ((qualifier, theme) in listOf("drawable" to LIGHT, "drawable-night" to DARK)) {
+        val xml = vectorDrawable(knotD, markPaths, sc, tx, ty, theme)
         val file = File(dir, "app/src/main/res/$qualifier/ratatoskr_logo.xml")
         file.parentFile.mkdirs()
         file.writeText(xml)
