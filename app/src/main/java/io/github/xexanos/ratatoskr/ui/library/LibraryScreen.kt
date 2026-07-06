@@ -357,7 +357,7 @@ private val previewItems = listOf(
     LibraryItemSummary("3", "Dune", "Frank Herbert", 75_600.0, null, null),
 )
 
-@Preview(name = "Library -- loaded", widthDp = 360, heightDp = 800)
+@Preview(name = "Library - loaded", widthDp = 360, heightDp = 800)
 @Composable
 private fun LibraryLoadedPreview() = RatatoskrTheme {
     Surface {
@@ -372,7 +372,7 @@ private fun LibraryLoadedPreview() = RatatoskrTheme {
     }
 }
 
-@Preview(name = "Library -- empty", widthDp = 360, heightDp = 800)
+@Preview(name = "Library - empty", widthDp = 360, heightDp = 800)
 @Composable
 private fun LibraryEmptyPreview() = RatatoskrTheme {
     Surface {
@@ -387,7 +387,7 @@ private fun LibraryEmptyPreview() = RatatoskrTheme {
     }
 }
 
-@Preview(name = "Library -- loading", widthDp = 360, heightDp = 800)
+@Preview(name = "Library - loading", widthDp = 360, heightDp = 800)
 @Composable
 private fun LibraryLoadingPreview() = RatatoskrTheme {
     Surface {

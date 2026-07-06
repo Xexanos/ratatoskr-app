@@ -26,7 +26,7 @@ android {
 
 // Generate the Kotlin client from the version-pinned contract submodule (SPEC section 4).
 // The output is never committed (see .gitignore); the domain/UI layer never touches these
-// types directly -- the wrapper in this module maps them to domain models (SPEC section 13).
+// types directly - the wrapper in this module maps them to domain models (SPEC section 13).
 // AGP owns the output directory: addGeneratedSourceDirectory (below) wires it and the task
 // ordering, so we do not set outputDir here. sourceFolder="" makes the generator write the
 // package tree straight into that directory instead of a nested src/main/kotlin.

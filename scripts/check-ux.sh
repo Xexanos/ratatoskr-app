@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# UX design guardrails -- the deterministic checks the ux-review skill mandates
+# UX design guardrails - the deterministic checks the ux-review skill mandates
 # (.claude/skills/ux-review). The "judged by the skill, stopped by CI" floor: they catch
 # drift that never needs a human eye. Run locally with `bash scripts/check-ux.sh`; CI runs
 # it on every push/PR.
@@ -29,7 +29,7 @@ if grep -rEn --include='*.kt' 'RoundedCornerShape\(\s*[0-9.]+\s*\.dp\s*\)' "$UI"
 else echo "  ok"; fi
 
 echo "== 3. Material-2 component imports (use androidx.compose.material3) [FATAL] =="
-# material.icons.* is the correct icon package for Material 3 -- only real M2 components count.
+# material.icons.* is the correct icon package for Material 3 - only real M2 components count.
 if grep -rEn --include='*.kt' 'import androidx\.compose\.material\.' "$UI" | grep -v 'androidx\.compose\.material\.icons'; then
   echo "  FAIL: Material 2 component import found; use material3."; fail=1
 else echo "  ok"; fi
@@ -53,7 +53,7 @@ ascii_files="$(git ls-files '*.kt' '*.kts' '*.sh' '*.py' 'app/src/main/res/value
 ascii_hits="$([ -n "$PY" ] && echo "$ascii_files" | xargs "$PY" scripts/lint_ascii.py || true)"
 if [ -n "$ascii_hits" ]; then
   echo "$ascii_hits"
-  if [ "$STRICT_ASCII" = 1 ]; then echo "  FAIL: keep source ASCII (arrows -> '->', em-dash -> '--', ...); non-ASCII text belongs in a translation."; fail=1
+  if [ "$STRICT_ASCII" = 1 ]; then echo "  FAIL: keep source ASCII (arrows -> '->', em-dash -> '-', ...); non-ASCII text belongs in a translation."; fail=1
   else echo "  warn: non-ASCII found; keep source ASCII."; fi
 else echo "  ok"; fi
 

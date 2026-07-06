@@ -40,7 +40,7 @@ object RatatoskrClientFactory {
         val sslSocketFactory = PinnedTrustManager.socketFactory(trustManager)
 
         // Logging is off by default. If raised for debugging it must stay at BASIC or below and
-        // keep Authorization redacted -- never log tokens, headers, or bodies (SPEC section 11).
+        // keep Authorization redacted - never log tokens, headers, or bodies (SPEC section 11).
         val logging = HttpLoggingInterceptor().apply {
             redactHeader("Authorization")
             level = HttpLoggingInterceptor.Level.NONE

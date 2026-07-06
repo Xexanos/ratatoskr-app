@@ -4,11 +4,11 @@ name: CI
 # change can't merge without compiling and passing tests. No branch filter: pushes to any
 # branch run too, so work on stacked/feature branches (and PRs targeting them) is covered.
 # Free-software toolchain only (SPEC section 8): official GitHub-hosted runner, Temurin
-# JDK, Gradle wrapper — no proprietary SDKs.
+# JDK, Gradle wrapper - no proprietary SDKs.
 #
 # paths-ignore is a denylist, not an allowlist: the run is skipped only when *every*
-# changed file is docs/metadata that can't affect the build or tests. Anything else —
-# including any new or unlisted path — still triggers CI, so this can never silently
+# changed file is docs/metadata that can't affect the build or tests. Anything else -
+# including any new or unlisted path - still triggers CI, so this can never silently
 # skip a real code change. (Note: if CI is later made a required check with branch
 # protection, a docs-only PR would show no CI run; use a companion always-pass job then.)
 on:
@@ -27,7 +27,7 @@ permissions:
 
 concurrency:
   # Key on the head branch (not the ref) so a branch's push event and its pull_request
-  # event collapse into one group — cancel-in-progress then keeps a single run instead of
+  # event collapse into one group - cancel-in-progress then keeps a single run instead of
   # building the same commit twice now that there is no branch filter.
   group: ci-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true

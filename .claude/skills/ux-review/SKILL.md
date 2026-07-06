@@ -1,6 +1,6 @@
 ---
 name: ux-review
-description: Review Ratatoskr Android UI changes against the checked-in UX design (docs/ux-design.html) and Material 3. Use when reviewing a diff, PR, or screen for UX/design drift, when someone asks "does this match the design", or before merging UI work. Complements the deterministic CI checks (screenshot golden tests, lint) — this skill covers the judgment calls those cannot.
+description: Review Ratatoskr Android UI changes against the checked-in UX design (docs/ux-design.html) and Material 3. Use when reviewing a diff, PR, or screen for UX/design drift, when someone asks "does this match the design", or before merging UI work. Complements the deterministic CI checks (screenshot golden tests, lint) - this skill covers the judgment calls those cannot.
 ---
 
 # Ratatoskr UX review
@@ -11,25 +11,25 @@ duplicated in the agent.
 
 ## Sources of truth (read these first)
 
-1. `docs/ux-design.html` — the v1 UX design: principles, per-screen decisions, tokens,
+1. `docs/ux-design.html` - the v1 UX design: principles, per-screen decisions, tokens,
    states, the knot loader, and the implementation/localization plan. **This is the
    contract.** When a screen's implementation disagrees with it, that is the drift.
-2. `docs/SPEC.md` §12 (tech stack) and §13 (screen/module structure) — architectural
+2. `docs/SPEC.md` §12 (tech stack) and §13 (screen/module structure) - architectural
    guardrails. A UI change that needs a new screen/module or a stack change is a SPEC
    change first, not a review nit.
-3. `app/src/main/java/io/github/xexanos/ratatoskr/ui/theme/` — `Color.kt`, `Type.kt`,
+3. `app/src/main/java/io/github/xexanos/ratatoskr/ui/theme/` - `Color.kt`, `Type.kt`,
    `Theme.kt`. Every color/typography value must resolve to these, never to inline literals.
-4. The `android-skills:android-ux` skill (if available) — its M3 compliance audit is the
+4. The `android-skills:android-ux` skill (if available) - its M3 compliance audit is the
    checklist below in more detail. Load it for the full 10-category audit.
 
 ## What this review is, and is not
 
-- **In scope:** judgment calls a machine cannot make — is there a designed empty/error/
+- **In scope:** judgment calls a machine cannot make - is there a designed empty/error/
   loading state? Is the primary action in the thumb zone? Is copper reserved for exactly
   one primary action per screen? Does copy match the conventions (English source, generic
   examples, no walk-back-able promises)? Does the screen match its section in the design doc?
 - **Out of scope (leave to deterministic checks):** hardcoded-color/shape detection, M2
-  imports, pixel drift — those are enforced by lint/detekt + screenshot golden tests in CI
+  imports, pixel drift - those are enforced by lint/detekt + screenshot golden tests in CI
   and should already be green before a human or this skill looks. If they are not wired up
   yet, say so; do not hand-audit what a grep can guarantee.
 
@@ -65,8 +65,8 @@ duplicated in the agent.
 4. **Check the screen-specific decisions** listed in that screen's card in the design doc
    (e.g. Library must carry the mini player off the existing session polling; Now playing
    header leads with "PLAYING ON <speaker>"; Speakers shows the resume position). A missing
-   or altered decision is drift — flag it with the doc section it violates.
-5. **Report** most-severe-first: `file:line — what drifted — which design-doc/SPEC rule —
+   or altered decision is drift - flag it with the doc section it violates.
+5. **Report** most-severe-first: `file:line - what drifted - which design-doc/SPEC rule -
    suggested fix`. Separate hard violations (token/a11y/state) from judgment notes.
 
 ## Copy conventions (repo: docs are English; see the copy-and-example convention)
@@ -85,7 +85,7 @@ duplicated in the agent.
 This skill catches what needs a human-like read. The actual *enforcement* that prevents
 drift is deterministic and belongs in CI, run on the existing `@Preview` composables:
 
-- **Screenshot golden tests** (Roborazzi or Paparazzi) over the `@Preview`s — CI fails on
+- **Screenshot golden tests** (Roborazzi or Paparazzi) over the `@Preview`s - CI fails on
   pixel drift. This is the real anti-drift mechanism.
 - **Lint / detekt rules** for the grep checks above (no hardcoded `Color(0x…)`, no
   `RoundedCornerShape(n.dp)`, no Material-2 imports, no hardcoded UI strings).

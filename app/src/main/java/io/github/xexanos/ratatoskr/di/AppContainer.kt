@@ -18,7 +18,7 @@ import io.github.xexanos.ratatoskr.network.tls.CertificateInspector
 
 /**
  * Manual dependency container (SPEC section 12): one instance per process, created in the
- * Application, holding the singletons the screens need. No DI framework -- the wiring is
+ * Application, holding the singletons the screens need. No DI framework - the wiring is
  * visible in one place.
  */
 class AppContainer(context: Context) {
