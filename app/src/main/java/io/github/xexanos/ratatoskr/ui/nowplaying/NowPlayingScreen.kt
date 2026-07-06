@@ -28,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -38,9 +39,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import io.github.xexanos.ratatoskr.data.ConnectionManager
 import io.github.xexanos.ratatoskr.network.domain.ApiResult
 import io.github.xexanos.ratatoskr.network.domain.LibraryItemSummary
@@ -55,9 +59,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlin.coroutines.coroutineContext
-import kotlin.time.Duration.Companion.milliseconds
 import java.time.OffsetDateTime
+
+private const val POLL_INTERVAL_MS = 5_000L
 
 data class NowPlayingUiState(
     val loading: Boolean = true,
@@ -73,16 +77,14 @@ class NowPlayingViewModel(
     private val _uiState = MutableStateFlow(NowPlayingUiState())
     val uiState: StateFlow<NowPlayingUiState> = _uiState.asStateFlow()
 
-    init {
-        viewModelScope.launch {
-            while (coroutineContext.isActive) {
-                refresh()
-                delay(POLL_INTERVAL_MS.milliseconds)
-            }
-        }
-    }
-
-    private suspend fun refresh() {
+    /**
+     * Fetches the current session once. The screen drives this while it is RESUMED (see
+     * [NowPlayingScreen]) instead of a self-running loop, so polling stops when the app is
+     * backgrounded. It is a no-op once the session has been stopped, so a late in-flight poll
+     * cannot revive a session the user just ended.
+     */
+    suspend fun refresh() {
+        if (_uiState.value.stopped) return
         val client = connectionManager.client() ?: return
         when (val result = client.currentSession()) {
             is ApiResult.Success -> applySession(result.data)
@@ -96,10 +98,17 @@ class NowPlayingViewModel(
     }
 
     private fun applySession(session: Session) {
+        // A poll or control response that completes after stop() must not revive the ended
+        // session: the `stopped` guard in refresh() only covers the start of the call, not the
+        // apply after the network await, and stop() has already navigated away.
+        if (_uiState.value.stopped) return
         // The server owns token rotation while a session is active (SPEC section 5).
         val active = session.state in ACTIVE_STATES
         connectionManager.setSessionActive(active)
-        _uiState.value = NowPlayingUiState(loading = false, session = session)
+        // Clear a stale error on a successful response so a transient poll failure doesn't
+        // leave a sticky banner once the stream is healthy again. `stopped` is preserved by the
+        // guard above; a fresh control action also clears the error up front.
+        _uiState.value = _uiState.value.copy(loading = false, session = session, error = null)
     }
 
     fun pause() = control { it.pause() }
@@ -108,6 +117,7 @@ class NowPlayingViewModel(
 
     fun stop() {
         viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(error = null)
             val client = connectionManager.client() ?: return@launch
             when (val result = client.stopSession()) {
                 is ApiResult.Success -> {
@@ -122,6 +132,9 @@ class NowPlayingViewModel(
 
     private fun control(action: suspend (io.github.xexanos.ratatoskr.network.api.RatatoskrClient) -> ApiResult<Session>) {
         viewModelScope.launch {
+            // Clear a stale error when the user starts a new action, so a later successful poll
+            // is not what makes the old message disappear.
+            _uiState.value = _uiState.value.copy(error = null)
             val client = connectionManager.client() ?: return@launch
             when (val result = action(client)) {
                 is ApiResult.Success -> applySession(result.data)
@@ -137,7 +150,6 @@ class NowPlayingViewModel(
     }
 
     private companion object {
-        const val POLL_INTERVAL_MS = 5_000L
         val ACTIVE_STATES = setOf(PlaybackState.PLAYING, PlaybackState.PAUSED, PlaybackState.BUFFERING)
     }
 }
@@ -148,6 +160,18 @@ fun NowPlayingScreen(
     onStopped: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    LaunchedEffect(lifecycleOwner) {
+        // Poll only while the screen is RESUMED; a backgrounded app stops hitting the server
+        // (and stops holding the session active).
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            while (isActive) {
+                viewModel.refresh()
+                delay(POLL_INTERVAL_MS)
+            }
+        }
+    }
 
     LaunchedEffect(state.stopped) {
         if (state.stopped) onStopped()
@@ -234,14 +258,26 @@ private fun androidx.compose.foundation.layout.ColumnScope.NowPlayingContent(
     // Push transport controls into the thumb zone (bottom third).
     Spacer(Modifier.weight(1f))
 
-    var sliderPosition by remember(session.positionSeconds) {
-        mutableFloatStateOf(session.positionSeconds.toFloat())
+    var dragging by remember { mutableStateOf(false) }
+    var sliderPosition by remember { mutableFloatStateOf(session.positionSeconds.toFloat()) }
+    // Keyed on the server position only (not `dragging`): follow the server while the user
+    // isn't dragging, but do NOT re-run the instant a drag is released — otherwise it would
+    // snap the thumb back to the last polled value before the seek round-trips. After release
+    // it resumes following on the next poll (by which time the seek has normally landed).
+    LaunchedEffect(session.positionSeconds) {
+        if (!dragging) sliderPosition = session.positionSeconds.toFloat()
     }
     val duration = session.durationSeconds.toFloat().coerceAtLeast(1f)
     Slider(
         value = sliderPosition.coerceIn(0f, duration),
-        onValueChange = { sliderPosition = it },
-        onValueChangeFinished = { onSeek(sliderPosition.toDouble()) },
+        onValueChange = {
+            dragging = true
+            sliderPosition = it
+        },
+        onValueChangeFinished = {
+            onSeek(sliderPosition.toDouble())
+            dragging = false
+        },
         valueRange = 0f..duration,
         colors = SliderDefaults.colors(),
         modifier = Modifier.fillMaxWidth(),

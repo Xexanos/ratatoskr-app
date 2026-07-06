@@ -34,6 +34,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -54,9 +55,13 @@ import io.github.xexanos.ratatoskr.network.domain.LibraryItemSummary
 import io.github.xexanos.ratatoskr.network.domain.Progress
 import io.github.xexanos.ratatoskr.ui.theme.RatatoskrTheme
 import io.github.xexanos.ratatoskr.ui.toMessage
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -66,6 +71,7 @@ data class LibraryUiState(
     val error: String? = null,
 )
 
+@OptIn(FlowPreview::class)
 class LibraryViewModel(
     private val connectionManager: ConnectionManager,
 ) : ViewModel() {
@@ -73,23 +79,39 @@ class LibraryViewModel(
     private val _uiState = MutableStateFlow(LibraryUiState())
     val uiState: StateFlow<LibraryUiState> = _uiState.asStateFlow()
 
-    init { load(null) }
+    private val query = MutableStateFlow<String?>(null)
 
-    fun search(query: String) = load(query.ifBlank { null })
-
-    private fun load(query: String?) {
-        _uiState.value = _uiState.value.copy(loading = true, error = null)
+    init {
+        // One search pipeline for the whole screen: the initial (null) load runs immediately,
+        // keystrokes are debounced, identical queries are ignored, and collectLatest cancels an
+        // in-flight request when a newer query arrives so results can't land out of order.
         viewModelScope.launch {
-            val client = connectionManager.client()
-            if (client == null) {
-                _uiState.value = LibraryUiState(error = "No server configured.")
-                return@launch
-            }
-            _uiState.value = when (val result = client.listLibraryItems(query = query)) {
-                is ApiResult.Success -> LibraryUiState(items = result.data.items)
-                is ApiResult.Failure -> LibraryUiState(error = result.error.toMessage())
-            }
+            query
+                .debounce { if (it == null) 0L else SEARCH_DEBOUNCE_MS }
+                .distinctUntilChanged()
+                .collectLatest { load(it) }
         }
+    }
+
+    fun search(query: String) {
+        this.query.value = query.ifBlank { null }
+    }
+
+    private suspend fun load(query: String?) {
+        _uiState.value = _uiState.value.copy(loading = true, error = null)
+        val client = connectionManager.client()
+        if (client == null) {
+            _uiState.value = LibraryUiState(error = "No server configured.")
+            return
+        }
+        _uiState.value = when (val result = client.listLibraryItems(query = query)) {
+            is ApiResult.Success -> LibraryUiState(items = result.data.items)
+            is ApiResult.Failure -> LibraryUiState(error = result.error.toMessage())
+        }
+    }
+
+    private companion object {
+        const val SEARCH_DEBOUNCE_MS = 300L
     }
 }
 
@@ -102,6 +124,13 @@ fun LibraryScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var query by rememberSaveable { mutableStateOf("") }
+
+    // On process-death restore the text field's saved query comes back, but the ViewModel's
+    // search flow restarts at null (full library). Re-issue the restored query so the results
+    // match what the search box shows.
+    LaunchedEffect(Unit) {
+        if (query.isNotBlank()) viewModel.search(query)
+    }
 
     LibraryContent(
         state = state,

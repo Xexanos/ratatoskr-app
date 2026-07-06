@@ -9,6 +9,8 @@ import io.github.xexanos.ratatoskr.network.api.RatatoskrClient
 import io.github.xexanos.ratatoskr.network.api.RatatoskrClientFactory
 import io.github.xexanos.ratatoskr.network.persist.ConnectionStore
 import io.github.xexanos.ratatoskr.network.persist.TokenStore
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -24,8 +26,18 @@ class ConnectionManager(
     // client must not refresh independently (SPEC section 5).
     private val sessionActive = AtomicBoolean(false)
 
-    private var cached: RatatoskrClient? = null
-    private var cachedKey: String? = null
+    // Guards client construction so concurrent callers (e.g. the poll loop and a screen right
+    // after sign-in) cannot each build a client. Two OkHttp stacks would each hold their own
+    // single-flight refresh lock and could refresh the same rotating token twice, invalidating
+    // the pair and signing the user out (SPEC section 5). @Volatile makes the fast-path read
+    // see the winner's write.
+    private val buildMutex = Mutex()
+
+    // The client and the key it was built for, held as one object so the lock-free fast path
+    // reads them in a single volatile load and can never observe a torn (client, key) pair.
+    private data class Cached(val key: String, val client: RatatoskrClient)
+
+    @Volatile private var cached: Cached? = null
 
     fun setSessionActive(active: Boolean) = sessionActive.set(active)
 
@@ -34,22 +46,26 @@ class ConnectionManager(
         val config = connectionStore.currentServerConfig() ?: return null
         val fingerprint = connectionStore.fingerprint() ?: return null
         val key = "${config.baseUrl}|$fingerprint"
-        val current = cached
-        if (current != null && cachedKey == key) return current
-        return RatatoskrClientFactory.create(
-            baseUrl = config.baseUrl,
-            fingerprint = fingerprint,
-            tokenStore = tokenStore,
-            sessionActive = { sessionActive.get() },
-        ).also {
-            cached = it
-            cachedKey = key
+        cached?.let { if (it.key == key) return it.client }
+        return buildMutex.withLock {
+            // Re-check inside the lock: another caller may have built it while we waited.
+            cached?.let { if (it.key == key) return@withLock it.client }
+            // A cached client for a different key is being replaced — release its HTTP stack.
+            cached?.client?.close()
+            RatatoskrClientFactory.create(
+                baseUrl = config.baseUrl,
+                fingerprint = fingerprint,
+                tokenStore = tokenStore,
+                sessionActive = { sessionActive.get() },
+            ).also {
+                cached = Cached(key, it)
+            }
         }
     }
 
-    /** Drop the cached client after the server or certificate changed. */
+    /** Drop the cached client after the server or certificate changed, releasing its HTTP stack. */
     fun invalidate() {
+        cached?.client?.close()
         cached = null
-        cachedKey = null
     }
 }

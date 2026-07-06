@@ -21,6 +21,7 @@ import io.github.xexanos.ratatoskr.network.generated.model.LoginRequest
 import io.github.xexanos.ratatoskr.network.generated.model.SeekRequest
 import io.github.xexanos.ratatoskr.network.generated.model.StartSessionRequest
 import io.github.xexanos.ratatoskr.network.generated.model.Error as GenError
+import io.github.xexanos.ratatoskr.network.generated.model.Session as GenSession
 import io.github.xexanos.ratatoskr.network.persist.TokenAccess
 import com.squareup.moshi.Moshi
 import retrofit2.Response
@@ -43,7 +44,15 @@ class RatatoskrClient internal constructor(
     private val playbackApi: PlaybackApi,
     private val tokenStore: TokenAccess,
     private val moshi: Moshi,
+    private val closeAction: () -> Unit = {},
 ) {
+
+    /**
+     * Releases the underlying OkHttp resources (dispatcher threads and pooled sockets). Call
+     * when this client is replaced — the owner does so on a server/certificate change — so the
+     * old HTTP stack does not linger until GC (SPEC section 13).
+     */
+    fun close() = closeAction()
 
     suspend fun login(username: String, password: String): ApiResult<AuthSession> {
         val result = execute { systemApi.login(LoginRequest(username, password)) }
@@ -72,7 +81,8 @@ class RatatoskrClient internal constructor(
         execute { libraryApi.getLibraryItem(itemId) }.map { it.toDomain() }
 
     suspend fun currentSession(): ApiResult<Session> =
-        execute(sessionEndpoint = true) { playbackApi.getCurrentSession() }.map { it.toDomain() }
+        execute(sessionEndpoint = true) { playbackApi.getCurrentSession() }
+            .adoptingRotatedTokens().map { it.toDomain() }
 
     /**
      * Starts playback. The stored refresh token is handed to the server so its sync loop can
@@ -83,21 +93,52 @@ class RatatoskrClient internal constructor(
         val refreshToken = tokenStore.refreshToken()
         return execute {
             playbackApi.startSession(StartSessionRequest(itemId, speakerId, refreshToken))
-        }.map { it.toDomain() }
+        }.adoptingRotatedTokens().map { it.toDomain() }
     }
 
+    /**
+     * Stops playback. The contract returns 204 normally, or 200 with a final [GenSession]
+     * carrying a still-pending rotated token pair (SPEC section 5); either counts as success.
+     * Any pair in a 200 body is adopted before the session ends, since the server discards its
+     * in-memory tokens on stop and cannot redeliver them.
+     */
     suspend fun stopSession(): ApiResult<Unit> =
-        executeUnit(sessionEndpoint = true) { playbackApi.stopSession() }
+        when (val result = executeNullable(sessionEndpoint = true) { playbackApi.stopSession() }) {
+            is ApiResult.Success -> {
+                result.data?.adoptRotatedTokens()
+                ApiResult.Success(Unit)
+            }
+            is ApiResult.Failure -> result
+        }
 
     suspend fun pause(): ApiResult<Session> =
-        execute(sessionEndpoint = true) { playbackApi.pauseSession() }.map { it.toDomain() }
+        execute(sessionEndpoint = true) { playbackApi.pauseSession() }
+            .adoptingRotatedTokens().map { it.toDomain() }
 
     suspend fun resume(): ApiResult<Session> =
-        execute(sessionEndpoint = true) { playbackApi.resumeSession() }.map { it.toDomain() }
+        execute(sessionEndpoint = true) { playbackApi.resumeSession() }
+            .adoptingRotatedTokens().map { it.toDomain() }
 
     suspend fun seek(positionSeconds: Double): ApiResult<Session> =
         execute(sessionEndpoint = true) { playbackApi.seekSession(SeekRequest(positionSeconds)) }
-            .map { it.toDomain() }
+            .adoptingRotatedTokens().map { it.toDomain() }
+
+    // --- token adoption -----------------------------------------------------------------
+
+    /**
+     * Adopts a rotated token pair carried on a successful [GenSession] response and passes the
+     * result through unchanged. This is how the app learns the tokens the server rotated during
+     * an active session, since it does not refresh on its own while a session is live
+     * (SPEC section 5).
+     */
+    private suspend fun ApiResult<GenSession>.adoptingRotatedTokens(): ApiResult<GenSession> {
+        (this as? ApiResult.Success)?.data?.adoptRotatedTokens()
+        return this
+    }
+
+    private suspend fun GenSession.adoptRotatedTokens() {
+        rotatedTokens?.let { tokenStore.updateTokens(it.accessToken, it.refreshToken) }
+    }
 
     // --- error handling -----------------------------------------------------------------
 
@@ -114,17 +155,28 @@ class RatatoskrClient internal constructor(
             ApiResult.Failure(mapHttpError(response.code(), response.errorBody()?.string(), sessionEndpoint))
         }
     } catch (t: Throwable) {
+        // Never swallow coroutine cancellation: rethrow so structured concurrency can unwind
+        // instead of the cancelled call writing a spurious error state.
+        if (t is kotlin.coroutines.cancellation.CancellationException) throw t
         ApiResult.Failure(mapThrowable(t))
     }
 
-    private suspend fun executeUnit(
+    /**
+     * Like [execute] but tolerates an empty body: a 204 (or any success with no body) becomes
+     * `Success(null)` rather than a failure. Used where the contract allows either a body or an
+     * empty success, e.g. stopSession returning 204 or 200-with-Session.
+     */
+    private suspend fun <T : Any> executeNullable(
         sessionEndpoint: Boolean = false,
-        call: suspend () -> Response<Unit>,
-    ): ApiResult<Unit> = try {
+        call: suspend () -> Response<T>,
+    ): ApiResult<T?> = try {
         val response = call()
-        if (response.isSuccessful) ApiResult.Success(Unit)
+        if (response.isSuccessful) ApiResult.Success(response.body())
         else ApiResult.Failure(mapHttpError(response.code(), response.errorBody()?.string(), sessionEndpoint))
     } catch (t: Throwable) {
+        // Never swallow coroutine cancellation: rethrow so structured concurrency can unwind
+        // instead of the cancelled call writing a spurious error state.
+        if (t is kotlin.coroutines.cancellation.CancellationException) throw t
         ApiResult.Failure(mapThrowable(t))
     }
 
