@@ -23,7 +23,7 @@ keystore.properties
 .DS_Store
 
 # Installed skills (third-party local tooling, not project code). Our own project
-# skills and agents ARE committed -- installed skills are re-excluded per entry below.
+# skills and agents ARE committed - installed skills are re-excluded per entry below.
 # skills-lock.json IS committed: it records the installed third-party skills (source +
 # content hash) so they stay reproducible without vendoring their files.
 .claude/skills/*
@@ -42,7 +42,7 @@ tools/logo/.fontcache/
 *.log
 
 # Generated API client (generated at build time from the OpenAPI contract; never
-# committed -- see SPEC section 4). AGP writes it under core-network/build
+# committed - see SPEC section 4). AGP writes it under core-network/build
 # (generate-resources/), already covered by the build/ rule above; listed explicitly
 # for clarity.
 core-network/build/generate-resources/
