@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.dp
 /**
  * Centered empty-state placeholder: a decorative icon above a title and supporting body.
  *
- * The icon is decorative (`contentDescription = null`), so it stays out of the semantics tree —
+ * The icon is decorative (`contentDescription = null`), so it stays out of the semantics tree -
  * TalkBack skips it and the title/body carry the meaning. Shared so every empty state keeps that
  * a11y idiom and the same layout in one place, instead of being copy-pasted (and drifting) per
  * screen.

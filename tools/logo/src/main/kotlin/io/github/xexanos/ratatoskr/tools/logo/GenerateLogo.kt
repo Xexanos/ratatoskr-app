@@ -20,6 +20,16 @@
  *                              wordmark outlines are read from the committed
  *                              ratatoskr-wordmark.svg, so the normal run stays
  *                              offline and deterministic.
+ *   ratatoskr-logo-dark.svg / ratatoskr-lockup-dark.svg
+ *                            - the same artwork generated for dark backgrounds: the frame
+ *                              swaps to FRAME_DARK and the mark is painted from the shifted
+ *                              copper ramp (see COPPER_RAMP / DARK_SHIFT).
+ *
+ * It also writes the framed logo into the app as vector drawables, so the in-app
+ * logo has the same single source as the SVGs:
+ *
+ *   app/src/main/res/drawable/ratatoskr_logo.xml       - light
+ *   app/src/main/res/drawable-night/ratatoskr_logo.xml - dark
  *
  * Run with: gradlew :tools:logo:run
  *
@@ -50,8 +60,26 @@ import kotlin.math.sin
 
 // --- parameters (identical to the Python tool) ----------------------------------------
 
-const val DARK = "#4F6B35"   // knot strand (E1 "Eschenlaub"; fallback E2 #3A5230)
-const val COPPER = "#A93B28" // squirrel body (Kupfer) - used for the spinner overlay
+const val FRAME_LIGHT = "#4F6B35"   // knot strand (E1 "Eschenlaub"; fallback E2 #3A5230)
+const val FRAME_DARK = "#8CAB64"    // knot strand on dark backgrounds
+
+// The mark's copper ramp, darkest (body) to lightest (tail tip). The artwork is generated
+// for both themes straight from this one ramp: each mark path in ratatoskr-mark.svg carries
+// a data-ramp index i, painted COPPER_RAMP[i] on light backgrounds and
+// COPPER_RAMP[i + DARK_SHIFT] on dark ones, so the tail keeps fading. Generating both from
+// the ramp means there is no light -> dark color map (and none of its source-is-also-target
+// aliasing) to keep in sync.
+val COPPER_RAMP = listOf(
+    "#A93B28", "#C56A4F", "#CF7B60", "#D98C71", "#E29D82",
+    "#EBAE93", "#F1BEA4", "#F5CDB5", "#F8DCC6",
+)
+const val DARK_SHIFT = 2   // steps toward the light end of the ramp on dark backgrounds
+
+// A theme is the frame color plus the ramp shift applied to the mark.
+data class Theme(val frame: String, val shift: Int)
+
+val LIGHT = Theme(FRAME_LIGHT, 0)
+val DARK = Theme(FRAME_DARK, DARK_SHIFT)
 
 const val R = 100.0          // ring radius
 const val A = 14.0           // wave amplitude
@@ -192,7 +220,7 @@ fun segmentIntersection(a: P, b: P, c: P, d: P): Pair<Double, Double>? {
     return if (t > 1e-9 && t < 1 - 1e-9 && u > 1e-9 && u < 1 - 1e-9) t to u else null
 }
 
-fun wovenKnotPath(): String {
+fun wovenKnotD(): String {
     val gf = GeometryFactory()
     val params = BufferParameters(8, BufferParameters.CAP_FLAT, BufferParameters.JOIN_MITRE, 6.0)
     fun buffer(pts: List<P>, dist: Double): Geometry =
@@ -226,64 +254,10 @@ fun wovenKnotPath(): String {
         return head + coords.drop(1).joinToString(" ") { "L%.2f,%.2f".format(Locale.ROOT, it.x, it.y) } + " Z"
     }
 
-    val d = polys.joinToString(" ") { pg ->
+    return polys.joinToString(" ") { pg ->
         (listOf(pg.exteriorRing) + (0 until pg.numInteriorRing).map { pg.getInteriorRingN(it) })
             .joinToString(" ") { ring(it.coordinates) }
     }
-    return "<path d=\"$d\" fill=\"$DARK\" fill-rule=\"evenodd\" stroke=\"none\"/>"
-}
-
-// --- spinner: the real knot as a static background + an animated squirrel overlay --------
-//
-// A self-contained loading indicator. The background is the SAME woven knot as the logo
-// frame (wovenKnotPath); nothing about it is recoloured or cut. On top, a copper "squirrel"
-// and a short comet trail run the strand's own centreline - the exact curve the ribbon is
-// buffered from (knotSegments), not an approximation. Animation is embedded via SMIL so the
-// file animates as a plain SVG in a browser; the Android app reimplements the same motion in
-// Compose because VectorDrawable does not support SMIL.
-
-/** The strand centreline as one continuous cubic-Bezier path (the ribbon's own spine). */
-fun centerlinePath(): String {
-    val f = { v: Double -> "%.2f".format(Locale.ROOT, v) }
-    val segs = knotSegments()
-    val sb = StringBuilder("M${f(segs.first().p0.x)},${f(segs.first().p0.y)} ")
-    for (c in segs) sb.append("C${f(c.c1.x)},${f(c.c1.y)} ${f(c.c2.x)},${f(c.c2.y)} ${f(c.p3.x)},${f(c.p3.y)} ")
-    return sb.append("Z").toString()
-}
-
-fun spinnerSvg(): String {
-    val dur = "2.4s"
-    val k = 6                 // comet layers; overlap fades bright head -> faint tail
-    val trail = 220           // trail length, in the route's normalised pathLength units (1000)
-    val route = centerlinePath()
-
-    // Comet: layered dashes on the centreline, all sharing the moving leading edge (the head).
-    // pathLength="1000" lets the dash maths ignore the true arc length; dashoffset shifts by a
-    // full period each loop, so it repeats seamlessly. calcMode="paced" on the dot below keeps
-    // the squirrel at that same head (both are linear in real arc length).
-    val layers = (1..k).joinToString("\n") { i ->
-        val len = trail * i / k
-        "  <use href=\"#ratatoskr-route\" stroke=\"$COPPER\" stroke-width=\"7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.30\" stroke-dasharray=\"$len ${1000 - len}\">\n" +
-            "    <animate attributeName=\"stroke-dashoffset\" dur=\"$dur\" repeatCount=\"indefinite\" calcMode=\"linear\" values=\"$len;${len - 1000}\"/>\n" +
-            "  </use>"
-    }
-    val runner =
-        "  <circle class=\"rat-runner\" r=\"12\" fill=\"$COPPER\" opacity=\"0.22\">\n" +
-            "    <animateMotion dur=\"$dur\" repeatCount=\"indefinite\" calcMode=\"paced\"><mpath href=\"#ratatoskr-route\"/></animateMotion>\n" +
-            "  </circle>\n" +
-            "  <circle class=\"rat-runner\" r=\"6.5\" fill=\"$COPPER\">\n" +
-            "    <animateMotion dur=\"$dur\" repeatCount=\"indefinite\" calcMode=\"paced\"><mpath href=\"#ratatoskr-route\"/></animateMotion>\n" +
-            "  </circle>"
-
-    return "  <style>\n" +
-        "    @media (prefers-reduced-motion: reduce) { .rat-spin { display: none; } }\n" +
-        "  </style>\n" +
-        "  " + wovenKnotPath() + "\n" +
-        "  <defs><path id=\"ratatoskr-route\" d=\"$route\" fill=\"none\" pathLength=\"1000\"/></defs>\n" +
-        "  <g class=\"rat-spin\">\n" +
-        layers + "\n" +
-        runner + "\n" +
-        "  </g>"
 }
 
 // --- wordmark: Norse Bold outlines, regenerated on demand ------------------------------
@@ -349,6 +323,75 @@ fun wordmarkPaths(font: File): String {
     return "<path fill-rule=\"evenodd\" d=\"${d.toString().trim()}\"/>"
 }
 
+// --- shared mark parsing --------------------------------------------------------------
+//
+// One parse of the mark into its paths, shared by the SVG composition (paintMarkSvg) and
+// the VectorDrawable emitter. Parsing once with a single set of assumptions keeps the two
+// outputs from drifting: a path the parser can't read - e.g. Inkscape rewrote <path/> as
+// <path></path>, or dropped the data-ramp index - fails here instead of silently vanishing
+// from one output while erroring in the other. Each path carries only its ramp index; its
+// color is chosen per theme from COPPER_RAMP (see rampColor).
+
+data class MarkPath(val raw: String, val ramp: Int, val evenOdd: Boolean, val d: String)
+
+fun parseMark(svg: String): List<MarkPath> =
+    Regex("<path\\b[^>]*>").findAll(svg).map { m ->
+        fun attr(name: String) = Regex("$name=\"([^\"]*)\"").find(m.value)?.groupValues?.get(1)
+        val ramp = (attr("data-ramp") ?: error("mark path has no data-ramp index: ${m.value}"))
+            .toIntOrNull() ?: error("mark path has a non-integer data-ramp: ${m.value}")
+        MarkPath(m.value, ramp, attr("fill-rule") == "evenodd", attr("d") ?: error("mark path has no d: ${m.value}"))
+    }.toList()
+
+// The ramp color for a path under a theme. An out-of-range index (data-ramp too large for
+// the shift, or negative) throws, so a mis-indexed source fails loudly rather than shipping
+// a wrong or unpainted mark.
+fun rampColor(path: MarkPath, theme: Theme): String = COPPER_RAMP[path.ramp + theme.shift]
+
+// Paint the parsed mark as an SVG fragment for a theme: each path is re-emitted with its
+// data-ramp index dropped and its placeholder fill replaced by the ramp color, leaving the
+// hand-authored geometry (and its exact formatting) untouched.
+fun paintMarkSvg(mark: List<MarkPath>, theme: Theme): String =
+    mark.joinToString("") { p ->
+        p.raw
+            .replace(" data-ramp=\"${p.ramp}\"", "")
+            .replace(Regex("fill=\"[^\"]*\""), "fill=\"${rampColor(p, theme)}\"")
+    }
+
+// --- Android vector drawable ------------------------------------------------------------
+//
+// The framed logo again, as a VectorDrawable for the app. Group nesting mirrors the SVG:
+// SVG "translate(t) scale(s)" equals a VectorDrawable group with scale s and translate t,
+// because a VectorDrawable group applies scale before translation.
+
+val DRAWABLE_HEADER = """
+    <!-- The framed Ratatoskr logo (docs/logo/ratatoskr-logo.svg) as a vector drawable.
+         GPL-3.0-or-later. Generated by tools/logo (gradlew :tools:logo:run); do not
+         edit by hand. -->
+""".trimIndent() + "\n"
+
+fun vectorDrawable(knotD: String, mark: List<MarkPath>, sc: Double, tx: Double, ty: Double, theme: Theme): String {
+    fun fmt(v: Double) = "%.1f".format(Locale.ROOT, v)
+    fun path(indent: String, fill: String, evenOdd: Boolean, d: String) =
+        "$indent<path android:fillColor=\"$fill\"" +
+            (if (evenOdd) " android:fillType=\"evenOdd\"" else "") +
+            " android:pathData=\"$d\"/>\n"
+
+    val markPaths = mark.joinToString("") { path("            ", rampColor(it, theme), it.evenOdd, it.d) }
+
+    return "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" + DRAWABLE_HEADER +
+        "<vector xmlns:android=\"http://schemas.android.com/apk/res/android\"\n" +
+        "    android:width=\"272dp\" android:height=\"272dp\"\n" +
+        "    android:viewportWidth=\"272\" android:viewportHeight=\"272\">\n" +
+        "    <group android:translateX=\"8\" android:translateY=\"8\">\n" +
+        path("        ", theme.frame, true, knotD) +
+        "        <group android:scaleX=\"$sc\" android:scaleY=\"$sc\" " +
+        "android:translateX=\"${fmt(tx)}\" android:translateY=\"${fmt(ty)}\">\n" +
+        markPaths +
+        "        </group>\n" +
+        "    </group>\n" +
+        "</vector>\n"
+}
+
 // --- output ---------------------------------------------------------------------------
 
 val HEADER = """
@@ -362,6 +405,51 @@ val WORDMARK_HEADER = """
          be committed to this repository. Regenerate via the regen-wordmark flag of
          the :tools:logo Gradle module (see GenerateLogo.kt). -->
 """.trimIndent() + "\n"
+
+// --- spinner: real woven knot (static) + a copper "squirrel" running the strand (SMIL) ----
+
+/** The strand centreline as one continuous cubic-Bezier path (the ribbon's own spine). */
+fun centerlinePath(): String {
+    val f = { v: Double -> "%.2f".format(Locale.ROOT, v) }
+    val segs = knotSegments()
+    val sb = StringBuilder("M${f(segs.first().p0.x)},${f(segs.first().p0.y)} ")
+    for (c in segs) sb.append("C${f(c.c1.x)},${f(c.c1.y)} ${f(c.c2.x)},${f(c.c2.y)} ${f(c.p3.x)},${f(c.p3.y)} ")
+    return sb.append("Z").toString()
+}
+
+/** Self-contained animated spinner: the real woven knot as a static background, with a copper
+ *  squirrel + comet trail running the strand centreline as an SMIL overlay (docs/ux-design.html).
+ *  VectorDrawable has no SMIL, so the app redraws this in Compose; the SVG is the reference. */
+fun spinnerSvg(): String {
+    val copper = COPPER_RAMP.first()
+    val dur = "2.4s"
+    val k = 6
+    val trail = 220
+    val route = centerlinePath()
+    val bg = "<path d=\"${wovenKnotD()}\" fill=\"$FRAME_LIGHT\" fill-rule=\"evenodd\" stroke=\"none\"/>"
+    val layers = (1..k).joinToString("\n") { i ->
+        val len = trail * i / k
+        "  <use href=\"#ratatoskr-route\" stroke=\"$copper\" stroke-width=\"7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.30\" stroke-dasharray=\"$len ${1000 - len}\">\n" +
+            "    <animate attributeName=\"stroke-dashoffset\" dur=\"$dur\" repeatCount=\"indefinite\" calcMode=\"linear\" values=\"$len;${len - 1000}\"/>\n" +
+            "  </use>"
+    }
+    val runner =
+        "  <circle class=\"rat-runner\" r=\"12\" fill=\"$copper\" opacity=\"0.22\">\n" +
+            "    <animateMotion dur=\"$dur\" repeatCount=\"indefinite\" calcMode=\"paced\"><mpath href=\"#ratatoskr-route\"/></animateMotion>\n" +
+            "  </circle>\n" +
+            "  <circle class=\"rat-runner\" r=\"6.5\" fill=\"$copper\">\n" +
+            "    <animateMotion dur=\"$dur\" repeatCount=\"indefinite\" calcMode=\"paced\"><mpath href=\"#ratatoskr-route\"/></animateMotion>\n" +
+            "  </circle>"
+    return "  <style>\n" +
+        "    @media (prefers-reduced-motion: reduce) { .rat-spin { display: none; } }\n" +
+        "  </style>\n" +
+        "  $bg\n" +
+        "  <defs><path id=\"ratatoskr-route\" d=\"$route\" fill=\"none\" pathLength=\"1000\"/></defs>\n" +
+        "  <g class=\"rat-spin\">\n" +
+        layers + "\n" +
+        runner + "\n" +
+        "  </g>"
+}
 
 fun main(args: Array<String>) {
     var dir = File(System.getProperty("user.dir"))
@@ -381,27 +469,37 @@ fun main(args: Array<String>) {
         write("ratatoskr-wordmark.svg", wordmarkPaths(cachedFont(toolDir)), "0 -45 200 55", WORDMARK_HEADER)
     }
 
-    val woven = wovenKnotPath()
-    val markOf = { file: String ->
-        Regex("<path[^>]*/>").findAll(File(out, file).readText()).joinToString("") { it.value }
-    }
-    val mark = markOf("ratatoskr-mark.svg")
-    val wordmark = markOf("ratatoskr-wordmark.svg")
+    val knotD = wovenKnotD()
+    val markPaths = parseMark(File(out, "ratatoskr-mark.svg").readText())
+    // The wordmark's paths inherit their fill from the enclosing <g fill=...>, so they carry
+    // no per-path fill and are only ever embedded verbatim (never turned into a drawable).
+    val wordmark = Regex("<path[^>]*/>").findAll(File(out, "ratatoskr-wordmark.svg").readText())
+        .joinToString("") { it.value }
 
     val sc = 0.55
     val tx = 128 - sc * 128
     val ty = 128 - sc * 130
-    val markGroup = "<g transform=\"translate(%.1f,%.1f) scale(%s)\">%s</g>"
-        .format(Locale.ROOT, tx, ty, sc.toString(), mark)
 
-    write("ratatoskr-knot-woven.svg", woven, "-8 -8 272 272")
-    write("ratatoskr-logo.svg", woven + markGroup, "-8 -8 272 272")
+    // The framed logo and the wordmark lockup, generated per theme straight from the ramp.
+    fun woven(theme: Theme) = "<path d=\"$knotD\" fill=\"${theme.frame}\" fill-rule=\"evenodd\" stroke=\"none\"/>"
+    fun logo(theme: Theme) = woven(theme) +
+        "<g transform=\"translate(%.1f,%.1f) scale(%s)\">%s</g>"
+            .format(Locale.ROOT, tx, ty, sc.toString(), paintMarkSvg(markPaths, theme))
+    fun lockup(theme: Theme) = "<g transform=\"translate(8,8)\">${logo(theme)}</g>" +
+        "<g fill=\"${theme.frame}\" transform=\"translate(36,330)\">$wordmark</g>"
+
+    write("ratatoskr-knot-woven.svg", woven(LIGHT), "-8 -8 272 272")
+    write("ratatoskr-logo.svg", logo(LIGHT), "-8 -8 272 272")
     write("ratatoskr-spinner.svg", spinnerSvg(), "-8 -8 272 272")
-    write(
-        "ratatoskr-lockup.svg",
-        "<g transform=\"translate(8,8)\">$woven$markGroup</g>" +
-            "<g fill=\"$DARK\" transform=\"translate(36,330)\">$wordmark</g>",
-        "0 0 272 350",
-        HEADER + WORDMARK_HEADER,
-    )
+    write("ratatoskr-logo-dark.svg", logo(DARK), "-8 -8 272 272")
+    write("ratatoskr-lockup.svg", lockup(LIGHT), "0 0 272 350", HEADER + WORDMARK_HEADER)
+    write("ratatoskr-lockup-dark.svg", lockup(DARK), "0 0 272 350", HEADER + WORDMARK_HEADER)
+
+    for ((qualifier, theme) in listOf("drawable" to LIGHT, "drawable-night" to DARK)) {
+        val xml = vectorDrawable(knotD, markPaths, sc, tx, ty, theme)
+        val file = File(dir, "app/src/main/res/$qualifier/ratatoskr_logo.xml")
+        file.parentFile.mkdirs()
+        file.writeText(xml)
+        println("$qualifier/ratatoskr_logo.xml ${xml.length}")
+    }
 }

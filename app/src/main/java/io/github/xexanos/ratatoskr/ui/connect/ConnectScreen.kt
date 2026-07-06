@@ -162,12 +162,29 @@ private fun ConnectContent(
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(32.dp))
+        // readOnly, not disabled: while inspecting/confirming the certificate the URL
+        // must stay legible (disabled text is 38% alpha and fails contrast checks),
+        // it just must not change under the certificate being confirmed.
+        val urlLocked = !(state is ConnectUiState.Idle || state is ConnectUiState.Error)
         OutlinedTextField(
             value = url,
             onValueChange = { url = it },
             label = { Text(stringResource(R.string.connect_server_url_label)) },
             singleLine = true,
-            enabled = state is ConnectUiState.Idle || state is ConnectUiState.Error,
+            readOnly = urlLocked,
+            // A plain readOnly field still looks editable; the lock icon signals the URL is
+            // held fixed to the certificate being confirmed (the same lock the card uses).
+            trailingIcon = if (urlLocked) {
+                {
+                    Icon(
+                        Icons.Default.Lock,
+                        contentDescription = stringResource(R.string.connect_url_locked_desc),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            } else {
+                null
+            },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
             shape = MaterialTheme.shapes.large,
             modifier = Modifier.fillMaxWidth(),
@@ -318,18 +335,18 @@ private val previewCert = CertificateInfo(
 
 @Preview(name = "Connect - idle", widthDp = 360, heightDp = 800)
 @Composable
-private fun ConnectIdlePreview() = RatatoskrTheme {
+internal fun ConnectIdlePreview() = RatatoskrTheme {
     Surface { ConnectContent(ConnectUiState.Idle, {}, { _, _ -> }, {}) }
 }
 
 @Preview(name = "Connect - confirm certificate", widthDp = 360, heightDp = 800)
 @Composable
-private fun ConnectConfirmPreview() = RatatoskrTheme {
+internal fun ConnectConfirmPreview() = RatatoskrTheme {
     Surface { ConnectContent(ConnectUiState.Confirm("https://ratatoskr.home:8080", previewCert), {}, { _, _ -> }, {}) }
 }
 
 @Preview(name = "Connect - error", widthDp = 360, heightDp = 800)
 @Composable
-private fun ConnectErrorPreview() = RatatoskrTheme {
+internal fun ConnectErrorPreview() = RatatoskrTheme {
     Surface { ConnectContent(ConnectUiState.Error("Could not read the server certificate."), {}, { _, _ -> }, {}) }
 }

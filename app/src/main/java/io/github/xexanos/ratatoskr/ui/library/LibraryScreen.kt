@@ -36,6 +36,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -128,6 +129,13 @@ fun LibraryScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var query by rememberSaveable { mutableStateOf("") }
+
+    // On process-death restore the text field's saved query comes back, but the ViewModel's
+    // search flow restarts at null (full library). Re-issue the restored query so the results
+    // match what the search box shows.
+    LaunchedEffect(Unit) {
+        if (query.isNotBlank()) viewModel.search(query)
+    }
 
     LibraryContent(
         state = state,
@@ -340,7 +348,7 @@ private val previewItems = listOf(
 
 @Preview(name = "Library - loaded", widthDp = 360, heightDp = 800)
 @Composable
-private fun LibraryLoadedPreview() = RatatoskrTheme {
+internal fun LibraryLoadedPreview() = RatatoskrTheme {
     Surface {
         LibraryContent(
             state = LibraryUiState(items = previewItems),
@@ -355,7 +363,7 @@ private fun LibraryLoadedPreview() = RatatoskrTheme {
 
 @Preview(name = "Library - empty", widthDp = 360, heightDp = 800)
 @Composable
-private fun LibraryEmptyPreview() = RatatoskrTheme {
+internal fun LibraryEmptyPreview() = RatatoskrTheme {
     Surface {
         LibraryContent(
             state = LibraryUiState(items = emptyList()),
@@ -370,7 +378,7 @@ private fun LibraryEmptyPreview() = RatatoskrTheme {
 
 @Preview(name = "Library - loading", widthDp = 360, heightDp = 800)
 @Composable
-private fun LibraryLoadingPreview() = RatatoskrTheme {
+internal fun LibraryLoadingPreview() = RatatoskrTheme {
     Surface {
         LibraryContent(
             state = LibraryUiState(loading = true),
