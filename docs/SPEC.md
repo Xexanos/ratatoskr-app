@@ -188,13 +188,44 @@ screen exposes the server URL, a re-trust/forget action for the certificate, and
 
 ## 9. Testing
 
+Tests run on the JVM so CI needs no device or emulator (see the CI workflow); they live in
+`testDebugUnitTest`.
+
+**Component / unit tests** (in place):
+
 - Unit-test the auth/token logic: attaching the bearer token, the refresh-on-401 flow, the
   single-flight refresh guard, and secure storage read/write (with the platform pieces
   faked).
 - Unit-test the mapping between generated contract types and the domain/UI models, including
   tolerance to unknown fields.
-- A small number of UI tests for the critical flows (connect and trust, sign in, start
-  playback, the now-playing controls) are welcome but not the priority for v1.
+
+**Integration tests** (next task, before further feature work): exercise the network layer
+*as it is actually assembled*, not hand-wired in the test. This is the priority gap: a unit
+test that constructs `RatatoskrClient` directly can pass while the real wiring is broken —
+the unknown-enum fallback Moshi was attached to the client but not to the Retrofit converter
+that `RatatoskrClientFactory` built, so it never ran on real responses, yet the unit test
+(which wired its own Moshi) stayed green. Integration tests close that gap by driving
+requests through `RatatoskrClientFactory.create(...)` (and, where practical,
+`ConnectionManager`) against an in-process `MockWebServer` served over HTTPS with a
+self-signed certificate, so the real deserialization, auth, and trust paths are covered.
+At least:
+
+- response deserialization through the factory's own Moshi — the unknown-`PlaybackState`
+  fallback and unknown-field tolerance actually taking effect on a real response body;
+- the TLS pin (section 6): a matching fingerprint connects, a changed one is rejected, and
+  the platform-first path behaves as specified;
+- bearer-token attachment and the 401 → refresh → retry flow, including single-flight under
+  concurrent 401s;
+- session-token rotation adopted end-to-end from a `Session`, and the `stopSession`
+  200-with-body vs 204 paths (section 5);
+- error mapping (401 / 404 / 502 / TLS failure) to the right `RatatoskrError`.
+
+These stay JVM-only (`MockWebServer` plus OkHttp's TLS test-certificate helpers), so they
+run in the same CI step as the unit tests. Setting up this harness — a reusable
+`MockWebServer`-over-HTTPS fixture and the first end-to-end cases — is the next work item.
+
+**UI tests**: a small number for the critical flows (connect and trust, sign in, start
+playback, the now-playing controls) are welcome but not the priority for v1.
 
 ## 10. Definition of done for v1
 
