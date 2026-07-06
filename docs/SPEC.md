@@ -137,7 +137,8 @@ certificate cannot be pinned at build time.
 - The user enters the server's URL (host and port). There is no discovery in v1.
 - Establish trust on first connection: fetch the server certificate, show its fingerprint,
   and ask the user to confirm it (trust-on-first-use). Persist the confirmed fingerprint
-  and pin it for all later connections; warn loudly if it ever changes.
+  and pin it for all later connections; warn loudly if it ever changes (with the scope
+  caveat below).
 - Decided mechanics: the connect screen fetches the certificate chain with a short-lived
   OkHttp client whose trust manager accepts anything but is used ONLY to read the chain —
   never for real requests. It shows the leaf certificate's SHA-256 fingerprint plus
@@ -148,6 +149,17 @@ certificate cannot be pinned at build time.
   fingerprint against the stored pin. Matching neither is a hard failure with a loud
   "certificate changed" warning and an explicit re-trust flow (settings → forget
   certificate).
+- Scope of the change guarantee (deliberate trade-off): the "warn loudly if it changes"
+  guarantee applies to the self-signed / local-CA deployment, which is the primary one and
+  where the platform chain fails so the stored pin is always the deciding factor. When the
+  server instead presents a **publicly trusted** certificate (e.g. TLS terminated at a
+  reverse proxy), the platform chain validates and the pin is not consulted — so a different
+  but validly issued certificate for the same host is accepted without re-confirmation. That
+  is an accepted consequence of putting platform validation first: in that deployment trust
+  is delegated to the public CA, and requiring the pin to match as well would reject every
+  routine certificate renewal (e.g. Let's Encrypt's ~90-day rotation) and force a manual
+  re-trust each time. Strict leaf-pinning against publicly trusted certificates was
+  considered and rejected on those grounds.
 - This runtime, user-confirmed pinning is implemented with the platform TLS stack and
   OkHttp only, so it survives a reproducible F-Droid build. A build-time
   network-security-config pin cannot express a per-user certificate and must not be relied
