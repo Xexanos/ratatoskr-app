@@ -44,9 +44,9 @@ if [ -n "$hits" ]; then
 else echo "  ok"; fi
 
 echo "== 5. Emoji used as UI glyphs (use Material icons) [$( [ "$STRICT_EMOJI" = 1 ] && echo FATAL || echo advisory )] =="
-# Range-based all-emoji detection via scripts/lint_emoji.py (see there for the Unicode blocks
-# and the explicit allowlist). Catches every emoji/pictograph — not a rot-prone denylist — and
-# is locale-independent. Skips gracefully if no Python interpreter is available.
+# All-emoji detection via scripts/lint_emoji.py: everything from U+2190 up is rejected except
+# an explicit allowlist (see there). A single threshold, so there are no gaps as new emoji are
+# added — not a rot-prone denylist — and it is locale-independent. Skips gracefully without Python.
 PY="$(command -v python3 || command -v python || true)"
 emoji_hits="$([ -n "$PY" ] && "$PY" scripts/lint_emoji.py "$UI" || true)"
 if [ -n "$emoji_hits" ]; then
