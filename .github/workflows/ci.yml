@@ -1,13 +1,26 @@
 name: CI
 
-# Builds the app and runs the unit tests on every push to the mainline branches
-# and on every pull request, so a change can't merge without compiling and passing
-# tests. Free-software toolchain only (SPEC section 8): official GitHub-hosted runner,
-# Temurin JDK, Gradle wrapper — no proprietary SDKs.
+# Builds the app and runs the unit tests on pushes to the mainline branches and on
+# every pull request, so a change can't merge without compiling and passing tests.
+# Free-software toolchain only (SPEC section 8): official GitHub-hosted runner, Temurin
+# JDK, Gradle wrapper — no proprietary SDKs.
+#
+# paths-ignore is a denylist, not an allowlist: the run is skipped only when *every*
+# changed file is docs/metadata that can't affect the build or tests. Anything else —
+# including any new or unlisted path — still triggers CI, so this can never silently
+# skip a real code change. (Note: if CI is later made a required check with branch
+# protection, a docs-only PR would show no CI run; use a companion always-pass job then.)
 on:
   push:
     branches: [main, scaffolding]
+    paths-ignore: &docs-only
+      - '**/*.md'
+      - 'docs/**'
+      - 'fastlane/**'
+      - '.gitignore'
+      - 'LICENSE'
   pull_request:
+    paths-ignore: *docs-only
 
 permissions:
   contents: read
