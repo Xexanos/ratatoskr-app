@@ -296,7 +296,7 @@ private fun CoverArt(title: String) {
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         Surface(
             modifier = Modifier.size(260.dp),
-            shape = RoundedCornerShape(28.dp),
+            shape = MaterialTheme.shapes.extraLarge,
             color = MaterialTheme.colorScheme.secondaryContainer,
             shadowElevation = 8.dp,
             tonalElevation = 2.dp,
