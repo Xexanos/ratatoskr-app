@@ -32,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -41,6 +42,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.xexanos.ratatoskr.R
 import io.github.xexanos.ratatoskr.data.ConnectionManager
 import io.github.xexanos.ratatoskr.network.domain.ApiResult
 import io.github.xexanos.ratatoskr.network.domain.LibraryItemSummary
@@ -159,7 +161,7 @@ fun NowPlayingScreen(
             .padding(horizontal = 24.dp, vertical = 16.dp),
     ) {
         Text(
-            text = "NOW PLAYING",
+            text = stringResource(R.string.nowplaying_header),
             style = MaterialTheme.typography.labelMedium,
             letterSpacing = 2.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -176,7 +178,7 @@ fun NowPlayingScreen(
             session == null ->
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
-                        state.error ?: "Nothing is playing right now.",
+                        state.error ?: stringResource(R.string.nowplaying_nothing_playing),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
@@ -315,13 +317,13 @@ private fun CoverArt(title: String) {
 
 @Composable
 private fun StateChip(state: PlaybackState) {
-    val (label, dot) = when (state) {
-        PlaybackState.PLAYING -> "Playing" to MaterialTheme.colorScheme.primary
-        PlaybackState.PAUSED -> "Paused" to MaterialTheme.colorScheme.onSurfaceVariant
-        PlaybackState.BUFFERING -> "Buffering" to MaterialTheme.colorScheme.onSurfaceVariant
-        PlaybackState.FINISHED -> "Finished" to MaterialTheme.colorScheme.primary
-        PlaybackState.STOPPED -> "Stopped" to MaterialTheme.colorScheme.onSurfaceVariant
-        PlaybackState.UNKNOWN -> "—" to MaterialTheme.colorScheme.onSurfaceVariant
+    val (labelRes, dot) = when (state) {
+        PlaybackState.PLAYING -> R.string.nowplaying_state_playing to MaterialTheme.colorScheme.primary
+        PlaybackState.PAUSED -> R.string.nowplaying_state_paused to MaterialTheme.colorScheme.onSurfaceVariant
+        PlaybackState.BUFFERING -> R.string.nowplaying_state_buffering to MaterialTheme.colorScheme.onSurfaceVariant
+        PlaybackState.FINISHED -> R.string.nowplaying_state_finished to MaterialTheme.colorScheme.primary
+        PlaybackState.STOPPED -> R.string.nowplaying_state_stopped to MaterialTheme.colorScheme.onSurfaceVariant
+        PlaybackState.UNKNOWN -> R.string.nowplaying_state_unknown to MaterialTheme.colorScheme.onSurfaceVariant
     }
     Surface(
         shape = RoundedCornerShape(50),
@@ -334,7 +336,7 @@ private fun StateChip(state: PlaybackState) {
         ) {
             Box(Modifier.size(8.dp).background(dot, CircleShape))
             Text(
-                label,
+                stringResource(labelRes),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -413,7 +415,7 @@ private fun NowPlayingPreviewScaffold(
         Surface {
             Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp)) {
                 Text(
-                    text = "NOW PLAYING",
+                    text = stringResource(R.string.nowplaying_header),
                     style = MaterialTheme.typography.labelMedium,
                     letterSpacing = 2.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -425,7 +427,7 @@ private fun NowPlayingPreviewScaffold(
                     }
                     session == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
-                            error ?: "Nothing is playing right now.",
+                            error ?: stringResource(R.string.nowplaying_nothing_playing),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,

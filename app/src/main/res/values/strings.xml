@@ -1,3 +1,54 @@
 <resources>
     <string name="app_name">Ratatoskr</string>
+
+    <!-- Connect -->
+    <string name="connect_title">Connect to your Ratatoskr server</string>
+    <string name="connect_server_url_label">Server URL</string>
+    <string name="connect_action_connect">Connect</string>
+    <string name="connect_confirm_title">Confirm this certificate</string>
+    <string name="connect_cert_subject">Subject: %1$s</string>
+    <string name="connect_cert_issuer">Issuer: %1$s</string>
+    <string name="connect_cert_valid_until">Valid until: %1$s</string>
+    <string name="connect_cert_fingerprint_label">SHA-256 fingerprint:</string>
+    <string name="connect_action_trust">Trust and continue</string>
+    <string name="connect_action_retry">Try again</string>
+
+    <!-- Sign in -->
+    <string name="signin_title">Sign in</string>
+    <string name="signin_subtitle">Use your Audiobookshelf username and password.</string>
+    <string name="signin_username_label">Username</string>
+    <string name="signin_password_label">Password</string>
+    <string name="signin_action">Sign in</string>
+
+    <!-- Library -->
+    <string name="library_now_playing">Now playing</string>
+    <string name="library_settings">Settings</string>
+    <string name="library_search_label">Search library</string>
+    <string name="library_empty">Your library is empty.</string>
+    <string name="library_no_results">No audiobooks match “%1$s”.</string>
+    <string name="library_finished">Finished</string>
+    <string name="library_percent_listened">%1$d%% listened</string>
+
+    <!-- Speakers -->
+    <string name="speakers_title">Choose a speaker</string>
+    <string name="speakers_empty">No speakers found on the network.</string>
+    <string name="speakers_group">Group: %1$s</string>
+    <string name="speakers_kind_speaker">Speaker</string>
+
+    <!-- Now playing -->
+    <string name="nowplaying_header">NOW PLAYING</string>
+    <string name="nowplaying_nothing_playing">Nothing is playing right now.</string>
+    <string name="nowplaying_state_playing">Playing</string>
+    <string name="nowplaying_state_paused">Paused</string>
+    <string name="nowplaying_state_buffering">Buffering</string>
+    <string name="nowplaying_state_finished">Finished</string>
+    <string name="nowplaying_state_stopped">Stopped</string>
+    <string name="nowplaying_state_unknown">—</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_server_label">Server</string>
+    <string name="settings_not_configured">Not configured</string>
+    <string name="settings_forget_cert">Forget certificate and re-trust</string>
+    <string name="settings_sign_out">Sign out</string>
 </resources>

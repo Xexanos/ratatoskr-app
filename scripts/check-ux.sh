@@ -5,13 +5,13 @@
 # they catch drift that never needs a human eye. Run locally with `bash scripts/check-ux.sh`;
 # CI runs it on every push/PR.
 #
-# Checks 1–3 are fatal. Check 4 (hardcoded strings) is gated behind STRICT_STRINGS so it can
-# be switched on the moment all copy lives in strings.xml (Phase 2). Default is now on.
+# All four checks are fatal. STRICT_STRINGS stays configurable only so a work-in-progress
+# branch can temporarily downgrade check 4 with STRICT_STRINGS=0; it defaults to on.
 #
 set -uo pipefail
 
 UI="app/src/main/java/io/github/xexanos/ratatoskr/ui"
-STRICT_STRINGS="${STRICT_STRINGS:-0}"
+STRICT_STRINGS="${STRICT_STRINGS:-1}"
 fail=0
 
 echo "== 1. Hardcoded colors outside theme/ (use MaterialTheme.colorScheme) =="
