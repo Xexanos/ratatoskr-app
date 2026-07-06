@@ -31,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -107,7 +108,10 @@ private fun SignInContent(
     onSignIn: (String, String) -> Unit,
 ) {
     var username by rememberSaveable { mutableStateOf("") }
-    var password by rememberSaveable { mutableStateOf("") }
+    // Plain remember, not rememberSaveable: the password must not be written to the
+    // saved-instance-state Bundle (persisted to disk on process death). Losing it across
+    // process death is the right trade-off for a credential.
+    var password by remember { mutableStateOf("") }
 
     Column(
         modifier = Modifier
