@@ -24,7 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import io.github.xexanos.ratatoskr.di.AppContainer
 import io.github.xexanos.ratatoskr.ui.navigation.RatatoskrNavHost
-import io.github.xexanos.ratatoskr.ui.navigation.Routes
+import io.github.xexanos.ratatoskr.ui.navigation.Route
 import io.github.xexanos.ratatoskr.ui.theme.RatatoskrTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -42,7 +42,7 @@ class MainActivity : ComponentActivity() {
                     Surface(modifier = Modifier.padding(innerPadding)) {
                         // Resolve the start route off the main thread (see decideStartDestination),
                         // showing a brief loader instead of blocking onCreate.
-                        var startDestination by remember { mutableStateOf<String?>(null) }
+                        var startDestination by remember { mutableStateOf<Route?>(null) }
                         LaunchedEffect(Unit) {
                             startDestination = decideStartDestination(container)
                         }
@@ -64,14 +64,14 @@ class MainActivity : ComponentActivity() {
      * reads and the Keystore-backed decrypt in authSession() are blocking, so resolving this
      * inside onCreate would risk dropped launch frames or an ANR.
      */
-    private suspend fun decideStartDestination(container: AppContainer): String =
+    private suspend fun decideStartDestination(container: AppContainer): Route =
         withContext(Dispatchers.IO) {
             val hasTrustedServer = container.connectionStore.currentServerConfig() != null &&
                 container.connectionStore.fingerprint() != null
             when {
-                !hasTrustedServer -> Routes.CONNECT
-                container.tokenStore.authSession() == null -> Routes.SIGN_IN
-                else -> Routes.LIBRARY
+                !hasTrustedServer -> Route.Connect
+                container.tokenStore.authSession() == null -> Route.SignIn
+                else -> Route.Library
             }
         }
 }

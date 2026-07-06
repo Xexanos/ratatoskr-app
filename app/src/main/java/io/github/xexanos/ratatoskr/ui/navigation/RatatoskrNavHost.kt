@@ -10,11 +10,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navArgument
+import androidx.navigation.toRoute
 import io.github.xexanos.ratatoskr.di.AppContainer
 import io.github.xexanos.ratatoskr.ui.auth.SignInScreen
 import io.github.xexanos.ratatoskr.ui.auth.SignInViewModel
@@ -28,18 +27,20 @@ import io.github.xexanos.ratatoskr.ui.settings.SettingsScreen
 import io.github.xexanos.ratatoskr.ui.settings.SettingsViewModel
 import io.github.xexanos.ratatoskr.ui.speakers.SpeakersScreen
 import io.github.xexanos.ratatoskr.ui.speakers.SpeakersViewModel
+import kotlinx.serialization.Serializable
 
-/** The single-activity navigation graph (SPEC section 13). */
-object Routes {
-    const val CONNECT = "connect"
-    const val SIGN_IN = "signin"
-    const val LIBRARY = "library"
-    const val SPEAKERS = "speakers"
-    const val NOW_PLAYING = "nowplaying"
-    const val SETTINGS = "settings"
-    const val ITEM_ID_ARG = "itemId"
-
-    fun speakers(itemId: String) = "$SPEAKERS/$itemId"
+/**
+ * The single-activity navigation graph as a sealed, type-safe route set (SPEC section 13).
+ * Destinations and their arguments are Kotlin types, so an argument like [Speakers.itemId] is
+ * carried by the type system rather than a stringly-typed key that could silently be missing.
+ */
+sealed interface Route {
+    @Serializable data object Connect : Route
+    @Serializable data object SignIn : Route
+    @Serializable data object Library : Route
+    @Serializable data class Speakers(val itemId: String) : Route
+    @Serializable data object NowPlaying : Route
+    @Serializable data object Settings : Route
 }
 
 /** Builds a ViewModel from the manual container (SPEC section 12) without a DI framework. */
@@ -47,11 +48,11 @@ private inline fun <reified VM : ViewModel> containerFactory(crossinline create:
     viewModelFactory { initializer { create() } }
 
 @Composable
-fun RatatoskrNavHost(container: AppContainer, startDestination: String) {
+fun RatatoskrNavHost(container: AppContainer, startDestination: Route) {
     val navController = rememberNavController()
 
     NavHost(navController = navController, startDestination = startDestination) {
-        composable(Routes.CONNECT) {
+        composable<Route.Connect> {
             val vm = viewModel<ConnectViewModel>(
                 factory = containerFactory {
                     ConnectViewModel(
@@ -62,70 +63,67 @@ fun RatatoskrNavHost(container: AppContainer, startDestination: String) {
                 },
             )
             ConnectScreen(vm) {
-                navController.navigate(Routes.SIGN_IN) {
-                    popUpTo(Routes.CONNECT) { inclusive = true }
+                navController.navigate(Route.SignIn) {
+                    popUpTo(Route.Connect) { inclusive = true }
                 }
             }
         }
 
-        composable(Routes.SIGN_IN) {
+        composable<Route.SignIn> {
             val vm = viewModel<SignInViewModel>(
                 factory = containerFactory { SignInViewModel(container.connectionManager) },
             )
             SignInScreen(vm) {
-                navController.navigate(Routes.LIBRARY) {
-                    popUpTo(Routes.SIGN_IN) { inclusive = true }
+                navController.navigate(Route.Library) {
+                    popUpTo(Route.SignIn) { inclusive = true }
                 }
             }
         }
 
-        composable(Routes.LIBRARY) {
+        composable<Route.Library> {
             val vm = viewModel<LibraryViewModel>(
                 factory = containerFactory { LibraryViewModel(container.connectionManager) },
             )
             LibraryScreen(
                 viewModel = vm,
-                onOpenItem = { itemId -> navController.navigate(Routes.speakers(itemId)) },
-                onOpenNowPlaying = { navController.navigate(Routes.NOW_PLAYING) },
-                onOpenSettings = { navController.navigate(Routes.SETTINGS) },
+                onOpenItem = { itemId -> navController.navigate(Route.Speakers(itemId)) },
+                onOpenNowPlaying = { navController.navigate(Route.NowPlaying) },
+                onOpenSettings = { navController.navigate(Route.Settings) },
             )
         }
 
-        composable(
-            route = "${Routes.SPEAKERS}/{${Routes.ITEM_ID_ARG}}",
-            arguments = listOf(navArgument(Routes.ITEM_ID_ARG) { type = NavType.StringType }),
-        ) { backStackEntry ->
-            val itemId = backStackEntry.arguments?.getString(Routes.ITEM_ID_ARG).orEmpty()
+        composable<Route.Speakers> { backStackEntry ->
+            val itemId = backStackEntry.toRoute<Route.Speakers>().itemId
             val vm = viewModel<SpeakersViewModel>(
                 factory = containerFactory { SpeakersViewModel(container.connectionManager, itemId) },
             )
             SpeakersScreen(vm) {
-                navController.navigate(Routes.NOW_PLAYING) {
-                    popUpTo(Routes.LIBRARY)
+                navController.navigate(Route.NowPlaying) {
+                    popUpTo(Route.Library)
                 }
             }
         }
 
-        composable(Routes.NOW_PLAYING) {
+        composable<Route.NowPlaying> {
             val vm = viewModel<NowPlayingViewModel>(
                 factory = containerFactory { NowPlayingViewModel(container.connectionManager) },
             )
             NowPlayingScreen(vm) {
-                navController.popBackStack(Routes.LIBRARY, inclusive = false)
+                navController.popBackStack(Route.Library, inclusive = false)
             }
         }
 
-        composable(Routes.SETTINGS) {
+        composable<Route.Settings> {
             val vm = viewModel<SettingsViewModel>(
                 factory = containerFactory { SettingsViewModel(container.connectionManager) },
             )
             SettingsScreen(
                 viewModel = vm,
                 onReTrust = {
-                    navController.navigate(Routes.CONNECT) { popUpTo(0) }
+                    navController.navigate(Route.Connect) { popUpTo(0) }
                 },
                 onSignedOut = {
-                    navController.navigate(Routes.SIGN_IN) { popUpTo(0) }
+                    navController.navigate(Route.SignIn) { popUpTo(0) }
                 },
             )
         }

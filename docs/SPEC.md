@@ -264,16 +264,21 @@ ratatoskr-app/
     ├── generated/           #   openapi-generator output — NEVER hand-edited
     ├── api/                 #   thin wrapper over the generated client: maps generated
     │                        #   DTOs to domain models, absorbs contract changes in one
-    │                        #   place, tolerant to unknown fields
+    │                        #   place, tolerant to unknown fields; also the bearer/refresh
+    │                        #   interceptors and the single-flight, session-aware refresh
+    │                        #   guard (section 5)
+    ├── domain/              #   domain models (library item, speaker, session, tokens) and
+    │                        #   the ApiResult type — the only types the app module sees
     ├── tls/                 #   TOFU trust manager and certificate-fetch helper (section 6)
-    └── auth/                #   Keystore-backed token store, bearer/refresh interceptors,
-                             #   single-flight refresh guard, session-aware refresh
-                             #   coordination (section 5)
+    └── persist/             #   Keystore-backed encrypted token store and the trusted-
+                             #   server / fingerprint store (sections 5, 6)
 ```
 
-- Single activity; Compose Navigation with a sealed route graph. Start destination is
-  chosen at launch: no stored server → connect; no stored tokens → sign-in; otherwise
-  library.
+- Single activity; Compose Navigation with a sealed, type-safe route graph — each
+  destination is a `@Serializable` `Route` type, so arguments (e.g. the speaker picker's
+  item id) are carried by the type system rather than stringly-typed keys that could be
+  missing. Start destination is resolved at launch off the main thread: no stored server →
+  connect; no stored tokens → sign-in; otherwise library.
 - One package per screen under `app/`, each with its composable screen, ViewModel, and
   UI-state type. The now-playing screen polls `getCurrentSession`, advances the displayed
   position locally between polls, and corrects to the server's value on each response
