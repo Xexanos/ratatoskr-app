@@ -18,7 +18,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -33,6 +39,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -290,18 +297,22 @@ private fun androidx.compose.foundation.layout.ColumnScope.NowPlayingContent(
     ) {
         val playing = session.state == PlaybackState.PLAYING
         CircleControl(
-            glyph = if (playing) "⏸" else "▶",
+            icon = if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+            contentDescription = stringResource(
+                if (playing) R.string.nowplaying_action_pause else R.string.nowplaying_action_play,
+            ),
             size = 76.dp,
-            glyphSize = 30.sp,
+            iconSize = 36.dp,
             container = MaterialTheme.colorScheme.primary,
             content = MaterialTheme.colorScheme.onPrimary,
             elevation = 6.dp,
             onClick = { if (playing) onPause() else onResume() },
         )
         CircleControl(
-            glyph = "⏹",
+            icon = Icons.Filled.Stop,
+            contentDescription = stringResource(R.string.nowplaying_action_stop),
             size = 56.dp,
-            glyphSize = 22.sp,
+            iconSize = 28.dp,
             container = MaterialTheme.colorScheme.surfaceVariant,
             content = MaterialTheme.colorScheme.onSurfaceVariant,
             elevation = 0.dp,
@@ -324,6 +335,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.NowPlayingContent(
 
 @Composable
 private fun CoverArt(title: String) {
+    val initial = title.trim().firstOrNull()?.uppercase()
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         Surface(
             modifier = Modifier.size(260.dp),
@@ -333,12 +345,21 @@ private fun CoverArt(title: String) {
             tonalElevation = 2.dp,
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Text(
-                    text = title.trim().firstOrNull()?.uppercase() ?: "♪",
-                    style = MaterialTheme.typography.displayLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                )
+                if (initial != null) {
+                    Text(
+                        text = initial,
+                        style = MaterialTheme.typography.displayLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                } else {
+                    Icon(
+                        Icons.Default.MusicNote,
+                        contentDescription = null,
+                        modifier = Modifier.size(96.dp),
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                }
             }
         }
     }
@@ -385,9 +406,10 @@ private fun TimeLabel(seconds: Double, color: androidx.compose.ui.graphics.Color
 
 @Composable
 private fun CircleControl(
-    glyph: String,
+    icon: ImageVector,
+    contentDescription: String,
     size: androidx.compose.ui.unit.Dp,
-    glyphSize: androidx.compose.ui.unit.TextUnit,
+    iconSize: androidx.compose.ui.unit.Dp,
     container: androidx.compose.ui.graphics.Color,
     content: androidx.compose.ui.graphics.Color,
     elevation: androidx.compose.ui.unit.Dp,
@@ -402,7 +424,7 @@ private fun CircleControl(
         shadowElevation = elevation,
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Text(glyph, fontSize = glyphSize)
+            Icon(icon, contentDescription = contentDescription, modifier = Modifier.size(iconSize))
         }
     }
 }

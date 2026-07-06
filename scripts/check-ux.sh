@@ -5,20 +5,17 @@
 # drift that never needs a human eye. Run locally with `bash scripts/check-ux.sh`; CI runs
 # it on every push/PR.
 #
-# Posture: this gate was introduced onto an existing codebase, so it enforces only what the
-# code already satisfies and *reports* the rest, exactly as you'd adopt any linter:
-#   - colors and real Material-2 component imports are FATAL (the code is already clean);
-#   - corner radii, hardcoded strings, and emoji-as-icons are ADVISORY for now — the screens
-#     predate these rules (custom radii like 20.dp have no M3 shape token; copy is not yet in
-#     strings.xml; some empty states use emoji). Flip STRICT_SHAPES / STRICT_STRINGS /
-#     STRICT_EMOJI to 1 per rule as the screens are migrated.
+# All five rules are FATAL: the screens have been migrated to theme tokens (colors + shapes),
+# strings.xml and Material icons, so the gate now holds the whole codebase to them. The
+# STRICT_* env vars remain only so a work-in-progress branch can temporarily downgrade a rule
+# (e.g. STRICT_STRINGS=0) while mid-refactor.
 #
 set -uo pipefail
 
 UI="app/src/main/java/io/github/xexanos/ratatoskr/ui"
-STRICT_SHAPES="${STRICT_SHAPES:-0}"
-STRICT_STRINGS="${STRICT_STRINGS:-0}"
-STRICT_EMOJI="${STRICT_EMOJI:-0}"
+STRICT_SHAPES="${STRICT_SHAPES:-1}"
+STRICT_STRINGS="${STRICT_STRINGS:-1}"
+STRICT_EMOJI="${STRICT_EMOJI:-1}"
 fail=0
 
 echo "== 1. Hardcoded colors outside theme/ (use MaterialTheme.colorScheme) [FATAL] =="
@@ -27,7 +24,7 @@ if grep -rEn --include='*.kt' 'Color\(0x[0-9a-fA-F]{6,8}\)' "$UI" | grep -v '/th
 else echo "  ok"; fi
 
 echo "== 2. Hardcoded corner radii in dp (prefer MaterialTheme.shapes) [$( [ "$STRICT_SHAPES" = 1 ] && echo FATAL || echo advisory )] =="
-if grep -rEn --include='*.kt' 'RoundedCornerShape\(\s*[0-9.]+\s*\.dp\s*\)' "$UI"; then
+if grep -rEn --include='*.kt' 'RoundedCornerShape\(\s*[0-9.]+\s*\.dp\s*\)' "$UI" | grep -v '/theme/'; then
   if [ "$STRICT_SHAPES" = 1 ]; then echo "  FAIL: use MaterialTheme.shapes, not RoundedCornerShape(n.dp)."; fail=1
   else echo "  warn: migrate to MaterialTheme.shapes (RoundedCornerShape(50) percent pills are fine)."; fi
 else echo "  ok"; fi

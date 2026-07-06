@@ -21,8 +21,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Speaker
+import androidx.compose.material.icons.filled.SpeakerGroup
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -31,6 +34,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -39,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.xexanos.ratatoskr.R
 import io.github.xexanos.ratatoskr.data.ConnectionManager
 import io.github.xexanos.ratatoskr.network.domain.ApiResult
 import io.github.xexanos.ratatoskr.network.domain.Speaker
@@ -114,14 +119,14 @@ private fun SpeakersContent(
 ) {
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         Text(
-            "Choose a speaker",
+            stringResource(R.string.speakers_title),
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.padding(top = 16.dp),
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            "Playback starts on the speaker you pick.",
+            stringResource(R.string.speakers_subtitle),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -132,7 +137,7 @@ private fun SpeakersContent(
                     if (state.starting) {
                         Spacer(Modifier.height(16.dp))
                         Text(
-                            "Starting playback…",
+                            stringResource(R.string.speakers_starting),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -155,10 +160,18 @@ private fun SpeakersContent(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.padding(horizontal = 32.dp),
                 ) {
-                    Text("🔇", style = MaterialTheme.typography.displaySmall)
-                    Text("No speakers found", style = MaterialTheme.typography.titleMedium)
+                    Icon(
+                        Icons.Default.SpeakerGroup,
+                        contentDescription = null,
+                        modifier = Modifier.size(48.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     Text(
-                        "Make sure your Sonos speakers are powered on and reachable from the server.",
+                        stringResource(R.string.speakers_empty_title),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Text(
+                        stringResource(R.string.speakers_empty_hint),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
@@ -182,7 +195,7 @@ private fun SpeakersContent(
 @Composable
 private fun SpeakerRow(speaker: Speaker, onClick: () -> Unit) {
     Surface(
-        shape = RoundedCornerShape(20.dp),
+        shape = MaterialTheme.shapes.extraLarge,
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 1.dp,
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
@@ -201,10 +214,10 @@ private fun SpeakerRow(speaker: Speaker, onClick: () -> Unit) {
                 },
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        if (speaker.isGroup) "⧉" else "◉",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = if (speaker.isGroup) {
+                    Icon(
+                        if (speaker.isGroup) Icons.Default.SpeakerGroup else Icons.Default.Speaker,
+                        contentDescription = null,
+                        tint = if (speaker.isGroup) {
                             MaterialTheme.colorScheme.onSecondaryContainer
                         } else {
                             MaterialTheme.colorScheme.onPrimaryContainer
@@ -218,9 +231,13 @@ private fun SpeakerRow(speaker: Speaker, onClick: () -> Unit) {
                 Text(
                     if (speaker.isGroup) {
                         val members = speaker.members
-                        if (members.isEmpty()) "Group" else "Group · ${members.joinToString()}"
+                        if (members.isEmpty()) {
+                            stringResource(R.string.speakers_group)
+                        } else {
+                            stringResource(R.string.speakers_group_members, members.joinToString())
+                        }
                     } else {
-                        "Speaker"
+                        stringResource(R.string.speakers_kind_speaker)
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

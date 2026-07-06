@@ -1,13 +1,73 @@
 <resources>
     <string name="app_name">Ratatoskr</string>
 
-    <!-- Now playing (the other screens' copy joins strings.xml as each screen is migrated) -->
+    <!-- Connect -->
+    <string name="connect_welcome_title">Welcome to Ratatoskr</string>
+    <string name="connect_welcome_subtitle">Connect to your Ratatoskr server to play audiobooks on your Sonos speakers.</string>
+    <string name="connect_server_url_label">Server URL</string>
+    <string name="connect_action_connect">Connect</string>
+    <string name="connect_inspecting">Reading the server certificate…</string>
+    <string name="connect_action_retry">Try again</string>
+    <string name="connect_confirm_title">First connection — confirm this certificate</string>
+    <string name="connect_cert_subject_label">Subject</string>
+    <string name="connect_cert_issuer_label">Issuer</string>
+    <string name="connect_cert_valid_until_label">Valid until</string>
+    <string name="connect_cert_fingerprint_label">SHA-256 fingerprint</string>
+    <string name="connect_cert_compare_hint">Compare this fingerprint with the one shown by your server before trusting it.</string>
+    <string name="connect_action_trust">Trust and continue</string>
+    <string name="connect_action_cancel">Cancel</string>
+
+    <!-- Sign in -->
+    <string name="signin_title">Sign in</string>
+    <string name="signin_subtitle">Use your Audiobookshelf username and password.</string>
+    <string name="signin_username_label">Username</string>
+    <string name="signin_password_label">Password</string>
+    <string name="signin_action">Sign in</string>
+
+    <!-- Library -->
+    <string name="library_title">Library</string>
+    <string name="library_now_playing">Now playing</string>
+    <string name="library_settings">Settings</string>
+    <string name="library_search_placeholder">Search your audiobooks</string>
+    <string name="library_empty_title">Your library is empty</string>
+    <string name="library_no_results_title">No matches</string>
+    <string name="library_empty_body">Audiobooks from your Audiobookshelf server will show up here.</string>
+    <string name="library_no_results_body">No audiobooks match “%1$s”. Try a shorter search.</string>
+    <string name="library_finished">Finished</string>
+    <string name="library_percent">%1$d%%</string>
+
+    <!-- Speakers -->
+    <string name="speakers_title">Choose a speaker</string>
+    <string name="speakers_subtitle">Playback starts on the speaker you pick.</string>
+    <string name="speakers_starting">Starting playback…</string>
+    <string name="speakers_empty_title">No speakers found</string>
+    <string name="speakers_empty_hint">Make sure your Sonos speakers are powered on and reachable from the server.</string>
+    <string name="speakers_group">Group</string>
+    <string name="speakers_group_members">Group · %1$s</string>
+    <string name="speakers_kind_speaker">Speaker</string>
+
+    <!-- Now playing -->
     <string name="nowplaying_header">NOW PLAYING</string>
     <string name="nowplaying_nothing_playing">Nothing is playing right now.</string>
+    <string name="nowplaying_action_play">Play</string>
+    <string name="nowplaying_action_pause">Pause</string>
+    <string name="nowplaying_action_stop">Stop</string>
     <string name="nowplaying_state_playing">Playing</string>
     <string name="nowplaying_state_paused">Paused</string>
     <string name="nowplaying_state_buffering">Buffering</string>
     <string name="nowplaying_state_finished">Finished</string>
     <string name="nowplaying_state_stopped">Stopped</string>
     <string name="nowplaying_state_unknown">—</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_section_server">Server</string>
+    <string name="settings_section_security">Security</string>
+    <string name="settings_section_account">Account</string>
+    <string name="settings_not_configured">Not configured</string>
+    <string name="settings_connected">Connected over HTTPS</string>
+    <string name="settings_not_connected">Connect from the start screen</string>
+    <string name="settings_forget_cert">Forget certificate and re-trust</string>
+    <string name="settings_forget_cert_hint">Removes the pinned certificate. You will confirm the server\'s fingerprint again on the next connection.</string>
+    <string name="settings_sign_out">Sign out</string>
 </resources>
