@@ -72,10 +72,15 @@ object RatatoskrClientFactory {
 
         val retrofitBase = "${baseUrl.trimEnd('/')}/v1/"
 
+        // Shared across both Retrofit instances so response bodies get the unknown-enum
+        // fallback (an unrecognised PlaybackState degrades to STOPPED instead of failing the
+        // whole response, SPEC section 4). The plain Serializer.moshi would throw.
+        val moshi = ratatoskrMoshi()
+
         // A client without bearer/authenticator, used only for login and refresh so a refresh
         // never recurses through the authenticator.
         val authClient = baseBuilder.build()
-        val authSystemApi = retrofit(retrofitBase, authClient).create(SystemApi::class.java)
+        val authSystemApi = retrofit(retrofitBase, authClient, moshi).create(SystemApi::class.java)
 
         val refresher = TokenRefresher { refreshToken ->
             runBlocking {
@@ -88,7 +93,7 @@ object RatatoskrClientFactory {
             .addInterceptor(BearerAuthInterceptor(tokenStore))
             .authenticator(TokenRefreshAuthenticator(tokenStore, refresher, sessionActive))
             .build()
-        val mainRetrofit = retrofit(retrofitBase, mainClient)
+        val mainRetrofit = retrofit(retrofitBase, mainClient, moshi)
 
         // Both OkHttp stacks own a dispatcher thread pool and a connection pool; release them
         // when the client is replaced so they do not linger until GC (SPEC section 13).
@@ -105,16 +110,16 @@ object RatatoskrClientFactory {
             libraryApi = mainRetrofit.create(LibraryApi::class.java),
             playbackApi = mainRetrofit.create(PlaybackApi::class.java),
             tokenStore = tokenStore,
-            moshi = ratatoskrMoshi(),
+            moshi = moshi,
             closeAction = closeAction,
         )
     }
 
-    private fun retrofit(baseUrl: String, client: OkHttpClient): Retrofit =
+    private fun retrofit(baseUrl: String, client: OkHttpClient, moshi: Moshi): Retrofit =
         Retrofit.Builder()
             .baseUrl(baseUrl)
             .client(client)
             .addConverterFactory(ScalarsConverterFactory.create())
-            .addConverterFactory(MoshiConverterFactory.create(Serializer.moshi))
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()
 }

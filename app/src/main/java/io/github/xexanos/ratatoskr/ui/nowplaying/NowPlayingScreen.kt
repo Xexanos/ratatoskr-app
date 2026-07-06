@@ -98,12 +98,17 @@ class NowPlayingViewModel(
     }
 
     private fun applySession(session: Session) {
+        // A poll or control response that completes after stop() must not revive the ended
+        // session: the `stopped` guard in refresh() only covers the start of the call, not the
+        // apply after the network await, and stop() has already navigated away.
+        if (_uiState.value.stopped) return
         // The server owns token rotation while a session is active (SPEC section 5).
         val active = session.state in ACTIVE_STATES
         connectionManager.setSessionActive(active)
-        // copy() rather than a fresh state so a poll cannot clobber `stopped` or a control
-        // error the user has not seen yet.
-        _uiState.value = _uiState.value.copy(loading = false, session = session)
+        // Clear a stale error on a successful response so a transient poll failure doesn't
+        // leave a sticky banner once the stream is healthy again. `stopped` is preserved by the
+        // guard above; a fresh control action also clears the error up front.
+        _uiState.value = _uiState.value.copy(loading = false, session = session, error = null)
     }
 
     fun pause() = control { it.pause() }
@@ -255,9 +260,11 @@ private fun androidx.compose.foundation.layout.ColumnScope.NowPlayingContent(
 
     var dragging by remember { mutableStateOf(false) }
     var sliderPosition by remember { mutableFloatStateOf(session.positionSeconds.toFloat()) }
-    // Follow the server position only when the user isn't dragging, so a poll mid-drag can't
-    // snap the thumb back under the finger; a released drag then seeks to the dragged value.
-    LaunchedEffect(session.positionSeconds, dragging) {
+    // Keyed on the server position only (not `dragging`): follow the server while the user
+    // isn't dragging, but do NOT re-run the instant a drag is released — otherwise it would
+    // snap the thumb back to the last polled value before the seek round-trips. After release
+    // it resumes following on the next poll (by which time the seek has normally landed).
+    LaunchedEffect(session.positionSeconds) {
         if (!dragging) sliderPosition = session.positionSeconds.toFloat()
     }
     val duration = session.durationSeconds.toFloat().coerceAtLeast(1f)
