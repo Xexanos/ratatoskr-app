@@ -162,12 +162,29 @@ private fun ConnectContent(
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(32.dp))
+        // readOnly, not disabled: while inspecting/confirming the certificate the URL
+        // must stay legible (disabled text is 38% alpha and fails contrast checks),
+        // it just must not change under the certificate being confirmed.
+        val urlLocked = !(state is ConnectUiState.Idle || state is ConnectUiState.Error)
         OutlinedTextField(
             value = url,
             onValueChange = { url = it },
             label = { Text("Server URL") },
             singleLine = true,
-            enabled = state is ConnectUiState.Idle || state is ConnectUiState.Error,
+            readOnly = urlLocked,
+            // A plain readOnly field still looks editable; the lock icon signals the URL is
+            // held fixed to the certificate being confirmed (the same lock the card uses).
+            trailingIcon = if (urlLocked) {
+                {
+                    Icon(
+                        Icons.Default.Lock,
+                        contentDescription = "URL locked while confirming the certificate",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            } else {
+                null
+            },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier.fillMaxWidth(),

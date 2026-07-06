@@ -41,6 +41,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -236,6 +237,10 @@ private fun EmptyLibrary(query: String) {
             Text(
                 if (query.isBlank()) "📚" else "🔍",
                 style = MaterialTheme.typography.displaySmall,
+                // Decorative: the headline below carries the meaning. Keeping the emoji
+                // out of the semantics tree spares TalkBack the noise and the fixed
+                // emoji colors the text-contrast check.
+                modifier = Modifier.clearAndSetSemantics {},
             )
             Text(
                 if (query.isBlank()) "Your library is empty" else "No matches",

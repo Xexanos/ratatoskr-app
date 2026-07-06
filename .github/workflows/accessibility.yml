@@ -1,0 +1,109 @@
+# Runs the accessibility check suite (AccessibilityChecksTest) on every pull request.
+#
+# The suite is instrumented on purpose — the Accessibility Test Framework needs the
+# real accessibility node tree, which only exists on a device (see the test's kdoc) —
+# so this boots a headless emulator on the KVM-enabled GitHub runner. Contrast is
+# theme-dependent, so the suite runs twice: once in light mode, once in dark mode.
+#
+# paths-ignore skips this (expensive, ~45 min emulator) run when a PR changes only
+# docs/metadata that can't affect the UI. Denylist, not allowlist: any other path still
+# triggers it, so a UI change can never silently skip the accessibility check.
+
+name: Accessibility
+
+on:
+  pull_request:
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'fastlane/**'
+      - '.gitignore'
+      - 'LICENSE'
+  workflow_dispatch:
+
+concurrency:
+  group: accessibility-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  accessibility-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out (with the contract submodule)
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Enable KVM for the emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # Cache the created AVD + its warm snapshot across runs so we skip the ~3–6 min
+      # cold boot. Keyed on the emulator params below — bump the key when any change.
+      - name: Cache the AVD snapshot
+        uses: actions/cache@v4
+        id: avd-cache
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-api36-x86_64-default-pixel_6
+
+      # On a cache miss, create the AVD once and let it save a snapshot (no -no-snapshot-save).
+      - name: Warm the AVD snapshot
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          arch: x86_64
+          target: default
+          profile: pixel_6
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: false
+          script: echo "Warmed the AVD snapshot for caching."
+
+      - name: Run the accessibility checks in light and dark mode
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          arch: x86_64
+          target: default
+          # Pin a 420dpi phone profile: the runner's default AVD is a small low-density
+          # screen where full-screen previews scroll and ATF measures clipped elements
+          # (false contrast findings). This matches the profile the suite is verified
+          # against locally.
+          profile: pixel_6
+          # Restore the cached AVD (don't recreate it) and boot from the snapshot without
+          # rewriting it; params must match the warm step above for the snapshot to load.
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: |
+            adb shell cmd uimode night no
+            ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=io.github.xexanos.ratatoskr.ui.AccessibilityChecksTest
+            adb shell cmd uimode night yes
+            ./gradlew :app:connectedDebugAndroidTest --rerun -Pandroid.testInstrumentationRunnerArguments.class=io.github.xexanos.ratatoskr.ui.AccessibilityChecksTest
+
+      - name: Upload the test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: accessibility-test-reports
+          path: |
+            app/build/reports/androidTests/connected
+            app/build/outputs/androidTest-results/connected
+          retention-days: 14

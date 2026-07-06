@@ -31,6 +31,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -155,7 +156,12 @@ private fun SpeakersContent(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.padding(horizontal = 32.dp),
                 ) {
-                    Text("🔇", style = MaterialTheme.typography.displaySmall)
+                    // Decorative, like the library empty state: out of the semantics tree.
+                    Text(
+                        "🔇",
+                        style = MaterialTheme.typography.displaySmall,
+                        modifier = Modifier.clearAndSetSemantics {},
+                    )
                     Text("No speakers found", style = MaterialTheme.typography.titleMedium)
                     Text(
                         "Make sure your Sonos speakers are powered on and reachable from the server.",
@@ -201,6 +207,9 @@ private fun SpeakerRow(speaker: Speaker, onClick: () -> Unit) {
                 },
             ) {
                 Box(contentAlignment = Alignment.Center) {
+                    // Decorative avatar glyph: the "Group"/"Speaker" caption below carries
+                    // the meaning. Out of the semantics tree, so TalkBack skips it and the
+                    // thin anti-aliased strokes don't trip the text-contrast check.
                     Text(
                         if (speaker.isGroup) "⧉" else "◉",
                         style = MaterialTheme.typography.titleMedium,
@@ -209,6 +218,7 @@ private fun SpeakerRow(speaker: Speaker, onClick: () -> Unit) {
                         } else {
                             MaterialTheme.colorScheme.onPrimaryContainer
                         },
+                        modifier = Modifier.clearAndSetSemantics {},
                     )
                 }
             }
