@@ -322,6 +322,26 @@ fun wordmarkPaths(font: File): String {
     return "<path fill-rule=\"evenodd\" d=\"${d.toString().trim()}\"/>"
 }
 
+// --- shared mark parsing --------------------------------------------------------------
+//
+// One parse of an SVG mark into its paths, shared by the SVG composition (which re-emits
+// each path verbatim via `raw`, so the SVGs stay byte-for-byte identical) and the
+// VectorDrawable emitter (which reads `fill`/`evenOdd`/`d`). Parsing once with a single set
+// of assumptions keeps the two outputs from drifting: a path the parser can't read -- e.g.
+// Inkscape moved the fill into a style= attribute, or rewrote <path/> as <path></path> --
+// fails here instead of silently vanishing from one output while erroring in the other.
+
+data class MarkPath(val raw: String, val fill: String, val evenOdd: Boolean, val d: String)
+
+fun parseMark(svg: String): List<MarkPath> =
+    Regex("<path\\b[^>]*>").findAll(svg).map { m ->
+        fun attr(name: String) = Regex("$name=\"([^\"]*)\"").find(m.value)?.groupValues?.get(1)
+        val fill = attr("fill")
+            ?: Regex("fill:\\s*(#[0-9A-Fa-f]{6})").find(attr("style") ?: "")?.groupValues?.get(1)
+            ?: error("mark path has no fill (checked fill= and style=): ${m.value}")
+        MarkPath(m.value, fill, attr("fill-rule") == "evenodd", attr("d") ?: error("mark path has no d: ${m.value}"))
+    }.toList()
+
 // --- Android vector drawable ------------------------------------------------------------
 //
 // The framed logo again, as a VectorDrawable for the app. Group nesting mirrors the SVG:
@@ -334,22 +354,14 @@ val DRAWABLE_HEADER = """
          edit by hand. -->
 """.trimIndent() + "\n"
 
-fun vectorDrawable(knotD: String, mark: String, sc: Double, tx: Double, ty: Double): String {
+fun vectorDrawable(knotD: String, mark: List<MarkPath>, sc: Double, tx: Double, ty: Double): String {
     fun fmt(v: Double) = "%.1f".format(Locale.ROOT, v)
     fun path(indent: String, fill: String, evenOdd: Boolean, d: String) =
         "$indent<path android:fillColor=\"$fill\"" +
             (if (evenOdd) " android:fillType=\"evenOdd\"" else "") +
             " android:pathData=\"$d\"/>\n"
 
-    val markPaths = Regex("<path[^>]*/>").findAll(mark).joinToString("") { m ->
-        fun attr(name: String) = Regex("$name=\"([^\"]*)\"").find(m.value)?.groupValues?.get(1)
-        path(
-            "            ",
-            attr("fill") ?: error("mark path without fill"),
-            attr("fill-rule") == "evenodd",
-            attr("d") ?: error("mark path without d"),
-        )
-    }
+    val markPaths = mark.joinToString("") { path("            ", it.fill, it.evenOdd, it.d) }
 
     return "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" + DRAWABLE_HEADER +
         "<vector xmlns:android=\"http://schemas.android.com/apk/res/android\"\n" +
@@ -399,11 +411,12 @@ fun main(args: Array<String>) {
 
     val knotD = wovenKnotD()
     val woven = "<path d=\"$knotD\" fill=\"$FRAME_LIGHT\" fill-rule=\"evenodd\" stroke=\"none\"/>"
-    val markOf = { file: String ->
-        Regex("<path[^>]*/>").findAll(File(out, file).readText()).joinToString("") { it.value }
-    }
-    val mark = markOf("ratatoskr-mark.svg")
-    val wordmark = markOf("ratatoskr-wordmark.svg")
+    val markPaths = parseMark(File(out, "ratatoskr-mark.svg").readText())
+    val mark = markPaths.joinToString("") { it.raw }
+    // The wordmark's paths inherit their fill from the enclosing <g fill=...>, so they carry
+    // no per-path fill and are only ever embedded verbatim (never turned into a drawable).
+    val wordmark = Regex("<path[^>]*/>").findAll(File(out, "ratatoskr-wordmark.svg").readText())
+        .joinToString("") { it.value }
 
     val sc = 0.55
     val tx = 128 - sc * 128
@@ -421,7 +434,7 @@ fun main(args: Array<String>) {
     write("ratatoskr-lockup.svg", lockup, "0 0 272 350", HEADER + WORDMARK_HEADER)
     write("ratatoskr-lockup-dark.svg", recolor(lockup), "0 0 272 350", HEADER + WORDMARK_HEADER)
 
-    val drawable = vectorDrawable(knotD, mark, sc, tx, ty)
+    val drawable = vectorDrawable(knotD, markPaths, sc, tx, ty)
     for ((qualifier, xml) in listOf("drawable" to drawable, "drawable-night" to recolor(drawable))) {
         val file = File(dir, "app/src/main/res/$qualifier/ratatoskr_logo.xml")
         file.parentFile.mkdirs()
