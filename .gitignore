@@ -22,9 +22,20 @@ keystore.properties
 *.iml
 .DS_Store
 
+# Installed agent/skills (local tooling, not project code)
+skills-lock.json
+.claude/skills/
+
+# Font cache of the logo generator. The Norse font license forbids
+# redistributing the font FILE, so it is downloaded from the author's
+# site on demand and must never be committed.
+tools/logo/.fontcache/
+
 # Logs
 *.log
 
-# Generated API client (generated at build time from the OpenAPI contract; never committed)
-# Adjust the path to match the layout the agent settles on.
-app/build/generated/openapi/
+# Generated API client (generated at build time from the OpenAPI contract; never
+# committed — see SPEC section 4). AGP writes it under core-network/build
+# (generate-resources/), already covered by the build/ rule above; listed explicitly
+# for clarity.
+core-network/build/generate-resources/

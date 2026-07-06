@@ -1,8 +1,34 @@
-# Contract proposal: return rotated tokens in `Session` responses
+# Contract proposal: return rotated tokens in `Session` responses — ACCEPTED (landed in server 1.1.0)
 
-Target: `ratatoskr-server/contract/openapi.yaml` (and server SPEC sections 8 and 14).
-Origin: app-side auth design (app SPEC section 5). Additive, non-breaking (minor bump
-within `/v1`); oasdiff-clean.
+**Status:** accepted and merged. The change shipped in the server's OpenAPI contract as
+version 1.1.0 (Xexanos/ratatoskr-server#11). This file is kept as a historical record; the
+authoritative descriptions now live in:
+
+- `ratatoskr-server/contract/openapi.yaml` — the `RotatedTokens` schema, the optional
+  `Session.rotatedTokens` field, and the `stopSession` 200 response.
+- `ratatoskr-server/docs/SPEC.md` — section 8 (handover protocol) and section 14 (log
+  redaction of token-bearing response bodies).
+- This repo's `docs/SPEC.md`, section 5 — the app's half of the protocol.
+
+## What changed between this proposal and the merged design
+
+The original proposal (below, preserved for context) was refined during review:
+
+- **Adoption-based delivery, not send-once.** The server keeps including the rotated pair
+  until the client authenticates with the new access token, so a dropped or half-read
+  response cannot strand the client. (The proposal marked delivery at send time, which
+  could lose the pair permanently.)
+- **A nested `rotatedTokens` object** (both members required) instead of two independent
+  optional fields, so the schema encodes the both-or-neither invariant.
+- **`stopSession` returns 200 with a final `Session`** carrying the pending pair (204 is
+  kept for the common case, so the change stays additive/oasdiff-clean). This closes the
+  race between the last poll and the stop, which the proposal could only shrink.
+- **The 401 recovery is sound and its basis is stated:** Audiobookshelf access tokens are
+  stateless and stay valid until their own expiry after rotation, and the sync loop
+  refreshes proactively before that expiry — so the client's still-valid old token can
+  fetch the rotated pair. TTLs are described version-agnostically.
+
+---
 
 ## Problem
 
@@ -14,55 +40,13 @@ client learns the new one. After a long session the client's next `/auth/refresh
 and the user is forced to sign in again. This is the open risk flagged in server SPEC
 section 14 ("Refresh-token rotation").
 
-## Proposed change
+## Proposed change (as originally written; see the merged design above for the final form)
 
-Add two optional fields to the `Session` schema:
-
-```yaml
-    Session:
-      type: object
-      required: [itemId, speakerId, state, positionSeconds, durationSeconds, updatedAt]
-      properties:
-        # ... existing properties unchanged ...
-        accessToken:
-          type: string
-          description: |
-            Present only when Ratatoskr has rotated the caller's Audiobookshelf tokens
-            since the last Session response it returned. Clients must adopt this token
-            immediately and discard the previous one.
-        refreshToken:
-          type: string
-          description: |
-            Present only when Ratatoskr has rotated the caller's Audiobookshelf tokens
-            since the last Session response it returned. Clients must adopt this token
-            immediately and discard the previous one.
-```
-
-Because every playback operation (`getCurrentSession`, `startSession`, `pauseSession`,
-`resumeSession`, `seekSession`) already returns a `Session`, rotated tokens reach the
-client through the polling it does anyway for the now-playing view. No new endpoint.
-
-## Server-side behavior
-
-- When the sync loop refreshes the session user's tokens, mark the new pair as
-  "not yet delivered".
-- Include `accessToken`/`refreshToken` in `Session` responses **to that user** until one
-  such response has been sent, then omit them again. (v1 has exactly one session and one
-  session user, so "to that user" is simply the authenticated caller of a session
-  endpoint.)
-- Never log these fields (they fall under the existing log-redaction rule, server SPEC
-  section 14).
-
-## Client-side protocol (for reference; implemented in the app)
-
-- While a session is active the client never calls `/auth/refresh` itself; it adopts
-  tokens only from `Session` responses.
-- On a 401 during an active session the client first re-fetches `getCurrentSession` to
-  pick up a rotated token, and only falls back to `/auth/refresh` if that yields nothing.
-- Immediately before `stopSession` the client fetches `getCurrentSession` once to adopt
-  the final token state before the server discards its in-memory copy. The narrow race
-  between that poll and the stop is accepted; the client recovers with a single
-  `/auth/refresh` attempt and, failing that, a re-login prompt.
+Add optional fields to the `Session` schema so that rotated tokens reach the client through
+the playback polling it already does for the now-playing view — no new endpoint. Because
+every playback operation (`getCurrentSession`, `startSession`, `pauseSession`,
+`resumeSession`, `seekSession`) already returns a `Session`, rotated tokens travel on
+responses the client is already fetching.
 
 ## Compatibility
 

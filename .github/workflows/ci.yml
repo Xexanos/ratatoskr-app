@@ -1,0 +1,64 @@
+name: CI
+
+# Builds the app and runs the unit tests on every push and every pull request, so a
+# change can't merge without compiling and passing tests. No branch filter: pushes to any
+# branch run too, so work on stacked/feature branches (and PRs targeting them) is covered.
+# Free-software toolchain only (SPEC section 8): official GitHub-hosted runner, Temurin
+# JDK, Gradle wrapper — no proprietary SDKs.
+#
+# paths-ignore is a denylist, not an allowlist: the run is skipped only when *every*
+# changed file is docs/metadata that can't affect the build or tests. Anything else —
+# including any new or unlisted path — still triggers CI, so this can never silently
+# skip a real code change. (Note: if CI is later made a required check with branch
+# protection, a docs-only PR would show no CI run; use a companion always-pass job then.)
+on:
+  push:
+    paths-ignore: &docs-only
+      - '**/*.md'
+      - 'docs/**'
+      - 'fastlane/**'
+      - '.gitignore'
+      - 'LICENSE'
+  pull_request:
+    paths-ignore: *docs-only
+
+permissions:
+  contents: read
+
+concurrency:
+  # Key on the head branch (not the ref) so a branch's push event and its pull_request
+  # event collapse into one group — cancel-in-progress then keeps a single run instead of
+  # building the same commit twice now that there is no branch filter.
+  group: ci-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: Build & unit test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out (with the contract submodule)
+        uses: actions/checkout@v4
+        with:
+          # The Kotlin client is generated at build time from the pinned contract
+          # submodule (SPEC section 4), so the build needs it checked out.
+          submodules: recursive
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        # Caches Gradle and validates the wrapper jar against known-good checksums,
+        # complementing the pinned distributionSha256Sum in gradle-wrapper.properties.
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Set up the Android SDK
+        # Provides cmdline-tools and accepts the SDK licences so AGP can provision the
+        # compileSdk platform and build-tools it needs.
+        uses: android-actions/setup-android@v3
+
+      - name: Assemble debug and run unit tests
+        run: ./gradlew --no-daemon assembleDebug testDebugUnitTest

@@ -1,0 +1,27 @@
+# Normalize line endings so the repo is deterministic across platforms
+# (matters for the reproducible F-Droid build).
+* text=auto eol=lf
+
+# The Gradle wrapper shell script must stay LF or it breaks on the
+# Linux F-Droid build server. The Windows batch file must stay CRLF.
+gradlew            text eol=lf
+*.bat              text eol=crlf
+
+# Kotlin / Gradle / config sources are text.
+*.kt               text eol=lf
+*.kts              text eol=lf
+*.java             text eol=lf
+*.xml              text eol=lf
+*.toml             text eol=lf
+*.properties       text eol=lf
+*.md               text eol=lf
+*.yaml             text eol=lf
+*.yml              text eol=lf
+
+# Binary assets — never touch.
+*.jar              binary
+*.webp             binary
+*.png              binary
+*.jpg              binary
+*.keystore         binary
+*.jks              binary

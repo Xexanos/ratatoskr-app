@@ -94,32 +94,39 @@ Auth is per-user and backed by Audiobookshelf, proxied through Ratatoskr (server
   or logs.
 - Sign-out clears the stored tokens.
 
-### Refresh-token rotation (decided; requires a contract addition on the server side)
+### Refresh-token rotation (contract 1.1.0)
 
 Audiobookshelf rotates the refresh token on every use, and the server holds the listening
-user's tokens in memory for the active session (server section 8 and the known-risks note
-in server section 14). The app and the server must not both consume the same refresh token
-independently. The agreed coordination scheme:
+user's tokens in memory for the active session (server section 8 and section 14). The app
+and the server must not both consume the same refresh token independently. This is resolved
+in contract 1.1.0 and mirrors the server's section 8; the app's obligations:
 
-- The `Session` schema gains optional `accessToken` and `refreshToken` fields (an additive,
-  non-breaking contract change, proposed to the server repo). They are present only when
-  the server has rotated the caller's tokens since the last response; the client must adopt
-  them immediately and discard the previous pair. Because every playback response
-  (`getCurrentSession`, `startSession`, `pauseSession`, `resumeSession`, `seekSession`)
-  returns a `Session`, rotated tokens reach the app through the polling it does anyway.
+- The `Session` schema carries an optional `rotatedTokens` object (`accessToken` +
+  `refreshToken`, both or neither). It is present only when the server has rotated the
+  caller's tokens since the last `Session` it returned; the app must adopt the pair
+  immediately, discard the previous one, and send the new access token on its next request.
+  Because every playback response (`getCurrentSession`, `startSession`, `pauseSession`,
+  `resumeSession`, `seekSession`) returns a `Session`, rotated tokens reach the app through
+  the polling it does anyway. The app must tolerate the fields being absent (an older server
+  never sends them).
 - While a session is active, the app never calls `POST /v1/auth/refresh` on its own. It
   hands its refresh token to the server in `startSession` and from then on only adopts
-  tokens arriving in `Session` responses. A 401 on a non-session call during an active
-  session first triggers an immediate `getCurrentSession` (to pick up a rotated token);
-  only if that yields nothing new does the app fall back to a regular `/auth/refresh`.
-- Immediately before `stopSession`, the app calls `getCurrentSession` once to adopt the
-  final token state before the server discards its in-memory copy. The residual risk of a
-  rotation in the narrow window between that poll and the stop is accepted and recovered
-  by a single `/auth/refresh` attempt after the session ends; if that also fails, the app
-  asks the user to sign in again rather than looping.
-
-Until the contract addition lands on the server, the app's session logic must not assume
-the fields exist (unknown-field tolerance already covers the reverse direction).
+  tokens arriving in `Session` responses (including the 200 body from `stopSession`, below).
+  The server confirms delivery by *adoption*: it keeps including `rotatedTokens` until the
+  app authenticates with the new access token, so a dropped or half-read response cannot
+  strand the app.
+- A 401 on a non-session call during an active session first triggers an immediate
+  `getCurrentSession` to pick up a rotated pair; only if none is offered does the app fall
+  back to a regular `/auth/refresh`. This re-fetch is guaranteed to authenticate because
+  Audiobookshelf access tokens are stateless (validated by signature and expiry only) and
+  the app's current one stays valid until its own expiry even after rotation — the server
+  refreshes proactively, before that expiry, precisely to leave this window open.
+- `stopSession` returns 200 with a final `Session` (instead of 204) when a rotated pair is
+  still pending, so the app adopts it as the session ends; the app treats any 2xx from
+  `stopSession` as success and adopts `rotatedTokens` if the body carries it. The one
+  irreducible residual — the single stop response that carries the final pair being lost in
+  transit — is recovered by asking the user to sign in again; the app must not loop
+  `/auth/refresh` on a token the server has already rotated away.
 
 ## 6. Server connection and certificate trust
 
@@ -130,7 +137,8 @@ certificate cannot be pinned at build time.
 - The user enters the server's URL (host and port). There is no discovery in v1.
 - Establish trust on first connection: fetch the server certificate, show its fingerprint,
   and ask the user to confirm it (trust-on-first-use). Persist the confirmed fingerprint
-  and pin it for all later connections; warn loudly if it ever changes.
+  and pin it for all later connections; warn loudly if it ever changes (with the scope
+  caveat below).
 - Decided mechanics: the connect screen fetches the certificate chain with a short-lived
   OkHttp client whose trust manager accepts anything but is used ONLY to read the chain —
   never for real requests. It shows the leaf certificate's SHA-256 fingerprint plus
@@ -141,6 +149,17 @@ certificate cannot be pinned at build time.
   fingerprint against the stored pin. Matching neither is a hard failure with a loud
   "certificate changed" warning and an explicit re-trust flow (settings → forget
   certificate).
+- Scope of the change guarantee (deliberate trade-off): the "warn loudly if it changes"
+  guarantee applies to the self-signed / local-CA deployment, which is the primary one and
+  where the platform chain fails so the stored pin is always the deciding factor. When the
+  server instead presents a **publicly trusted** certificate (e.g. TLS terminated at a
+  reverse proxy), the platform chain validates and the pin is not consulted — so a different
+  but validly issued certificate for the same host is accepted without re-confirmation. That
+  is an accepted consequence of putting platform validation first: in that deployment trust
+  is delegated to the public CA, and requiring the pin to match as well would reject every
+  routine certificate renewal (e.g. Let's Encrypt's ~90-day rotation) and force a manual
+  re-trust each time. Strict leaf-pinning against publicly trusted certificates was
+  considered and rejected on those grounds.
 - This runtime, user-confirmed pinning is implemented with the platform TLS stack and
   OkHttp only, so it survives a reproducible F-Droid build. A build-time
   network-security-config pin cannot express a per-user certificate and must not be relied
@@ -169,13 +188,44 @@ screen exposes the server URL, a re-trust/forget action for the certificate, and
 
 ## 9. Testing
 
+Tests run on the JVM so CI needs no device or emulator (see the CI workflow); they live in
+`testDebugUnitTest`.
+
+**Component / unit tests** (in place):
+
 - Unit-test the auth/token logic: attaching the bearer token, the refresh-on-401 flow, the
   single-flight refresh guard, and secure storage read/write (with the platform pieces
   faked).
 - Unit-test the mapping between generated contract types and the domain/UI models, including
   tolerance to unknown fields.
-- A small number of UI tests for the critical flows (connect and trust, sign in, start
-  playback, the now-playing controls) are welcome but not the priority for v1.
+
+**Integration tests** (next task, before further feature work): exercise the network layer
+*as it is actually assembled*, not hand-wired in the test. This is the priority gap: a unit
+test that constructs `RatatoskrClient` directly can pass while the real wiring is broken —
+the unknown-enum fallback Moshi was attached to the client but not to the Retrofit converter
+that `RatatoskrClientFactory` built, so it never ran on real responses, yet the unit test
+(which wired its own Moshi) stayed green. Integration tests close that gap by driving
+requests through `RatatoskrClientFactory.create(...)` (and, where practical,
+`ConnectionManager`) against an in-process `MockWebServer` served over HTTPS with a
+self-signed certificate, so the real deserialization, auth, and trust paths are covered.
+At least:
+
+- response deserialization through the factory's own Moshi — the unknown-`PlaybackState`
+  fallback and unknown-field tolerance actually taking effect on a real response body;
+- the TLS pin (section 6): a matching fingerprint connects, a changed one is rejected, and
+  the platform-first path behaves as specified;
+- bearer-token attachment and the 401 → refresh → retry flow, including single-flight under
+  concurrent 401s;
+- session-token rotation adopted end-to-end from a `Session`, and the `stopSession`
+  200-with-body vs 204 paths (section 5);
+- error mapping (401 / 404 / 502 / TLS failure) to the right `RatatoskrError`.
+
+These stay JVM-only (`MockWebServer` plus OkHttp's TLS test-certificate helpers), so they
+run in the same CI step as the unit tests. Setting up this harness — a reusable
+`MockWebServer`-over-HTTPS fixture and the first end-to-end cases — is the next work item.
+
+**UI tests**: a small number for the critical flows (connect and trust, sign in, start
+playback, the now-playing controls) are welcome but not the priority for v1.
 
 ## 10. Definition of done for v1
 
@@ -245,16 +295,21 @@ ratatoskr-app/
     ├── generated/           #   openapi-generator output — NEVER hand-edited
     ├── api/                 #   thin wrapper over the generated client: maps generated
     │                        #   DTOs to domain models, absorbs contract changes in one
-    │                        #   place, tolerant to unknown fields
+    │                        #   place, tolerant to unknown fields; also the bearer/refresh
+    │                        #   interceptors and the single-flight, session-aware refresh
+    │                        #   guard (section 5)
+    ├── domain/              #   domain models (library item, speaker, session, tokens) and
+    │                        #   the ApiResult type — the only types the app module sees
     ├── tls/                 #   TOFU trust manager and certificate-fetch helper (section 6)
-    └── auth/                #   Keystore-backed token store, bearer/refresh interceptors,
-                             #   single-flight refresh guard, session-aware refresh
-                             #   coordination (section 5)
+    └── persist/             #   Keystore-backed encrypted token store and the trusted-
+                             #   server / fingerprint store (sections 5, 6)
 ```
 
-- Single activity; Compose Navigation with a sealed route graph. Start destination is
-  chosen at launch: no stored server → connect; no stored tokens → sign-in; otherwise
-  library.
+- Single activity; Compose Navigation with a sealed, type-safe route graph — each
+  destination is a `@Serializable` `Route` type, so arguments (e.g. the speaker picker's
+  item id) are carried by the type system rather than stringly-typed keys that could be
+  missing. Start destination is resolved at launch off the main thread: no stored server →
+  connect; no stored tokens → sign-in; otherwise library.
 - One package per screen under `app/`, each with its composable screen, ViewModel, and
   UI-state type. The now-playing screen polls `getCurrentSession`, advances the displayed
   position locally between polls, and corrects to the server's value on each response

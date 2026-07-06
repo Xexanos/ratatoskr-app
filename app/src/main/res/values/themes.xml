@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The Android 12+ system splash screen takes its background from this XML theme
+         (before Compose runs), so the window background must match the Compose theme's
+         background and needs a values-night counterpart for dark mode. -->
+    <style name="Theme.Ratatoskr" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">#FFFBF8</item>
+    </style>
+</resources>

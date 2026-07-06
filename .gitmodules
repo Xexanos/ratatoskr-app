@@ -1,0 +1,3 @@
+[submodule "contract/ratatoskr-server"]
+	path = contract/ratatoskr-server
+	url = https://github.com/Xexanos/ratatoskr-server.git
