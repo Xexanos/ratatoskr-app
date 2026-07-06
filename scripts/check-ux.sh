@@ -46,11 +46,12 @@ echo "== 5. Non-ASCII characters (English code is ASCII; non-ASCII belongs in do
 # Scope: Kotlin + Gradle/shell/python + the base strings.xml + repo config. UTF-8 (non-ASCII)
 # is allowed in prose docs (*.md, so proper nouns like author names survive), localized
 # resources (values-*/), fastlane locale metadata, the rendered design doc, and SVGs; the
-# vendored gradlew is also skipped. lint_ascii.py flags any character > U+007F.
-PY="$(command -v python3 || command -v python || true)"
+# vendored gradlew is also skipped.
+# In the C (byte) locale, [\200-\377] matches any byte of a non-ASCII UTF-8 character; this
+# keeps the whole gate in one language (git-bash's grep rejects -P even under LC_ALL=C).
 ascii_files="$(git ls-files '*.kt' '*.kts' '*.sh' '*.py' 'app/src/main/res/values/strings.xml' '.gitignore' '.gitattributes' \
   | grep -vE '^(docs/ux-design\.html|gradlew)$|\.svg$|/values-|^fastlane/')"
-ascii_hits="$([ -n "$PY" ] && echo "$ascii_files" | xargs "$PY" scripts/lint_ascii.py || true)"
+ascii_hits="$(echo "$ascii_files" | LC_ALL=C xargs -r grep -nE "$(printf '[\200-\377]')" 2>/dev/null || true)"
 if [ -n "$ascii_hits" ]; then
   echo "$ascii_hits"
   if [ "$STRICT_ASCII" = 1 ]; then echo "  FAIL: keep source ASCII (arrows -> '->', em-dash -> '-', ...); non-ASCII text belongs in a translation."; fail=1
