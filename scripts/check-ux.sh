@@ -42,12 +42,13 @@ if [ -n "$hits" ]; then
   else echo "  warn: move UI copy into strings.xml (English source), then flip STRICT_STRINGS=1."; fi
 else echo "  ok"; fi
 
-echo "== 5. Non-ASCII characters (English source is ASCII; non-ASCII belongs in translations) [$( [ "$STRICT_ASCII" = 1 ] && echo FATAL || echo advisory )] =="
-# Scope: Kotlin + Gradle/shell/python + prose docs + the base strings.xml. Exempt: the rendered
-# design doc, SVGs, localized resources (values-*/), fastlane locale metadata, and the vendored
-# gradlew. lint_ascii.py flags any character > U+007F (emoji, arrows, smart quotes, accents...).
+echo "== 5. Non-ASCII characters (English code is ASCII; non-ASCII belongs in docs/translations) [$( [ "$STRICT_ASCII" = 1 ] && echo FATAL || echo advisory )] =="
+# Scope: Kotlin + Gradle/shell/python + the base strings.xml + repo config. UTF-8 (non-ASCII)
+# is allowed in prose docs (*.md, so proper nouns like author names survive), localized
+# resources (values-*/), fastlane locale metadata, the rendered design doc, and SVGs; the
+# vendored gradlew is also skipped. lint_ascii.py flags any character > U+007F.
 PY="$(command -v python3 || command -v python || true)"
-ascii_files="$(git ls-files '*.kt' '*.kts' '*.sh' '*.py' '*.md' 'app/src/main/res/values/strings.xml' '.gitignore' '.gitattributes' \
+ascii_files="$(git ls-files '*.kt' '*.kts' '*.sh' '*.py' 'app/src/main/res/values/strings.xml' '.gitignore' '.gitattributes' \
   | grep -vE '^(docs/ux-design\.html|gradlew)$|\.svg$|/values-|^fastlane/')"
 ascii_hits="$([ -n "$PY" ] && echo "$ascii_files" | xargs "$PY" scripts/lint_ascii.py || true)"
 if [ -n "$ascii_hits" ]; then

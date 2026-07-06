@@ -4,8 +4,8 @@ Android client for the Ratatoskr server. This app is a thin remote: it sends com
 shows state. All domain logic (Audiobookshelf, Sonos control, position mapping, progress
 sync) lives in the server.
 
-Authoritative context -- read before doing anything:
-- `docs/SPEC.md` -- goal, scope, architecture, auth, certificate trust, constraints.
+Authoritative context — read before doing anything:
+- `docs/SPEC.md` — goal, scope, architecture, auth, certificate trust, constraints.
 - The server's API contract is the single source of truth for communication:
   `ratatoskr-server/contract/openapi.yaml` (OpenAPI 3.0.3). The Kotlin client is generated
   from it and must not be hand-edited.
