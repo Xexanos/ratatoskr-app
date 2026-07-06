@@ -10,9 +10,12 @@ import io.github.xexanos.ratatoskr.network.generated.api.PlaybackApi
 import io.github.xexanos.ratatoskr.network.generated.api.SpeakersApi
 import io.github.xexanos.ratatoskr.network.generated.api.SystemApi
 import io.github.xexanos.ratatoskr.network.generated.infrastructure.Serializer
+import io.github.xexanos.ratatoskr.network.generated.model.PlaybackState
 import io.github.xexanos.ratatoskr.network.generated.model.RefreshRequest
 import io.github.xexanos.ratatoskr.network.persist.TokenAccess
 import io.github.xexanos.ratatoskr.network.tls.PinnedTrustManager
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.adapters.EnumJsonAdapter
 import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -20,6 +23,21 @@ import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 import retrofit2.converter.scalars.ScalarsConverterFactory
 import java.util.concurrent.TimeUnit
+
+/**
+ * The app's Moshi: the generated [Serializer.moshi] plus an unknown-value fallback for
+ * [PlaybackState]. The kotlin generator's enum adapter throws on an unrecognised value, which
+ * would fail the whole `Session` response; instead a future/unknown state deserializes to a
+ * benign [PlaybackState.stopped] so an older app keeps working against a newer server
+ * (SPEC section 4). STOPPED is the neutral choice — it never implies audio is playing.
+ */
+internal fun ratatoskrMoshi(): Moshi =
+    Serializer.moshi.newBuilder()
+        .add(
+            PlaybackState::class.java,
+            EnumJsonAdapter.create(PlaybackState::class.java).withUnknownFallback(PlaybackState.stopped),
+        )
+        .build()
 
 /**
  * Assembles a [RatatoskrClient] for one server: an OkHttp stack with the trust-on-first-use
@@ -72,13 +90,23 @@ object RatatoskrClientFactory {
             .build()
         val mainRetrofit = retrofit(retrofitBase, mainClient)
 
+        // Both OkHttp stacks own a dispatcher thread pool and a connection pool; release them
+        // when the client is replaced so they do not linger until GC (SPEC section 13).
+        val closeAction = {
+            for (client in listOf(mainClient, authClient)) {
+                client.dispatcher.executorService.shutdown()
+                client.connectionPool.evictAll()
+            }
+        }
+
         return RatatoskrClient(
             systemApi = mainRetrofit.create(SystemApi::class.java),
             speakersApi = mainRetrofit.create(SpeakersApi::class.java),
             libraryApi = mainRetrofit.create(LibraryApi::class.java),
             playbackApi = mainRetrofit.create(PlaybackApi::class.java),
             tokenStore = tokenStore,
-            moshi = Serializer.moshi,
+            moshi = ratatoskrMoshi(),
+            closeAction = closeAction,
         )
     }
 

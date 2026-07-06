@@ -47,6 +47,8 @@ class ConnectionManager(
         return buildMutex.withLock {
             // Re-check inside the lock: another caller may have built it while we waited.
             cached?.let { if (cachedKey == key) return@withLock it }
+            // A cached client for a different key is being replaced — release its HTTP stack.
+            cached?.close()
             RatatoskrClientFactory.create(
                 baseUrl = config.baseUrl,
                 fingerprint = fingerprint,
@@ -59,8 +61,9 @@ class ConnectionManager(
         }
     }
 
-    /** Drop the cached client after the server or certificate changed. */
+    /** Drop the cached client after the server or certificate changed, releasing its HTTP stack. */
     fun invalidate() {
+        cached?.close()
         cached = null
         cachedKey = null
     }

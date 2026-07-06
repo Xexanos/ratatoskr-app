@@ -7,12 +7,12 @@ package io.github.xexanos.ratatoskr.network.api
 
 import io.github.xexanos.ratatoskr.network.FakeTokenAccess
 import io.github.xexanos.ratatoskr.network.domain.ApiResult
+import io.github.xexanos.ratatoskr.network.domain.PlaybackState
 import io.github.xexanos.ratatoskr.network.domain.RatatoskrError
 import io.github.xexanos.ratatoskr.network.generated.api.LibraryApi
 import io.github.xexanos.ratatoskr.network.generated.api.PlaybackApi
 import io.github.xexanos.ratatoskr.network.generated.api.SpeakersApi
 import io.github.xexanos.ratatoskr.network.generated.api.SystemApi
-import io.github.xexanos.ratatoskr.network.generated.infrastructure.Serializer
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
@@ -38,11 +38,12 @@ class RatatoskrClientTest {
     @Before
     fun setUp() {
         server.start()
+        val moshi = ratatoskrMoshi()
         val retrofit = Retrofit.Builder()
             .baseUrl(server.url("/v1/"))
             .client(OkHttpClient())
             .addConverterFactory(ScalarsConverterFactory.create())
-            .addConverterFactory(MoshiConverterFactory.create(Serializer.moshi))
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()
         client = RatatoskrClient(
             systemApi = retrofit.create(SystemApi::class.java),
@@ -50,7 +51,7 @@ class RatatoskrClientTest {
             libraryApi = retrofit.create(LibraryApi::class.java),
             playbackApi = retrofit.create(PlaybackApi::class.java),
             tokenStore = tokens,
-            moshi = Serializer.moshi,
+            moshi = moshi,
         )
     }
 
@@ -205,5 +206,22 @@ class RatatoskrClientTest {
         assertTrue(result is ApiResult.Success)
         assertEquals("a0", tokens.currentAccessTokenBlocking())
         assertEquals("r0", tokens.refreshToken())
+    }
+
+    @Test
+    fun `an unrecognised playback state falls back instead of failing the response`() = runBlocking {
+        // A newer server could report a state this app's enum doesn't know; the response must
+        // still deserialize rather than surfacing as an error (SPEC section 4).
+        server.enqueue(
+            MockResponse().setBody(
+                """{"itemId":"i1","speakerId":"s1","state":"warping","positionSeconds":1.0,
+                   "durationSeconds":10.0,"updatedAt":"2026-07-05T12:00:00Z"}""",
+            ),
+        )
+
+        val result = client.currentSession()
+
+        assertTrue(result is ApiResult.Success)
+        assertEquals(PlaybackState.STOPPED, (result as ApiResult.Success).data.state)
     }
 }

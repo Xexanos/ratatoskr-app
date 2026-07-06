@@ -44,7 +44,15 @@ class RatatoskrClient internal constructor(
     private val playbackApi: PlaybackApi,
     private val tokenStore: TokenAccess,
     private val moshi: Moshi,
+    private val closeAction: () -> Unit = {},
 ) {
+
+    /**
+     * Releases the underlying OkHttp resources (dispatcher threads and pooled sockets). Call
+     * when this client is replaced — the owner does so on a server/certificate change — so the
+     * old HTTP stack does not linger until GC (SPEC section 13).
+     */
+    fun close() = closeAction()
 
     suspend fun login(username: String, password: String): ApiResult<AuthSession> {
         val result = execute { systemApi.login(LoginRequest(username, password)) }
