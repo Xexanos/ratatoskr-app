@@ -146,4 +146,64 @@ class RatatoskrClientTest {
 
         assertTrue(job.isCancelled)
     }
+
+    @Test
+    fun `a session response with rotatedTokens is adopted`() = runBlocking {
+        server.enqueue(
+            MockResponse().setBody(
+                """{"itemId":"i1","speakerId":"s1","state":"playing","positionSeconds":1.0,
+                   "durationSeconds":10.0,"updatedAt":"2026-07-05T12:00:00Z",
+                   "rotatedTokens":{"accessToken":"a2","refreshToken":"r2"}}""",
+            ),
+        )
+
+        val result = client.currentSession()
+
+        assertTrue(result is ApiResult.Success)
+        assertEquals("a2", tokens.currentAccessTokenBlocking())
+        assertEquals("r2", tokens.refreshToken())
+    }
+
+    @Test
+    fun `a session response without rotatedTokens leaves the stored pair untouched`() = runBlocking {
+        server.enqueue(
+            MockResponse().setBody(
+                """{"itemId":"i1","speakerId":"s1","state":"playing","positionSeconds":1.0,
+                   "durationSeconds":10.0,"updatedAt":"2026-07-05T12:00:00Z"}""",
+            ),
+        )
+
+        client.currentSession()
+
+        assertEquals("a0", tokens.currentAccessTokenBlocking())
+        assertEquals("r0", tokens.refreshToken())
+    }
+
+    @Test
+    fun `stopSession adopts a rotated pair from a 200 body`() = runBlocking {
+        server.enqueue(
+            MockResponse().setResponseCode(200).setBody(
+                """{"itemId":"i1","speakerId":"s1","state":"stopped","positionSeconds":5.0,
+                   "durationSeconds":10.0,"updatedAt":"2026-07-05T12:00:00Z",
+                   "rotatedTokens":{"accessToken":"a3","refreshToken":"r3"}}""",
+            ),
+        )
+
+        val result = client.stopSession()
+
+        assertTrue(result is ApiResult.Success)
+        assertEquals("a3", tokens.currentAccessTokenBlocking())
+        assertEquals("r3", tokens.refreshToken())
+    }
+
+    @Test
+    fun `stopSession succeeds on a 204 and keeps the stored tokens`() = runBlocking {
+        server.enqueue(MockResponse().setResponseCode(204))
+
+        val result = client.stopSession()
+
+        assertTrue(result is ApiResult.Success)
+        assertEquals("a0", tokens.currentAccessTokenBlocking())
+        assertEquals("r0", tokens.refreshToken())
+    }
 }
