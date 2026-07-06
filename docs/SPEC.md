@@ -1,4 +1,4 @@
-# Ratatoskr app — specification and implementation brief
+# Ratatoskr app -- specification and implementation brief
 
 This document is the ground truth for implementing the Ratatoskr Android app. It captures
 the goal, the scope of the first version, and the decisions that are already fixed by the
@@ -67,7 +67,7 @@ Sonos knowledge. It sends commands and shows state.
   (`https://github.com/Xexanos/ratatoskr-server`), pinned to a tag or commit, and the
   client is generated from it at Gradle build time. F-Droid's build server supports
   submodules (`submodules: yes` in the fdroiddata recipe), which keeps the build hermetic
-  and deterministic — unlike jitpack, which F-Droid's inclusion policy rejects. The
+  and deterministic -- unlike jitpack, which F-Droid's inclusion policy rejects. The
   submodule pointer is only ever moved deliberately (reviewing the contract diff), never
   automatically during a build. Do not depend on a private or authenticated package
   registry (that breaks F-Droid's build server). A human-readable rendering of the
@@ -119,13 +119,13 @@ in contract 1.1.0 and mirrors the server's section 8; the app's obligations:
   `getCurrentSession` to pick up a rotated pair; only if none is offered does the app fall
   back to a regular `/auth/refresh`. This re-fetch is guaranteed to authenticate because
   Audiobookshelf access tokens are stateless (validated by signature and expiry only) and
-  the app's current one stays valid until its own expiry even after rotation — the server
+  the app's current one stays valid until its own expiry even after rotation -- the server
   refreshes proactively, before that expiry, precisely to leave this window open.
 - `stopSession` returns 200 with a final `Session` (instead of 204) when a rotated pair is
   still pending, so the app adopts it as the session ends; the app treats any 2xx from
   `stopSession` as success and adopts `rotatedTokens` if the body carries it. The one
-  irreducible residual — the single stop response that carries the final pair being lost in
-  transit — is recovered by asking the user to sign in again; the app must not loop
+  irreducible residual -- the single stop response that carries the final pair being lost in
+  transit -- is recovered by asking the user to sign in again; the app must not loop
   `/auth/refresh` on a token the server has already rotated away.
 
 ## 6. Server connection and certificate trust
@@ -140,20 +140,20 @@ certificate cannot be pinned at build time.
   and pin it for all later connections; warn loudly if it ever changes (with the scope
   caveat below).
 - Decided mechanics: the connect screen fetches the certificate chain with a short-lived
-  OkHttp client whose trust manager accepts anything but is used ONLY to read the chain —
+  OkHttp client whose trust manager accepts anything but is used ONLY to read the chain --
   never for real requests. It shows the leaf certificate's SHA-256 fingerprint plus
   subject, issuer, and validity; on confirmation the app persists
   `{host, port, sha256 fingerprint}`. All real requests go through a custom
-  `X509TrustManager` (in `core-network`) that first tries the platform trust chain — which
-  covers the reverse-proxy-with-public-CA case — and only on its failure compares the leaf
+  `X509TrustManager` (in `core-network`) that first tries the platform trust chain -- which
+  covers the reverse-proxy-with-public-CA case -- and only on its failure compares the leaf
   fingerprint against the stored pin. Matching neither is a hard failure with a loud
-  "certificate changed" warning and an explicit re-trust flow (settings → forget
+  "certificate changed" warning and an explicit re-trust flow (settings -> forget
   certificate).
 - Scope of the change guarantee (deliberate trade-off): the "warn loudly if it changes"
   guarantee applies to the self-signed / local-CA deployment, which is the primary one and
   where the platform chain fails so the stored pin is always the deciding factor. When the
   server instead presents a **publicly trusted** certificate (e.g. TLS terminated at a
-  reverse proxy), the platform chain validates and the pin is not consulted — so a different
+  reverse proxy), the platform chain validates and the pin is not consulted -- so a different
   but validly issued certificate for the same host is accepted without re-confirmation. That
   is an accepted consequence of putting platform validation first: in that deployment trust
   is delegated to the public CA, and requiring the pin to match as well would reject every
@@ -224,13 +224,13 @@ Decided with the implementing agent. Rationale in brief, so it is not re-litigat
 - **Asynchrony and state:** coroutines and Flow; one ViewModel per screen; unidirectional
   data flow (immutable UI state exposed as a `StateFlow`).
 - **Dependency injection:** manual constructor injection via a single `AppContainer`
-  created in the `Application` class. No Hilt/Koin — the app is too small to pay for a
+  created in the `Application` class. No Hilt/Koin -- the app is too small to pay for a
   framework, and the container keeps wiring in one visible place.
 - **API client:** openapi-generator with the Kotlin `jvm-retrofit2` template on Retrofit +
   OkHttp, generated at Gradle build time from the contract git submodule (section 4).
   Retrofit's Kotlin generator template is the maturest option, supports suspend functions
   natively, and OkHttp accepts a runtime-configured `X509TrustManager`/`SSLSocketFactory`,
-  which is exactly what the TOFU pinning in section 6 needs — without touching generated
+  which is exactly what the TOFU pinning in section 6 needs -- without touching generated
   code.
 - **JSON:** tolerant deserialization (unknown fields ignored) as section 4 requires; the
   serialization library is whatever the chosen generator template uses (Moshi for
@@ -245,34 +245,34 @@ Decided with the implementing agent. Rationale in brief, so it is not re-litigat
 
 ## 13. Screen and module structure
 
-Decided with the implementing agent. Two Gradle modules — the app is too small for more,
+Decided with the implementing agent. Two Gradle modules -- the app is too small for more,
 but the "generated client only behind a wrapper" rule (section 4) is enforced
 architecturally, not by convention: UI code cannot import generated types because they
 live in `core-network` and only the wrapper's domain models are exposed.
 
 ```
 ratatoskr-app/
-├── app/                    # Compose UI, ViewModels, navigation, AppContainer
-│   ├── connect/             #   connect-and-trust screen (URL entry, fingerprint confirm)
-│   ├── auth/                #   sign-in screen
-│   ├── library/             #   browse and search
-│   ├── speakers/            #   speaker picker
-│   ├── nowplaying/          #   play/pause/seek/stop, position display
-│   └── settings/            #   server URL, certificate re-trust/forget, sign-out
-│
-└── core-network/           # everything that talks to the server; app depends on this
-    ├── generated/           #   openapi-generator output — NEVER hand-edited
-    ├── api/                 #   thin wrapper over the generated client: maps generated
-    │                        #   DTOs to domain models, absorbs contract changes in one
-    │                        #   place, tolerant to unknown fields
-    ├── tls/                 #   TOFU trust manager and certificate-fetch helper (section 6)
-    └── auth/                #   Keystore-backed token store, bearer/refresh interceptors,
++-- app/                    # Compose UI, ViewModels, navigation, AppContainer
+|   +-- connect/             #   connect-and-trust screen (URL entry, fingerprint confirm)
+|   +-- auth/                #   sign-in screen
+|   +-- library/             #   browse and search
+|   +-- speakers/            #   speaker picker
+|   +-- nowplaying/          #   play/pause/seek/stop, position display
+|   `-- settings/            #   server URL, certificate re-trust/forget, sign-out
+|
+`-- core-network/           # everything that talks to the server; app depends on this
+    +-- generated/           #   openapi-generator output -- NEVER hand-edited
+    +-- api/                 #   thin wrapper over the generated client: maps generated
+    |                        #   DTOs to domain models, absorbs contract changes in one
+    |                        #   place, tolerant to unknown fields
+    +-- tls/                 #   TOFU trust manager and certificate-fetch helper (section 6)
+    `-- auth/                #   Keystore-backed token store, bearer/refresh interceptors,
                              #   single-flight refresh guard, session-aware refresh
                              #   coordination (section 5)
 ```
 
 - Single activity; Compose Navigation with a sealed route graph. Start destination is
-  chosen at launch: no stored server → connect; no stored tokens → sign-in; otherwise
+  chosen at launch: no stored server -> connect; no stored tokens -> sign-in; otherwise
   library.
 - One package per screen under `app/`, each with its composable screen, ViewModel, and
   UI-state type. The now-playing screen polls `getCurrentSession`, advances the displayed

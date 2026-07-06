@@ -6,9 +6,9 @@
     <string name="connect_welcome_subtitle">Connect to your Ratatoskr server to play audiobooks on your Sonos speakers.</string>
     <string name="connect_server_url_label">Server URL</string>
     <string name="connect_action_connect">Connect</string>
-    <string name="connect_inspecting">Reading the server certificate…</string>
+    <string name="connect_inspecting">Reading the server certificate...</string>
     <string name="connect_action_retry">Try again</string>
-    <string name="connect_confirm_title">First connection — confirm this certificate</string>
+    <string name="connect_confirm_title">First connection: confirm this certificate</string>
     <string name="connect_cert_subject_label">Subject</string>
     <string name="connect_cert_issuer_label">Issuer</string>
     <string name="connect_cert_valid_until_label">Valid until</string>
@@ -32,18 +32,18 @@
     <string name="library_empty_title">Your library is empty</string>
     <string name="library_no_results_title">No matches</string>
     <string name="library_empty_body">Audiobooks from your Audiobookshelf server will show up here.</string>
-    <string name="library_no_results_body">No audiobooks match “%1$s”. Try a shorter search.</string>
+    <string name="library_no_results_body">No audiobooks match %1$s. Try a shorter search.</string>
     <string name="library_finished">Finished</string>
     <string name="library_percent">%1$d%%</string>
 
     <!-- Speakers -->
     <string name="speakers_title">Choose a speaker</string>
     <string name="speakers_subtitle">Playback starts on the speaker you pick.</string>
-    <string name="speakers_starting">Starting playback…</string>
+    <string name="speakers_starting">Starting playback...</string>
     <string name="speakers_empty_title">No speakers found</string>
     <string name="speakers_empty_hint">Make sure your Sonos speakers are powered on and reachable from the server.</string>
     <string name="speakers_group">Group</string>
-    <string name="speakers_group_members">Group · %1$s</string>
+    <string name="speakers_group_members">Group: %1$s</string>
     <string name="speakers_kind_speaker">Speaker</string>
 
     <!-- Now playing -->
@@ -57,7 +57,7 @@
     <string name="nowplaying_state_buffering">Buffering</string>
     <string name="nowplaying_state_finished">Finished</string>
     <string name="nowplaying_state_stopped">Stopped</string>
-    <string name="nowplaying_state_unknown">—</string>
+    <string name="nowplaying_state_unknown">-</string>
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>

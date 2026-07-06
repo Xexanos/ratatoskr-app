@@ -41,7 +41,7 @@ class BearerAuthInterceptor(
  * A single-flight lock prevents concurrent refreshes from racing: whoever loses the lock
  * picks up the token the winner already stored instead of refreshing again.
  *
- * [refreshSuppressed] lets the app switch this off while a playback session is active — the
+ * [refreshSuppressed] lets the app switch this off while a playback session is active -- the
  * server then owns the refresh-token rotation for the session, and the app must not consume
  * the same refresh token independently (SPEC section 5). While suppressed a 401 is surfaced
  * so the app can re-fetch the session (which carries any rotated token) instead.

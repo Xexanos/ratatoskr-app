@@ -24,7 +24,7 @@ data class CertificateInfo(
     val issuer: String,
     val notBefore: OffsetDateTime,
     val notAfter: OffsetDateTime,
-    /** Lowercase, colon-separated SHA-256 of the DER encoding, e.g. "ab:cd:…". */
+    /** Lowercase, colon-separated SHA-256 of the DER encoding, e.g. "ab:cd:...". */
     val sha256Fingerprint: String,
 )
 

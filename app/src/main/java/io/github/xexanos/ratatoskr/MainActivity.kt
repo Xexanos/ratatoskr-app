@@ -40,7 +40,7 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Launch routing (SPEC section 13): no trusted server → connect; no stored tokens →
+     * Launch routing (SPEC section 13): no trusted server -> connect; no stored tokens ->
      * sign-in; otherwise the library. Reads are one-shot and fast (DataStore caches).
      */
     private fun decideStartDestination(container: AppContainer): String = runBlocking {

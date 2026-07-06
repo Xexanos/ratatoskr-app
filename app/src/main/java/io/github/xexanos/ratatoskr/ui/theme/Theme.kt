@@ -52,7 +52,7 @@ private val LightColorScheme = lightColorScheme(
     outline = OutlineLight,
 )
 
-// The app's corner-radius scale — the single source of truth for shapes, so screens use
+// The app's corner-radius scale -- the single source of truth for shapes, so screens use
 // MaterialTheme.shapes.* rather than literal RoundedCornerShape(n.dp). Values match the radii
 // the screens were built with (12 / 16 / 20 dp).
 private val AppShapes = Shapes(

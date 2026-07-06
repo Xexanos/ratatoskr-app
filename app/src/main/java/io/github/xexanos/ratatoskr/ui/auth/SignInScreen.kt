@@ -212,19 +212,19 @@ private fun SignInContent(
 
 // --- Previews (render in Android Studio without a running server) --------------------------
 
-@Preview(name = "Sign in — idle", widthDp = 360, heightDp = 800)
+@Preview(name = "Sign in -- idle", widthDp = 360, heightDp = 800)
 @Composable
 private fun SignInIdlePreview() = RatatoskrTheme {
     Surface { SignInContent(SignInUiState.Idle) { _, _ -> } }
 }
 
-@Preview(name = "Sign in — error", widthDp = 360, heightDp = 800)
+@Preview(name = "Sign in -- error", widthDp = 360, heightDp = 800)
 @Composable
 private fun SignInErrorPreview() = RatatoskrTheme {
     Surface { SignInContent(SignInUiState.Error("Sign-in expired. Please sign in again.")) { _, _ -> } }
 }
 
-@Preview(name = "Sign in — submitting", widthDp = 360, heightDp = 800)
+@Preview(name = "Sign in -- submitting", widthDp = 360, heightDp = 800)
 @Composable
 private fun SignInSubmittingPreview() = RatatoskrTheme {
     Surface { SignInContent(SignInUiState.Submitting) { _, _ -> } }

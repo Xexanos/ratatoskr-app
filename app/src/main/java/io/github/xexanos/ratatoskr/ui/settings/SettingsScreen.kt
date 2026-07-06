@@ -220,7 +220,7 @@ private fun SettingsPreview() = RatatoskrTheme {
     }
 }
 
-@Preview(name = "Settings — not configured", widthDp = 360, heightDp = 800)
+@Preview(name = "Settings -- not configured", widthDp = 360, heightDp = 800)
 @Composable
 private fun SettingsUnconfiguredPreview() = RatatoskrTheme {
     Surface {

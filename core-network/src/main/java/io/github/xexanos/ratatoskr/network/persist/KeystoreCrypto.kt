@@ -35,7 +35,7 @@ class KeystoreCrypto(private val keyAlias: String = DEFAULT_ALIAS) {
     }
 
     /**
-     * Decrypts a value produced by [encrypt], or returns null when it cannot be read — the
+     * Decrypts a value produced by [encrypt], or returns null when it cannot be read -- the
      * key is gone (cleared, invalidated, or never created) or the stored ciphertext is
      * corrupt. Callers treat null as "no stored value", so an unreadable token leads to a
      * re-login rather than a crash. Crucially this never mints a key: decrypting with a fresh

@@ -1,26 +1,25 @@
 #!/usr/bin/env bash
 #
-# UX design guardrails — the deterministic checks the ux-review skill mandates
+# UX design guardrails -- the deterministic checks the ux-review skill mandates
 # (.claude/skills/ux-review). The "judged by the skill, stopped by CI" floor: they catch
 # drift that never needs a human eye. Run locally with `bash scripts/check-ux.sh`; CI runs
 # it on every push/PR.
 #
-# All five rules are FATAL: the screens have been migrated to theme tokens (colors + shapes),
-# strings.xml and Material icons, so the gate now holds the whole codebase to them. The
-# STRICT_* env vars remain only so a work-in-progress branch can temporarily downgrade a rule
-# (e.g. STRICT_STRINGS=0) while mid-refactor.
+# All five rules are FATAL: the codebase was migrated to theme tokens (colors + shapes),
+# strings.xml, Material icons, and ASCII-only source. The STRICT_* env vars remain only so a
+# work-in-progress branch can temporarily downgrade a rule (e.g. STRICT_STRINGS=0) mid-refactor.
 #
 set -uo pipefail
 
 UI="app/src/main/java/io/github/xexanos/ratatoskr/ui"
 STRICT_SHAPES="${STRICT_SHAPES:-1}"
 STRICT_STRINGS="${STRICT_STRINGS:-1}"
-STRICT_EMOJI="${STRICT_EMOJI:-1}"
+STRICT_ASCII="${STRICT_ASCII:-1}"
 fail=0
 
 echo "== 1. Hardcoded colors outside theme/ (use MaterialTheme.colorScheme) [FATAL] =="
 if grep -rEn --include='*.kt' 'Color\(0x[0-9a-fA-F]{6,8}\)' "$UI" | grep -v '/theme/'; then
-  echo "  FAIL: use theme tokens, not literal Color(0x…)."; fail=1
+  echo "  FAIL: use theme tokens, not literal Color(0x...)."; fail=1
 else echo "  ok"; fi
 
 echo "== 2. Hardcoded corner radii in dp (prefer MaterialTheme.shapes) [$( [ "$STRICT_SHAPES" = 1 ] && echo FATAL || echo advisory )] =="
@@ -30,7 +29,7 @@ if grep -rEn --include='*.kt' 'RoundedCornerShape\(\s*[0-9.]+\s*\.dp\s*\)' "$UI"
 else echo "  ok"; fi
 
 echo "== 3. Material-2 component imports (use androidx.compose.material3) [FATAL] =="
-# material.icons.* is the correct icon package for Material 3 — only real M2 components count.
+# material.icons.* is the correct icon package for Material 3 -- only real M2 components count.
 if grep -rEn --include='*.kt' 'import androidx\.compose\.material\.' "$UI" | grep -v 'androidx\.compose\.material\.icons'; then
   echo "  FAIL: Material 2 component import found; use material3."; fail=1
 else echo "  ok"; fi
@@ -43,16 +42,18 @@ if [ -n "$hits" ]; then
   else echo "  warn: move UI copy into strings.xml (English source), then flip STRICT_STRINGS=1."; fi
 else echo "  ok"; fi
 
-echo "== 5. Emoji used as UI glyphs (use Material icons) [$( [ "$STRICT_EMOJI" = 1 ] && echo FATAL || echo advisory )] =="
-# All-emoji detection via scripts/lint_emoji.py: everything from U+2190 up is rejected except
-# an explicit allowlist (see there). A single threshold, so there are no gaps as new emoji are
-# added — not a rot-prone denylist — and it is locale-independent. Skips gracefully without Python.
+echo "== 5. Non-ASCII characters (English source is ASCII; non-ASCII belongs in translations) [$( [ "$STRICT_ASCII" = 1 ] && echo FATAL || echo advisory )] =="
+# Scope: Kotlin + Gradle/shell/python + prose docs + the base strings.xml. Exempt: the rendered
+# design doc, SVGs, localized resources (values-*/), fastlane locale metadata, and the vendored
+# gradlew. lint_ascii.py flags any character > U+007F (emoji, arrows, smart quotes, accents...).
 PY="$(command -v python3 || command -v python || true)"
-emoji_hits="$([ -n "$PY" ] && "$PY" scripts/lint_emoji.py "$UI" || true)"
-if [ -n "$emoji_hits" ]; then
-  echo "$emoji_hits"
-  if [ "$STRICT_EMOJI" = 1 ]; then echo "  FAIL: replace emoji with Material icons (Icon + contentDescription)."; fail=1
-  else echo "  warn: replace emoji with Material icons; then flip STRICT_EMOJI=1."; fi
+ascii_files="$(git ls-files '*.kt' '*.kts' '*.sh' '*.py' '*.md' 'app/src/main/res/values/strings.xml' '.gitignore' '.gitattributes' \
+  | grep -vE '^(docs/ux-design\.html|gradlew)$|\.svg$|/values-|^fastlane/')"
+ascii_hits="$([ -n "$PY" ] && echo "$ascii_files" | xargs "$PY" scripts/lint_ascii.py || true)"
+if [ -n "$ascii_hits" ]; then
+  echo "$ascii_hits"
+  if [ "$STRICT_ASCII" = 1 ]; then echo "  FAIL: keep source ASCII (arrows -> '->', em-dash -> '--', ...); non-ASCII text belongs in a translation."; fail=1
+  else echo "  warn: non-ASCII found; keep source ASCII."; fi
 else echo "  ok"; fi
 
 if [ "$fail" -ne 0 ]; then
