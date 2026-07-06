@@ -114,6 +114,9 @@ class RatatoskrClient internal constructor(
             ApiResult.Failure(mapHttpError(response.code(), response.errorBody()?.string(), sessionEndpoint))
         }
     } catch (t: Throwable) {
+        // Never swallow coroutine cancellation: rethrow so structured concurrency can unwind
+        // instead of the cancelled call writing a spurious error state.
+        if (t is kotlin.coroutines.cancellation.CancellationException) throw t
         ApiResult.Failure(mapThrowable(t))
     }
 
@@ -125,6 +128,9 @@ class RatatoskrClient internal constructor(
         if (response.isSuccessful) ApiResult.Success(Unit)
         else ApiResult.Failure(mapHttpError(response.code(), response.errorBody()?.string(), sessionEndpoint))
     } catch (t: Throwable) {
+        // Never swallow coroutine cancellation: rethrow so structured concurrency can unwind
+        // instead of the cancelled call writing a spurious error state.
+        if (t is kotlin.coroutines.cancellation.CancellationException) throw t
         ApiResult.Failure(mapThrowable(t))
     }
 

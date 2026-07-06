@@ -8,6 +8,7 @@ package io.github.xexanos.ratatoskr.network.persist
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import java.security.GeneralSecurityException
 import java.security.KeyStore
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -33,18 +34,37 @@ class KeystoreCrypto(private val keyAlias: String = DEFAULT_ALIAS) {
         return Base64.encodeToString(combined, Base64.NO_WRAP)
     }
 
-    fun decrypt(encoded: String): String {
-        val combined = Base64.decode(encoded, Base64.NO_WRAP)
-        val iv = combined.copyOfRange(0, IV_LENGTH)
-        val ciphertext = combined.copyOfRange(IV_LENGTH, combined.size)
-        val cipher = Cipher.getInstance(TRANSFORMATION)
-        cipher.init(Cipher.DECRYPT_MODE, getOrCreateKey(), GCMParameterSpec(TAG_LENGTH_BITS, iv))
-        return String(cipher.doFinal(ciphertext), Charsets.UTF_8)
+    /**
+     * Decrypts a value produced by [encrypt], or returns null when it cannot be read — the
+     * key is gone (cleared, invalidated, or never created) or the stored ciphertext is
+     * corrupt. Callers treat null as "no stored value", so an unreadable token leads to a
+     * re-login rather than a crash. Crucially this never mints a key: decrypting with a fresh
+     * key would only turn a missing key into a guaranteed authentication-tag failure, which is
+     * what previously crashed the app on every launch (SPEC section 5).
+     */
+    fun decrypt(encoded: String): String? {
+        val key = existingKey() ?: return null
+        return try {
+            val combined = Base64.decode(encoded, Base64.NO_WRAP)
+            val iv = combined.copyOfRange(0, IV_LENGTH)
+            val ciphertext = combined.copyOfRange(IV_LENGTH, combined.size)
+            val cipher = Cipher.getInstance(TRANSFORMATION)
+            cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(TAG_LENGTH_BITS, iv))
+            String(cipher.doFinal(ciphertext), Charsets.UTF_8)
+        } catch (_: GeneralSecurityException) {
+            null // wrong/rotated key (AEADBadTagException) or other crypto failure
+        } catch (_: IllegalArgumentException) {
+            null // malformed or truncated Base64
+        }
+    }
+
+    private fun existingKey(): SecretKey? {
+        val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
+        return (keyStore.getEntry(keyAlias, null) as? KeyStore.SecretKeyEntry)?.secretKey
     }
 
     private fun getOrCreateKey(): SecretKey {
-        val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
-        (keyStore.getEntry(keyAlias, null) as? KeyStore.SecretKeyEntry)?.let { return it.secretKey }
+        existingKey()?.let { return it }
 
         val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
         generator.init(

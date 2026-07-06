@@ -13,6 +13,9 @@ import io.github.xexanos.ratatoskr.network.generated.api.PlaybackApi
 import io.github.xexanos.ratatoskr.network.generated.api.SpeakersApi
 import io.github.xexanos.ratatoskr.network.generated.api.SystemApi
 import io.github.xexanos.ratatoskr.network.generated.infrastructure.Serializer
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
@@ -128,5 +131,19 @@ class RatatoskrClientTest {
         assertTrue(result is ApiResult.Success)
         val body = server.takeRequest().body.readUtf8()
         assertTrue("request should carry the refresh token, was: $body", body.contains("\"r0\""))
+    }
+
+    @Test
+    fun `cancellation propagates instead of becoming a Failure`() = runBlocking {
+        // No response is enqueued, so the call hangs until the coroutine is cancelled. If the
+        // wrapper swallowed CancellationException it would complete normally with a Failure;
+        // instead the job must end cancelled.
+        val job = launch(start = CoroutineStart.UNDISPATCHED) {
+            client.currentSession()
+        }
+
+        job.cancelAndJoin()
+
+        assertTrue(job.isCancelled)
     }
 }
