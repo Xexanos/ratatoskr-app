@@ -185,6 +185,19 @@ screen exposes the server URL, a re-trust/forget action for the certificate, and
   `fdroiddata` repository, not here.
 - Choose a reasonable `minSdk` that covers the encrypted-storage and TLS requirements; the
   agent proposes the exact value.
+- Release shrinking (R8) is near-term build hardening, not a post-v1 nice-to-have: take it
+  up soon — after the integration-test layer below (section 9) — so the debt of shipping
+  unshrunk stops growing. It is currently disabled because the generated API client uses
+  reflective Moshi adapters (`@JsonClass(generateAdapter = false)`); enabling shrinking first
+  needs validated Moshi/Retrofit keep rules, or (better) switching the generator to Moshi
+  codegen adapters so no reflection is kept at all. Sequencing it right after the integration
+  tests is deliberate: that harness drives real responses through the factory's own Moshi over
+  `MockWebServer`, which is exactly what verifies a minified build still deserializes correctly.
+  While it stays off, unused code and resources accumulate unshrunk (e.g. the vectors pulled in
+  with `material-icons-extended`), inflating the F-Droid build size — the longer it waits, the
+  more debt it carries. Until the keep rules are validated against a real minified, on-device
+  run, the release ships unshrunk rather than risk a runtime-only break; the `build.gradle.kts`
+  release block carries the same rationale where it is off.
 
 ## 9. Testing
 
