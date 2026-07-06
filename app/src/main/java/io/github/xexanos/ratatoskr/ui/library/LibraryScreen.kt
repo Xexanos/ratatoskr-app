@@ -56,6 +56,7 @@ import io.github.xexanos.ratatoskr.data.ConnectionManager
 import io.github.xexanos.ratatoskr.network.domain.ApiResult
 import io.github.xexanos.ratatoskr.network.domain.LibraryItemSummary
 import io.github.xexanos.ratatoskr.network.domain.Progress
+import io.github.xexanos.ratatoskr.ui.EmptyState
 import io.github.xexanos.ratatoskr.ui.theme.RatatoskrTheme
 import io.github.xexanos.ratatoskr.ui.toMessage
 import kotlinx.coroutines.FlowPreview
@@ -223,37 +224,17 @@ private fun LibraryContent(
 
 @Composable
 private fun EmptyLibrary(query: String) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(horizontal = 32.dp),
-        ) {
-            Icon(
-                if (query.isBlank()) Icons.AutoMirrored.Filled.MenuBook else Icons.Default.SearchOff,
-                contentDescription = null,
-                modifier = Modifier.size(48.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                stringResource(
-                    if (query.isBlank()) R.string.library_empty_title else R.string.library_no_results_title,
-                ),
-                style = MaterialTheme.typography.titleMedium,
-                textAlign = TextAlign.Center,
-            )
-            Text(
-                if (query.isBlank()) {
-                    stringResource(R.string.library_empty_body)
-                } else {
-                    stringResource(R.string.library_no_results_body, query)
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-        }
-    }
+    EmptyState(
+        icon = if (query.isBlank()) Icons.AutoMirrored.Filled.MenuBook else Icons.Default.SearchOff,
+        title = stringResource(
+            if (query.isBlank()) R.string.library_empty_title else R.string.library_no_results_title,
+        ),
+        body = if (query.isBlank()) {
+            stringResource(R.string.library_empty_body)
+        } else {
+            stringResource(R.string.library_no_results_body, query)
+        },
+    )
 }
 
 @Composable

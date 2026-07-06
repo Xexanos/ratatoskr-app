@@ -47,6 +47,7 @@ import io.github.xexanos.ratatoskr.R
 import io.github.xexanos.ratatoskr.data.ConnectionManager
 import io.github.xexanos.ratatoskr.network.domain.ApiResult
 import io.github.xexanos.ratatoskr.network.domain.Speaker
+import io.github.xexanos.ratatoskr.ui.EmptyState
 import io.github.xexanos.ratatoskr.ui.theme.RatatoskrTheme
 import io.github.xexanos.ratatoskr.ui.toMessage
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -154,30 +155,11 @@ private fun SpeakersContent(
                 )
             }
 
-            state.speakers.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.padding(horizontal = 32.dp),
-                ) {
-                    Icon(
-                        Icons.Default.SpeakerGroup,
-                        contentDescription = null,
-                        modifier = Modifier.size(48.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        stringResource(R.string.speakers_empty_title),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Text(
-                        stringResource(R.string.speakers_empty_hint),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                    )
-                }
-            }
+            state.speakers.isEmpty() -> EmptyState(
+                icon = Icons.Default.SpeakerGroup,
+                title = stringResource(R.string.speakers_empty_title),
+                body = stringResource(R.string.speakers_empty_hint),
+            )
 
             else -> LazyColumn(
                 modifier = Modifier.fillMaxSize(),
