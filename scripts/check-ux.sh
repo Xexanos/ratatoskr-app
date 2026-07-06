@@ -8,15 +8,17 @@
 # Posture: this gate was introduced onto an existing codebase, so it enforces only what the
 # code already satisfies and *reports* the rest, exactly as you'd adopt any linter:
 #   - colors and real Material-2 component imports are FATAL (the code is already clean);
-#   - corner radii and hardcoded strings are ADVISORY for now — the screens predate these
-#     rules (custom radii like 20.dp have no M3 shape token; copy is not yet in strings.xml).
-#     Flip STRICT_SHAPES / STRICT_STRINGS to 1 per rule as the screens are migrated.
+#   - corner radii, hardcoded strings, and emoji-as-icons are ADVISORY for now — the screens
+#     predate these rules (custom radii like 20.dp have no M3 shape token; copy is not yet in
+#     strings.xml; some empty states use emoji). Flip STRICT_SHAPES / STRICT_STRINGS /
+#     STRICT_EMOJI to 1 per rule as the screens are migrated.
 #
 set -uo pipefail
 
 UI="app/src/main/java/io/github/xexanos/ratatoskr/ui"
 STRICT_SHAPES="${STRICT_SHAPES:-0}"
 STRICT_STRINGS="${STRICT_STRINGS:-0}"
+STRICT_EMOJI="${STRICT_EMOJI:-0}"
 fail=0
 
 echo "== 1. Hardcoded colors outside theme/ (use MaterialTheme.colorScheme) [FATAL] =="
@@ -42,6 +44,19 @@ if [ -n "$hits" ]; then
   echo "$hits"
   if [ "$STRICT_STRINGS" = 1 ]; then echo "  FAIL: move UI copy into strings.xml and use stringResource()."; fail=1
   else echo "  warn: move UI copy into strings.xml (English source), then flip STRICT_STRINGS=1."; fi
+else echo "  ok"; fi
+
+echo "== 5. Emoji used as UI glyphs (use Material icons) [$( [ "$STRICT_EMOJI" = 1 ] && echo FATAL || echo advisory )] =="
+# Fixed-string (byte-wise) match on a denylist of icon-like glyphs — locale-independent, so
+# it behaves the same on git-bash and the CI runner, and never touches umlauts/em-dash/quotes.
+emoji_hits="$(grep -rnF --include='*.kt' \
+  -e '▶' -e '⏸' -e '⏹' -e '⏭' -e '⏮' -e '⏩' -e '⏪' -e '♪' -e '♫' -e '♬' \
+  -e '🔀' -e '🔁' -e '🔊' -e '🔈' -e '🔇' -e '🎵' -e '🎶' -e '🎧' -e '📚' -e '📖' \
+  -e '🔍' -e '✅' -e '❌' -e '⚠' -e '➕' -e '➖' -e '🔒' -e '🔑' -e '⚙' -e '🏠' -e '⭐' "$UI" || true)"
+if [ -n "$emoji_hits" ]; then
+  echo "$emoji_hits"
+  if [ "$STRICT_EMOJI" = 1 ]; then echo "  FAIL: replace emoji with Material icons (Icon + contentDescription)."; fail=1
+  else echo "  warn: replace emoji with Material icons; then flip STRICT_EMOJI=1."; fi
 else echo "  ok"; fi
 
 if [ "$fail" -ne 0 ]; then

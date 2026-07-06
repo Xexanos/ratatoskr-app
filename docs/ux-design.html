@@ -554,6 +554,21 @@
         <tr><td><code>full</code></td><td>Buttons, search field, chips — the app’s friendly base shape</td></tr>
       </table>
     </div>
+
+    <p class="token-sub">Iconography</p>
+    <p style="max-width:640px; color:#4A3C33; margin:0 0 16px;">One icon family: <b>Material Symbols</b> (<code>androidx.compose.material.icons</code>, already used across the app). <b>No emoji as UI glyphs</b> — emoji render in the device’s own emoji font, so they differ across manufacturers and OS versions, can’t take the brand tint, and read as decoration to TalkBack. Material icons are bundled vectors: identical everywhere, tintable, and each carries a label.</p>
+    <div class="table-scroll">
+      <table class="tokens">
+        <tr><th>Rule</th><th>Value</th></tr>
+        <tr><td>Family / weight</td><td>Material Symbols; <b>filled</b> for primary/active affordances (transport), outlined elsewhere — one weight per surface</td></tr>
+        <tr><td>Color</td><td>Tint via the theme role (<code>onSurface</code>, <code>primary</code> for the key action) — never a hardcoded color</td></tr>
+        <tr><td>Size / target</td><td>24 dp glyph inside a ≥ 48 dp touch target</td></tr>
+        <tr><td>Accessibility</td><td>A real <code>contentDescription</code> (from <code>strings.xml</code>); <code>null</code> only when the icon is decorative or merged into a labeled parent</td></tr>
+        <tr><td>Transport set</td><td><code>PlayArrow</code> · <code>Pause</code> · <code>Stop</code>; skips <code>Replay10</code>/<code>Forward10</code>; chapters <code>SkipPrevious</code>/<code>SkipNext</code></td></tr>
+        <tr><td>Placeholders</td><td>Missing cover art → the title’s initial on a brand gradient, with a tinted <code>MenuBook</code>/<code>LibraryMusic</code> icon as fallback — not a “♪” emoji</td></tr>
+        <tr><td colspan="2" style="color:var(--muted); font-size:13px">F-Droid: <code>material-icons-core</code> is Apache-2.0 with no Play Services. Prefer core; if a glyph lives only in <code>-extended</code> (e.g. <code>Replay10</code>), ship it as a small local vector rather than pulling the whole extended set. The UX gate flags emoji glyphs in <code>Text(…)</code> so they can’t creep back in.</td></tr>
+      </table>
+    </div>
   </section>
 
   <!-- ============ 01 connect ============ -->
