@@ -24,9 +24,14 @@ keystore.properties
 
 # Installed skills (third-party local tooling, not project code). Our own project
 # skills and agents ARE committed -- installed skills are re-excluded per entry below.
-skills-lock.json
+# skills-lock.json IS committed: it records the installed third-party skills (source +
+# content hash) so they stay reproducible without vendoring their files.
 .claude/skills/*
 !.claude/skills/ux-review/
+
+# Personal, machine-local settings (plugin toggles, etc.). The shared, committed config
+# lives in .claude/settings.json; this override file must never be committed.
+.claude/settings.local.json
 
 # Font cache of the logo generator. The Norse font license forbids
 # redistributing the font FILE, so it is downloaded from the author's
