@@ -10,6 +10,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -121,12 +122,13 @@ fun RatatoskrNavHost(container: AppContainer, startDestination: Route) {
                 viewModel = vm,
                 onReTrust = {
                     // Clear the whole back stack so Back can't return to authenticated screens.
-                    // launchSingleTop is required because Connect is the graph's start
-                    // destination in a first-run session: without it, popping the graph and
-                    // navigating to the start destination does not land on Connect (the screen
-                    // would stay on Settings).
+                    // Pop to the start destination inclusively (not the graph id): re-trust
+                    // navigates to Connect, which is the graph's start destination in a first-run
+                    // session, and popUpTo(graph.id) + navigate(startDestination) does not land
+                    // there (the screen stays on Settings). This is the canonical clear-and-reset
+                    // idiom that works for the start destination too.
                     navController.navigate(Route.Connect) {
-                        popUpTo(navController.graph.id) { inclusive = true }
+                        popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
                         launchSingleTop = true
                     }
                 },
