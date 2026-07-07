@@ -26,6 +26,7 @@ import io.github.xexanos.ratatoskr.R
 import io.github.xexanos.ratatoskr.network.WireFixtures
 import io.github.xexanos.ratatoskr.network.testutil.HttpsMockServer
 import okhttp3.mockwebserver.MockResponse
+import org.junit.Before
 import org.junit.FixMethodOrder
 import org.junit.Rule
 import org.junit.Test
@@ -65,7 +66,14 @@ class AppFlowTest {
 
     private fun str(id: Int): String = compose.activity.getString(id)
 
-    private fun installServer(dispatcher: RatatoskrDispatcher = RatatoskrDispatcher()) {
+    // Every test starts with the happy-path server; a test needing different behaviour
+    // overrides it via useDispatcher(...). Runs after the rule chain has started the server.
+    @Before
+    fun installDefaultServer() {
+        server.server.dispatcher = RatatoskrDispatcher()
+    }
+
+    private fun useDispatcher(dispatcher: RatatoskrDispatcher) {
         server.server.dispatcher = dispatcher
     }
 
@@ -90,7 +98,6 @@ class AppFlowTest {
 
     @Test
     fun aSmoke_appLaunchesToTheConnectScreen() {
-        installServer()
         // Guards the whole sync approach: the app must render past its startup spinner to the
         // connect screen. If the wait strategy is wrong this fails here, before any flow.
         compose.awaitText(str(R.string.connect_action_connect))
@@ -99,7 +106,6 @@ class AppFlowTest {
 
     @Test
     fun connectSignInLibrarySpeakersNowPlaying() {
-        installServer()
         connectTrustAndSubmitSignIn()
 
         // Library -> open the first book.
@@ -134,7 +140,6 @@ class AppFlowTest {
 
     @Test
     fun connectRejectsAnUnreachableServer() {
-        installServer()
         compose.awaitText(str(R.string.connect_action_connect))
         // Nothing listens on :1, so certificate inspection fails -> the error/retry card.
         compose.onNode(hasSetTextAction()).performTextReplacement("https://localhost:1")
@@ -148,7 +153,7 @@ class AppFlowTest {
 
     @Test
     fun signInFailureKeepsTheUserOnSignIn() {
-        installServer(RatatoskrDispatcher(login = { MockResponse().setResponseCode(401) }))
+        useDispatcher(RatatoskrDispatcher(login = { MockResponse().setResponseCode(401) }))
         connectTrustAndSubmitSignIn()
         // Login was rejected: the sign-in action returns (not submitting) and we did not
         // navigate to the library.
@@ -159,7 +164,7 @@ class AppFlowTest {
 
     @Test
     fun emptyLibraryShowsTheEmptyState() {
-        installServer(RatatoskrDispatcher(libraryPage = WireFixtures.libraryPageJson(items = emptyList())))
+        useDispatcher(RatatoskrDispatcher(libraryPage = WireFixtures.libraryPageJson(items = emptyList())))
         connectTrustAndSubmitSignIn()
         compose.awaitText(str(R.string.library_empty_title))
         compose.onAllNodesWithTag(UiTestTags.LIBRARY_ROW).assertCountEquals(0)
