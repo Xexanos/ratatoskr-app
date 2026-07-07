@@ -5,6 +5,8 @@
  */
 package io.github.xexanos.ratatoskr.network.component
 
+import io.github.xexanos.ratatoskr.network.testutil.HttpsMockServer
+
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.test.ext.junit.runners.AndroidJUnit4

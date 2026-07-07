@@ -40,4 +40,39 @@ object WireFixtures {
     ): String =
         """{"accessToken":"$accessToken","refreshToken":"$refreshToken",""" +
             """"user":{"id":"7","username":"$username"}}"""
+
+    /** A single `Speaker` wire object. */
+    fun speakerJson(
+        id: String = "s1",
+        name: String = "Living Room",
+        isGroup: Boolean = false,
+        members: List<String> = emptyList(),
+    ): String {
+        val m = members.joinToString(",") { "\"$it\"" }
+        return """{"id":"$id","name":"$name","isGroup":$isGroup,"members":[$m]}"""
+    }
+
+    /** A `GET /v1/speakers` response body (a JSON array of speakers). */
+    fun speakerListJson(vararg speakers: String = arrayOf(speakerJson())): String =
+        "[${speakers.joinToString(",")}]"
+
+    /** A single `LibraryItemSummary` wire object (cover/progress omitted - optional). */
+    fun libraryItemSummaryJson(
+        id: String = "i1",
+        title: String = "The Hobbit",
+        author: String? = "J. R. R. Tolkien",
+        durationSeconds: Double = 39_600.0,
+    ): String {
+        val a = author?.let { ""","author":"$it"""" } ?: ""
+        return """{"id":"$id","title":"$title"$a,"durationSeconds":$durationSeconds}"""
+    }
+
+    /** A `GET /v1/library/items` response body (a `LibraryItemPage`). */
+    fun libraryPageJson(
+        items: List<String> = listOf(libraryItemSummaryJson()),
+        nextCursor: String? = null,
+    ): String {
+        val c = nextCursor?.let { ""","nextCursor":"$it"""" } ?: ""
+        return """{"items":[${items.joinToString(",")}]$c}"""
+    }
 }

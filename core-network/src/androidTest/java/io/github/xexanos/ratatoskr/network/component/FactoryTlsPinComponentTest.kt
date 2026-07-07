@@ -5,6 +5,8 @@
  */
 package io.github.xexanos.ratatoskr.network.component
 
+import io.github.xexanos.ratatoskr.network.testutil.HttpsMockServer
+
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.xexanos.ratatoskr.network.FakeTokenAccess
 import io.github.xexanos.ratatoskr.network.api.RatatoskrClient

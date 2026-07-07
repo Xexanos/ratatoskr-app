@@ -3,7 +3,7 @@
  * Copyright (C) 2026  Ratatoskr contributors
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
-package io.github.xexanos.ratatoskr.network.component
+package io.github.xexanos.ratatoskr.network.testutil
 
 import io.github.xexanos.ratatoskr.network.api.RatatoskrClient
 import io.github.xexanos.ratatoskr.network.tls.Fingerprints

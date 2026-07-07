@@ -81,6 +81,14 @@ dependencies {
     api(libs.kotlinx.coroutines.core)
     implementation(libs.androidx.datastore.preferences)
 
+    // Shared test fixtures (FakeTokenAccess, WireFixtures, HttpsMockServer) consumed by this
+    // module's unit + instrumented tests AND the :app UI integration tests. HttpsMockServer's
+    // public surface exposes JUnit's ExternalResource and MockWebServer/okhttp-tls types, so
+    // these are `api` (transitive to consumers), not `implementation`.
+    testFixturesApi(libs.junit)
+    testFixturesApi(libs.okhttp.mockwebserver)
+    testFixturesApi(libs.okhttp.tls)
+
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.core)
     testImplementation(libs.okhttp.mockwebserver)
