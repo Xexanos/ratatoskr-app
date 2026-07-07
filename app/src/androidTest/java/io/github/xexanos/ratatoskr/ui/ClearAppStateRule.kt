@@ -15,19 +15,16 @@ import org.junit.rules.ExternalResource
  * install (`MainActivity` routes to the connect screen). Must be the OUTER rule in the chain
  * so it runs before the activity launches.
  *
- * The reset goes through the process singleton container's OWN store instances - not by
- * deleting the DataStore files - because DataStore keeps an in-memory cache: a prior test's
+ * The reset goes through the process singleton container's own `reset()` - not by deleting
+ * the DataStore files - because DataStore keeps an in-memory cache: a prior test's
  * `saveTrustedServer` lives in that cache, and deleting the file on disk would not evict it,
  * so the next test would still read the stale server (a dead MockWebServer port) and skip
- * connect. `invalidate()` drops any client cached against that dead port.
+ * connect. Delegating to `AppContainer.reset()` keeps the set of cleared stores defined next
+ * to where the stores themselves are declared, so a newly added store is covered there.
  */
 class ClearAppStateRule : ExternalResource() {
     override fun before() {
         val app = ApplicationProvider.getApplicationContext<RatatoskrApp>()
-        runBlocking {
-            app.container.connectionStore.clear()
-            app.container.tokenStore.clear()
-        }
-        app.container.connectionManager.invalidate()
+        runBlocking { app.container.reset() }
     }
 }

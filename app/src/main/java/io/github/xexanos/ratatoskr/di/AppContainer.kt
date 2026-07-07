@@ -35,4 +35,15 @@ class AppContainer(context: Context) {
     val tokenStore = TokenStore(tokenDataStore, KeystoreCrypto())
     val certificateInspector = CertificateInspector()
     val connectionManager = ConnectionManager(connectionStore, tokenStore)
+
+    /**
+     * Clears all locally persisted state (trusted server + certificate, auth tokens) and drops
+     * the cached client. Lives next to the store declarations so a newly added store is covered
+     * here by construction; used by the instrumented tests to start each from a clean install.
+     */
+    suspend fun reset() {
+        connectionStore.clear()
+        tokenStore.clear()
+        connectionManager.invalidate()
+    }
 }
