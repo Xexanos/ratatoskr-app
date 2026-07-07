@@ -40,16 +40,18 @@ class HttpsMockServer {
     private val served: HeldCertificate =
         HeldCertificate.Builder().addSubjectAlternativeName(loopbackHost).build()
 
-    // A second, never-served certificate. Its fingerprint is a valid SHA-256 that simply does
-    // not match what the server presents, standing in for a changed/rotated certificate.
-    private val other: HeldCertificate =
-        HeldCertificate.Builder().addSubjectAlternativeName(loopbackHost).build()
-
     /** SHA-256 of the served leaf, in the exact form [Fingerprints.sha256] produces. */
     val fingerprint: String get() = Fingerprints.sha256(served.certificate)
 
-    /** A valid-format fingerprint that does not match the served certificate. */
-    val wrongFingerprint: String get() = Fingerprints.sha256(other.certificate)
+    /**
+     * A well-formed SHA-256 fingerprint that cannot match the served certificate, standing in
+     * for a changed/rotated one. A constant suffices: the pin comparison is a normalized string
+     * equality ([Fingerprints.matches]), never a proof that the pin belongs to a real
+     * certificate - so minting a second certificate would buy nothing.
+     */
+    val wrongFingerprint: String =
+        "00:11:22:33:44:55:66:77:88:99:aa:bb:cc:dd:ee:ff:" +
+            "00:11:22:33:44:55:66:77:88:99:aa:bb:cc:dd:ee:ff"
 
     /** Base URL WITHOUT the `/v1/` suffix - the factory appends it. Valid after [start]. */
     val baseUrl: String get() = server.url("/").toString().trimEnd('/')
