@@ -1,8 +1,10 @@
 name: CI
 
-# Builds the app and runs the unit tests on every push and every pull request, so a
-# change can't merge without compiling and passing tests. No branch filter: pushes to any
-# branch run too, so work on stacked/feature branches (and PRs targeting them) is covered.
+# Builds the app and runs the unit tests, so a change can't merge without compiling and
+# passing tests. push builds only main; every pull request builds its head. Feature-branch
+# work is covered by its PR - a branch with no open PR does not build. Scoping push to main
+# is deliberate: a push to a PR branch would otherwise fire BOTH the push and pull_request
+# events and build the same commit twice (leaving a cancelled duplicate run on the PR).
 # Free-software toolchain only (SPEC section 8): official GitHub-hosted runner, Temurin
 # JDK, Gradle wrapper - no proprietary SDKs.
 #
@@ -13,6 +15,7 @@ name: CI
 # protection, a docs-only PR would show no CI run; use a companion always-pass job then.)
 on:
   push:
+    branches: [main]
     paths-ignore: &docs-only
       - '**/*.md'
       - 'docs/**'
@@ -26,9 +29,9 @@ permissions:
   contents: read
 
 concurrency:
-  # Key on the head branch (not the ref) so a branch's push event and its pull_request
-  # event collapse into one group - cancel-in-progress then keeps a single run instead of
-  # building the same commit twice now that there is no branch filter.
+  # push (main) and pull_request no longer fire for the same commit, so there is no push/PR
+  # duplicate to collapse here; this just cancels a superseded run when new commits land in
+  # quick succession on the same PR (or on main).
   group: ci-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
