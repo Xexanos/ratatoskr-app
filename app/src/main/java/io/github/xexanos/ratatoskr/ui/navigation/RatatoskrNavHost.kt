@@ -120,10 +120,8 @@ fun RatatoskrNavHost(container: AppContainer, startDestination: Route) {
             SettingsScreen(
                 viewModel = vm,
                 onReTrust = {
-                    // Clear the whole back stack so Back can't return to authenticated screens.
-                    // NOTE: in a first-run session Connect is the graph's start destination and
-                    // this does not actually land on Connect (the screen stays on Settings) -
-                    // a pre-existing re-trust navigation bug tracked separately; not fixed here.
+                    // Re-trust: return to the connect screen with an empty back stack, so Back
+                    // can't reach the now-untrusted authenticated screens.
                     navController.navigate(Route.Connect) {
                         popUpTo(navController.graph.id) { inclusive = true }
                     }

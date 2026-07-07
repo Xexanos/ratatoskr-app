@@ -9,8 +9,10 @@ import io.github.xexanos.ratatoskr.network.api.RatatoskrClient
 import io.github.xexanos.ratatoskr.network.api.RatatoskrClientFactory
 import io.github.xexanos.ratatoskr.network.persist.ConnectionStore
 import io.github.xexanos.ratatoskr.network.persist.TokenStore
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -51,7 +53,7 @@ class ConnectionManager(
             // Re-check inside the lock: another caller may have built it while we waited.
             cached?.let { if (it.key == key) return@withLock it.client }
             // A cached client for a different key is being replaced - release its HTTP stack.
-            cached?.client?.close()
+            cached?.client?.let { closeClient(it) }
             RatatoskrClientFactory.create(
                 baseUrl = config.baseUrl,
                 fingerprint = fingerprint,
@@ -64,8 +66,18 @@ class ConnectionManager(
     }
 
     /** Drop the cached client after the server or certificate changed, releasing its HTTP stack. */
-    fun invalidate() {
-        cached?.client?.close()
+    suspend fun invalidate() {
+        val toClose = cached?.client
         cached = null
+        toClose?.let { closeClient(it) }
+    }
+
+    // RatatoskrClient.close() evicts the OkHttp connection pool, which flushes and closes live
+    // TLS sockets - blocking network I/O. Callers invalidate from viewModelScope
+    // (Dispatchers.Main), so closing on the caller's thread throws NetworkOnMainThreadException
+    // (and would crash forget-certificate, where a live client exists). Tear down off the main
+    // thread.
+    private suspend fun closeClient(client: RatatoskrClient) {
+        withContext(Dispatchers.IO) { client.close() }
     }
 }
