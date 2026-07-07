@@ -21,6 +21,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -103,9 +104,13 @@ class FactoryAuthIntegrationTest {
                 done.countDown()
             }
         }
-        done.await()
-        pool.shutdown()
+        // Bounded wait: if the refresh path ever deadlocks again (e.g. a shared dispatcher
+        // starves the refresh under concurrent 401s), fail here in seconds instead of hanging
+        // until the CI job timeout.
+        val finished = done.await(30, TimeUnit.SECONDS)
+        pool.shutdownNow()
 
+        assertTrue("requests deadlocked: only ${outcomes.size}/$n finished", finished)
         assertEquals(1, refreshCalls.get())
         assertTrue("all requests should succeed, was $outcomes", outcomes.all { it })
     }
