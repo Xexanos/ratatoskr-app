@@ -201,50 +201,73 @@ screen exposes the server URL, a re-trust/forget action for the certificate, and
 
 ## 9. Testing
 
-Tests run on the JVM so CI needs no device or emulator (see the CI workflow); they live in
-`testDebugUnitTest`.
+Testing is layered by what each layer can honestly verify. The layers are complementary, not
+redundant: lower layers go deep on mechanics and edge cases, the integration layer goes broad
+across the assembled user flow. Any overlap between them is deliberately thin.
 
-**Component / unit tests** (in place):
+### 1. Unit tests (JVM)
 
-- Unit-test the auth/token logic: attaching the bearer token, the refresh-on-401 flow, the
-  single-flight refresh guard, and secure storage read/write (with the platform pieces
-  faked).
-- Unit-test the mapping between generated contract types and the domain/UI models, including
-  tolerance to unknown fields.
-- A small number of UI tests for the critical flows (connect and trust, sign in, start
-  playback, the now-playing controls) are welcome but not the priority for v1.
-- Automated accessibility checks: an instrumented suite (`AccessibilityChecksTest`) runs
-  the Accessibility Test Framework over every screen preview and fails on violations.
-  Instrumented on purpose — the checks need the real accessibility node tree and pass
-  vacuously on the JVM; a canary test guards against that.
+Pure logic with the platform pieces faked. JVM (`testDebugUnitTest`), no device, fast; most
+tests live here. In place: the auth/token logic (bearer attachment, refresh-on-401,
+single-flight guard, secure-storage read/write with the platform faked) and the mapping
+between generated contract types and the domain/UI models (including unknown-field tolerance).
 
-**Integration tests** (next task, before further feature work): exercise the network layer
-*as it is actually assembled*, not hand-wired in the test. This is the priority gap: a unit
-test that constructs `RatatoskrClient` directly can pass while the real wiring is broken —
-the unknown-enum fallback Moshi was attached to the client but not to the Retrofit converter
-that `RatatoskrClientFactory` built, so it never ran on real responses, yet the unit test
-(which wired its own Moshi) stayed green. Integration tests close that gap by driving
-requests through `RatatoskrClientFactory.create(...)` (and, where practical,
-`ConnectionManager`) against an in-process `MockWebServer` served over HTTPS with a
-self-signed certificate, so the real deserialization, auth, and trust paths are covered.
-At least:
+### 2. Component tests (instrumented)
 
-- response deserialization through the factory's own Moshi — the unknown-`PlaybackState`
-  fallback and unknown-field tolerance actually taking effect on a real response body;
-- the TLS pin (section 6): a matching fingerprint connects, a changed one is rejected, and
-  the platform-first path behaves as specified;
-- bearer-token attachment and the 401 → refresh → retry flow, including single-flight under
-  concurrent 401s;
-- session-token rotation adopted end-to-end from a `Session`, and the `stopSession`
-  200-with-body vs 204 paths (section 5);
-- error mapping (401 / 404 / 502 / TLS failure) to the right `RatatoskrError`.
+The network / trust / persistence stack *as it is actually assembled*, driven through
+`RatatoskrClientFactory.create(...)` against an in-process `MockWebServer` over HTTPS. These
+run **instrumented on an emulator**, not on the JVM, because the paths that matter here are
+exactly the ones that diverge between the JVM and Android: TLS trust goes through Android's
+real system trust store and TLS provider (Conscrypt), and token persistence through the real
+Keystore-backed store — a JVM run would validate a stand-in (JDK `cacerts`, an in-memory token
+fake), not what ships.
 
-These stay JVM-only (`MockWebServer` plus OkHttp's TLS test-certificate helpers), so they
-run in the same CI step as the unit tests. Setting up this harness — a reusable
-`MockWebServer`-over-HTTPS fixture and the first end-to-end cases — is the next work item.
+They exist because a hand-wired unit test can pass while the real wiring is broken: the
+unknown-enum fallback Moshi was once attached to the client but not to the Retrofit converter
+`RatatoskrClientFactory` builds, so it never ran on real responses, yet a unit test that wired
+its own Moshi stayed green. Driving the real factory closes that gap. In place
+(`core-network`, `Factory*ComponentTest`):
 
-**UI tests**: a small number for the critical flows (connect and trust, sign in, start
-playback, the now-playing controls) are welcome but not the priority for v1.
+- response deserialization through the factory's own converter — the unknown-`PlaybackState`
+  fallback and unknown-field tolerance on a real response body;
+- the TLS pin (section 6): a matching fingerprint connects and a changed/absent one is
+  rejected, against Android's real trust manager. The primary self-signed / local-CA path is
+  covered (the platform chain fails, so the pin decides). The publicly-trusted-cert branch of
+  the section-6 trade-off (platform validates, pin is skipped) is not reachable from a
+  self-signed `MockWebServer` — a documented gap, not a covered case;
+- bearer attachment and the 401 → refresh → retry flow, including single-flight under
+  concurrent 401s (which caught a real dispatcher deadlock — see `RatatoskrClientFactory`);
+- session-token rotation adopted end-to-end, and the `stopSession` 200-with-body vs 204 paths
+  (section 5), against the real Keystore-backed token store;
+- error mapping (401 / 404 / 502 / 500 / TLS failure) to the right `RatatoskrError`.
+
+### 3. Integration tests (instrumented, whole-app UI)
+
+The **complete app driven through its UI** — the Playwright analogue. An instrumented Compose
+UI suite launches the real app (`MainActivity` / the navigation graph) and taps and types
+through the actual screens, so the app itself drives its real navigation → ViewModels →
+`ConnectionManager` → `core-network`, against a `MockWebServer` standing in for the Ratatoskr
+server. It covers the assembled user flow — connect and confirm the certificate, sign in,
+browse the library, pick a speaker, start playback, pause/resume/seek/stop — plus key
+alternates (an unreachable server at connect, a sign-in failure, an empty library).
+
+This layer asserts **user-visible outcomes and flow**, and deliberately does *not* re-assert
+the wire-level mechanics the component layer already owns (enum fallback, error taxonomy,
+token-rotation precision, concurrency). The thin, healthy overlap — a matching pin connects, a
+normal session renders — is checked from each layer's own angle.
+
+### 4. End-to-end tests
+
+The app against the *real* stack (Ratatoskr server + Audiobookshelf + the official Sonos
+simulator), no mocks. Out of scope for now; a separate later layer.
+
+### CI
+
+Component and integration suites run instrumented in the emulator CI job (alongside the
+`AccessibilityChecksTest` accessibility suite), not the JVM `testDebugUnitTest` step. The
+shared harness is a reusable `MockWebServer`-over-HTTPS fixture (OkHttp's `okhttp-tls`
+`HeldCertificate`) in `core-network` test fixtures. `ConnectionManager`'s caching is thin and
+orthogonal; a small test for it can follow separately.
 
 ## 10. Definition of done for v1
 

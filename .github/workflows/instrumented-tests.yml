@@ -1,15 +1,18 @@
-# Runs the accessibility check suite (AccessibilityChecksTest) on every pull request.
+# Runs the instrumented suites on every pull request: the core-network integration tests
+# (SPEC section 9 - the real client assembly driven over HTTPS against MockWebServer, on the
+# device's actual TLS/Keystore stack) and the accessibility checks (AccessibilityChecksTest).
 #
-# The suite is instrumented on purpose — the Accessibility Test Framework needs the
-# real accessibility node tree, which only exists on a device (see the test's kdoc) —
-# so this boots a headless emulator on the KVM-enabled GitHub runner. Contrast is
-# theme-dependent, so the suite runs twice: once in light mode, once in dark mode.
+# Both are instrumented on purpose and share one emulator boot to amortise the ~cold-boot cost.
+# The Accessibility Test Framework needs the real accessibility node tree, which only exists on
+# a device (see the test's kdoc), and contrast is theme-dependent, so that suite runs twice:
+# once in light mode, once in dark mode. The integration tests are theme-independent and run
+# once, first.
 #
-# paths-ignore skips this (expensive, ~45 min emulator) run when a PR changes only
-# docs/metadata that can't affect the UI. Denylist, not allowlist: any other path still
-# triggers it, so a UI change can never silently skip the accessibility check.
+# paths-ignore skips this (expensive, up to an hour of emulator time for both suites) run
+# when a PR changes only docs/metadata that can't affect the build. Denylist, not allowlist:
+# any other path still triggers it, so a code change can never silently skip these suites.
 
-name: Accessibility
+name: Instrumented tests
 
 on:
   pull_request:
@@ -22,13 +25,13 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: accessibility-${{ github.head_ref || github.run_id }}
+  group: instrumented-tests-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 
 jobs:
-  accessibility-checks:
+  instrumented-tests:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
 
     steps:
       - name: Check out (with the contract submodule)
@@ -76,7 +79,7 @@ jobs:
           disable-animations: false
           script: echo "Warmed the AVD snapshot for caching."
 
-      - name: Run the accessibility checks in light and dark mode
+      - name: Run the integration and accessibility suites
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 36
@@ -93,6 +96,8 @@ jobs:
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: |
+            # Integration tests first (theme-independent), then accessibility in each theme.
+            ./gradlew :core-network:connectedDebugAndroidTest
             adb shell cmd uimode night no
             ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=io.github.xexanos.ratatoskr.ui.AccessibilityChecksTest
             adb shell cmd uimode night yes
@@ -102,8 +107,10 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: accessibility-test-reports
+          name: instrumented-test-reports
           path: |
             app/build/reports/androidTests/connected
             app/build/outputs/androidTest-results/connected
+            core-network/build/reports/androidTests/connected
+            core-network/build/outputs/androidTest-results/connected
           retention-days: 14

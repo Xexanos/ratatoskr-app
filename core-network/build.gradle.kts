@@ -18,6 +18,13 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // One copy of the test fakes and wire-format fixtures, consumed by BOTH the JVM unit
+    // tests and the instrumented integration tests (they are separate source sets and cannot
+    // see each other). Without this the fakes existed twice and had to be hand-synced.
+    testFixtures {
+        enable = true
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
@@ -77,4 +84,17 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.core)
     testImplementation(libs.okhttp.mockwebserver)
+    testImplementation(testFixtures(project(":core-network")))
+
+    // Instrumented integration tests (SPEC section 9): drive the real client assembly through
+    // RatatoskrClientFactory against MockWebServer over HTTPS, on the real Android runtime.
+    androidTestImplementation(libs.androidx.junit)
+    // androidx.test.ext:junit does not pull the instrumentation runner in transitively; without
+    // this the test APK lacks AndroidJUnitRunner and the process crashes before any test runs.
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.kotlinx.coroutines.core)
+    androidTestImplementation(libs.okhttp.mockwebserver)
+    androidTestImplementation(libs.okhttp.tls)
+    androidTestImplementation(libs.androidx.datastore.preferences)
+    androidTestImplementation(testFixtures(project(":core-network")))
 }

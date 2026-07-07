@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Instrumented integration tests connect to an in-process MockWebServer over the emulator's
+  loopback interface, which still requires the INTERNET permission on Android.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+</manifest>

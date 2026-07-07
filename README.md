@@ -61,9 +61,11 @@ line with Gradle. The app is designed to build reproducibly from source with onl
 free-software dependencies, so it can be published on F-Droid; it is also intended for the
 Play Store.
 
-Unit tests run with `gradlew :app:testDebugUnitTest`. With an emulator or device attached,
-`gradlew :app:connectedDebugAndroidTest` additionally runs the accessibility checks
-(Accessibility Test Framework) over every screen.
+Unit tests run with `gradlew testDebugUnitTest`. With an emulator or device attached,
+`gradlew :core-network:connectedDebugAndroidTest` runs the network integration tests (the
+real client assembly over HTTPS — TLS trust, auth, token rotation; see
+[`docs/SPEC.md`](docs/SPEC.md) section 9), and `gradlew :app:connectedDebugAndroidTest`
+runs the accessibility checks (Accessibility Test Framework) over every screen.
 
 ## API
 

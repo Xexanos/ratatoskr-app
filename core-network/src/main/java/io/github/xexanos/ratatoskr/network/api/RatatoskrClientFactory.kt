@@ -17,6 +17,7 @@ import io.github.xexanos.ratatoskr.network.tls.PinnedTrustManager
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.adapters.EnumJsonAdapter
 import kotlinx.coroutines.runBlocking
+import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -78,8 +79,15 @@ object RatatoskrClientFactory {
         val moshi = ratatoskrMoshi()
 
         // A client without bearer/authenticator, used only for login and refresh so a refresh
-        // never recurses through the authenticator.
-        val authClient = baseBuilder.build()
+        // never recurses through the authenticator. It gets its OWN dispatcher: a refresh is
+        // issued from inside the main client's authenticator while the original request still
+        // occupies a dispatcher slot, so sharing one dispatcher deadlocks once concurrent 401s
+        // fill maxRequestsPerHost (5 by default) - the refresh can never get a slot, and the
+        // requests waiting on it never free theirs. A separate dispatcher keeps refresh
+        // admission independent of the requests it unblocks.
+        val authClient = baseBuilder
+            .dispatcher(Dispatcher())
+            .build()
         val authSystemApi = retrofit(retrofitBase, authClient, moshi).create(SystemApi::class.java)
 
         val refresher = TokenRefresher { refreshToken ->
@@ -90,13 +98,15 @@ object RatatoskrClientFactory {
         }
 
         val mainClient = baseBuilder
+            .dispatcher(Dispatcher())
             .addInterceptor(BearerAuthInterceptor(tokenStore))
             .authenticator(TokenRefreshAuthenticator(tokenStore, refresher, sessionActive))
             .build()
         val mainRetrofit = retrofit(retrofitBase, mainClient, moshi)
 
-        // Both OkHttp stacks own a dispatcher thread pool and a connection pool; release them
-        // when the client is replaced so they do not linger until GC (SPEC section 13).
+        // Each OkHttp stack now owns its own dispatcher thread pool and a connection pool;
+        // release them when the client is replaced so they do not linger until GC (SPEC
+        // section 13).
         val closeAction = {
             for (client in listOf(mainClient, authClient)) {
                 client.dispatcher.executorService.shutdown()
