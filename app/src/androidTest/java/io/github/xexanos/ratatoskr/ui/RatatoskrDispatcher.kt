@@ -31,6 +31,9 @@ class RatatoskrDispatcher(
     // Low start position against a long duration (see session()) so the seek test can move the
     // slider to a distinct value; a maxed-out slider would clamp SetProgress to a no-op.
     @Volatile private var position = 30.0
+    // Once stopped (DELETE), a real server reports no active session; mirror that so a stray
+    // poll after Stop gets 404, not a revived session.
+    @Volatile private var ended = false
 
     override fun dispatch(request: RecordedRequest): MockResponse {
         val path = request.path.orEmpty().substringBefore('?')
@@ -43,11 +46,20 @@ class RatatoskrDispatcher(
             path.startsWith("/v1/library/items/") -> MockResponse().setResponseCode(404)
             path == "/v1/library/items" -> jsonResponse(libraryPage)
             path == "/v1/sessions/current" && request.method == "PUT" -> {
+                ended = false
                 state = "playing"
                 jsonResponse(session())
             }
-            path == "/v1/sessions/current" && request.method == "GET" -> jsonResponse(session())
-            path == "/v1/sessions/current" && request.method == "DELETE" -> MockResponse().setResponseCode(204)
+            path == "/v1/sessions/current" && request.method == "GET" ->
+                if (ended) {
+                    jsonResponse("""{"code":"no_active_session","message":"Nothing playing"}""", code = 404)
+                } else {
+                    jsonResponse(session())
+                }
+            path == "/v1/sessions/current" && request.method == "DELETE" -> {
+                ended = true
+                MockResponse().setResponseCode(204)
+            }
             path.endsWith("/pause") -> { state = "paused"; jsonResponse(session()) }
             path.endsWith("/resume") -> { state = "playing"; jsonResponse(session()) }
             path.endsWith("/seek") -> {
