@@ -71,7 +71,6 @@ dependencies {
     // MockWebServer over HTTPS, reusing the shared HttpsMockServer + wire fixtures.
     androidTestImplementation(testFixtures(project(":core-network")))
     androidTestImplementation(libs.okhttp.mockwebserver)
-    androidTestImplementation(libs.okhttp.tls)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

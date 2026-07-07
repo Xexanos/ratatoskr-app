@@ -83,11 +83,12 @@ dependencies {
 
     // Shared test fixtures (FakeTokenAccess, WireFixtures, HttpsMockServer) consumed by this
     // module's unit + instrumented tests AND the :app UI integration tests. HttpsMockServer's
-    // public surface exposes JUnit's ExternalResource and MockWebServer/okhttp-tls types, so
-    // these are `api` (transitive to consumers), not `implementation`.
+    // PUBLIC surface exposes JUnit's ExternalResource (superclass) and MockWebServer/MockResponse
+    // (return types), so those are `api`. okhttp-tls (HeldCertificate/HandshakeCertificates) is
+    // used only in private members, so it stays `implementation` - consumers don't need it.
     testFixturesApi(libs.junit)
     testFixturesApi(libs.okhttp.mockwebserver)
-    testFixturesApi(libs.okhttp.tls)
+    testFixturesImplementation(libs.okhttp.tls)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.core)
