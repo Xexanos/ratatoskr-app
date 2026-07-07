@@ -81,6 +81,9 @@ dependencies {
     // Instrumented integration tests (SPEC section 9): drive the real client assembly through
     // RatatoskrClientFactory against MockWebServer over HTTPS, on the real Android runtime.
     androidTestImplementation(libs.androidx.junit)
+    // androidx.test.ext:junit does not pull the instrumentation runner in transitively; without
+    // this the test APK lacks AndroidJUnitRunner and the process crashes before any test runs.
+    androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.kotlinx.coroutines.core)
     androidTestImplementation(libs.okhttp.mockwebserver)
     androidTestImplementation(libs.okhttp.tls)
