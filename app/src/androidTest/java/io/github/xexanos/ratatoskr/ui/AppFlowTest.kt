@@ -27,12 +27,10 @@ import io.github.xexanos.ratatoskr.network.WireFixtures
 import io.github.xexanos.ratatoskr.network.testutil.HttpsMockServer
 import okhttp3.mockwebserver.MockResponse
 import org.junit.Before
-import org.junit.FixMethodOrder
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.RuleChain
 import org.junit.runner.RunWith
-import org.junit.runners.MethodSorters
 
 /**
  * SPEC section 9, layer 3 - the whole app driven through its UI (the Playwright analogue).
@@ -49,11 +47,11 @@ import org.junit.runners.MethodSorters
  * state clears within a frame or two and idle is reached. [awaitTag]/[awaitText]/
  * [awaitContentDescription] poll for the post-load nodes across those brief spinners. Freezing
  * the clock (`autoAdvance = false`) is deliberately NOT used: it also freezes recomposition, so
- * the awaited screens would never render. Methods run in name order; `aSmoke...` runs first so
- * a broken sync assumption fails fast and unambiguously.
+ * the awaited screens would never render. A minimal launch smoke test
+ * ([appLaunchesToTheConnectScreen]) fails fast and unambiguously if the sync approach is wrong,
+ * before the multi-step flows.
  */
 @RunWith(AndroidJUnit4::class)
-@FixMethodOrder(MethodSorters.NAME_ASCENDING)
 class AppFlowTest {
 
     private val reset = ClearAppStateRule()
@@ -97,7 +95,7 @@ class AppFlowTest {
     }
 
     @Test
-    fun aSmoke_appLaunchesToTheConnectScreen() {
+    fun appLaunchesToTheConnectScreen() {
         // Guards the whole sync approach: the app must render past its startup spinner to the
         // connect screen. If the wait strategy is wrong this fails here, before any flow.
         compose.awaitText(str(R.string.connect_action_connect))
