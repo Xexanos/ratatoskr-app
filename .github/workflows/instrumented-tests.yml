@@ -8,9 +8,9 @@
 # once in light mode, once in dark mode. The integration tests are theme-independent and run
 # once, first.
 #
-# paths-ignore skips this (expensive, ~45 min emulator) run when a PR changes only
-# docs/metadata that can't affect the build. Denylist, not allowlist: any other path still
-# triggers it, so a code change can never silently skip these suites.
+# paths-ignore skips this (expensive, up to an hour of emulator time for both suites) run
+# when a PR changes only docs/metadata that can't affect the build. Denylist, not allowlist:
+# any other path still triggers it, so a code change can never silently skip these suites.
 
 name: Instrumented tests
 
