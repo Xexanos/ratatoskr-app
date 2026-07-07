@@ -77,4 +77,12 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.core)
     testImplementation(libs.okhttp.mockwebserver)
+
+    // Instrumented integration tests (SPEC section 9): drive the real client assembly through
+    // RatatoskrClientFactory against MockWebServer over HTTPS, on the real Android runtime.
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.kotlinx.coroutines.core)
+    androidTestImplementation(libs.okhttp.mockwebserver)
+    androidTestImplementation(libs.okhttp.tls)
+    androidTestImplementation(libs.androidx.datastore.preferences)
 }

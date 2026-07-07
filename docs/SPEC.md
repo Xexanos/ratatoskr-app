@@ -201,8 +201,19 @@ screen exposes the server URL, a re-trust/forget action for the certificate, and
 
 ## 9. Testing
 
-Tests run on the JVM so CI needs no device or emulator (see the CI workflow); they live in
-`testDebugUnitTest`.
+Testing is layered by what each layer can honestly verify, not by convenience:
+
+1. **Unit tests** — pure logic with the platform pieces faked. JVM (`testDebugUnitTest`), no
+   device, fast; this is where most tests live.
+2. **Integration tests** — the network / trust / persistence stack *as it is actually
+   assembled*, driven against an in-process `MockWebServer` over HTTPS. These run
+   **instrumented on an emulator**, not on the JVM, because the paths that matter here are
+   exactly the ones that diverge between the JVM and Android: TLS trust goes through Android's
+   real system trust store and TLS provider (Conscrypt), and token persistence through the
+   real Keystore-backed store. A JVM run would validate a stand-in (JDK `cacerts` / SunJSSE,
+   an in-memory token fake), not the thing that ships.
+3. **End-to-end tests** — the app against a *real* Ratatoskr backend. Out of scope for now; a
+   separate later layer.
 
 **Component / unit tests** (in place):
 
@@ -224,24 +235,32 @@ test that constructs `RatatoskrClient` directly can pass while the real wiring i
 the unknown-enum fallback Moshi was attached to the client but not to the Retrofit converter
 that `RatatoskrClientFactory` built, so it never ran on real responses, yet the unit test
 (which wired its own Moshi) stayed green. Integration tests close that gap by driving
-requests through `RatatoskrClientFactory.create(...)` (and, where practical,
-`ConnectionManager`) against an in-process `MockWebServer` served over HTTPS with a
-self-signed certificate, so the real deserialization, auth, and trust paths are covered.
-At least:
+requests through `RatatoskrClientFactory.create(...)` against an in-process `MockWebServer`
+served over HTTPS with a self-signed certificate, so the real deserialization, auth, and
+trust paths are covered. At least:
 
 - response deserialization through the factory's own Moshi — the unknown-`PlaybackState`
   fallback and unknown-field tolerance actually taking effect on a real response body;
-- the TLS pin (section 6): a matching fingerprint connects, a changed one is rejected, and
-  the platform-first path behaves as specified;
+- the TLS pin (section 6): a matching fingerprint connects and a changed one is rejected,
+  exercised against Android's real trust manager. The primary self-signed / local-CA path is
+  covered directly (the platform chain fails, so the pin decides). The publicly-trusted-cert
+  branch of the section-6 trade-off (platform validates, pin is skipped) is not reachable
+  from a self-signed `MockWebServer` — the app's trust manager consults only the system trust
+  store, which a test-minted CA is not in — so it stays a documented gap here rather than a
+  covered case;
 - bearer-token attachment and the 401 → refresh → retry flow, including single-flight under
   concurrent 401s;
 - session-token rotation adopted end-to-end from a `Session`, and the `stopSession`
-  200-with-body vs 204 paths (section 5);
+  200-with-body vs 204 paths (section 5), against the real Keystore-backed token store;
 - error mapping (401 / 404 / 502 / TLS failure) to the right `RatatoskrError`.
 
-These stay JVM-only (`MockWebServer` plus OkHttp's TLS test-certificate helpers), so they
-run in the same CI step as the unit tests. Setting up this harness — a reusable
-`MockWebServer`-over-HTTPS fixture and the first end-to-end cases — is the next work item.
+These run **instrumented on an emulator** (`connectedDebugAndroidTest`), sharing the emulator
+CI job with the accessibility suite rather than the JVM `testDebugUnitTest` step — see the
+rationale above (real Android trust store, Conscrypt, and Keystore). The harness is a
+reusable `MockWebServer`-over-HTTPS fixture (OkHttp's `okhttp-tls` `HeldCertificate`) plus the
+cases above; setting it up is the next work item. `ConnectionManager` (the app-module caching
+wrapper over the factory) is thin and orthogonal to assembly; a small test for it can follow
+separately.
 
 **UI tests**: a small number for the critical flows (connect and trust, sign in, start
 playback, the now-playing controls) are welcome but not the priority for v1.
