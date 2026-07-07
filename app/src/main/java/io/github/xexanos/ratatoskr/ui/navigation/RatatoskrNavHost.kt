@@ -121,8 +121,13 @@ fun RatatoskrNavHost(container: AppContainer, startDestination: Route) {
                 viewModel = vm,
                 onReTrust = {
                     // Clear the whole back stack so Back can't return to authenticated screens.
+                    // launchSingleTop is required because Connect is the graph's start
+                    // destination in a first-run session: without it, popping the graph and
+                    // navigating to the start destination does not land on Connect (the screen
+                    // would stay on Settings).
                     navController.navigate(Route.Connect) {
                         popUpTo(navController.graph.id) { inclusive = true }
+                        launchSingleTop = true
                     }
                 },
                 onSignedOut = {
