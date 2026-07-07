@@ -96,8 +96,9 @@ jobs:
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: |
-            # Integration tests first (theme-independent), then accessibility in each theme.
+            # Theme-independent suites first (once), then accessibility in each theme.
             ./gradlew :core-network:connectedDebugAndroidTest
+            ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=io.github.xexanos.ratatoskr.ui.AppFlowTest
             adb shell cmd uimode night no
             ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=io.github.xexanos.ratatoskr.ui.AccessibilityChecksTest
             adb shell cmd uimode night yes

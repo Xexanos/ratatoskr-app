@@ -1,0 +1,162 @@
+/*
+ * Ratatoskr Android app
+ * Copyright (C) 2026  Ratatoskr contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+package io.github.xexanos.ratatoskr.ui
+
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasImeAction
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.text.input.ImeAction
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import io.github.xexanos.ratatoskr.MainActivity
+import io.github.xexanos.ratatoskr.R
+import io.github.xexanos.ratatoskr.network.WireFixtures
+import io.github.xexanos.ratatoskr.network.testutil.HttpsMockServer
+import okhttp3.mockwebserver.MockResponse
+import org.junit.FixMethodOrder
+import org.junit.Rule
+import org.junit.Test
+import org.junit.rules.RuleChain
+import org.junit.runner.RunWith
+import org.junit.runners.MethodSorters
+
+/**
+ * SPEC section 9, layer 3 - the whole app driven through its UI (the Playwright analogue).
+ * Each test launches the real [MainActivity] and taps/types through the actual screens; the
+ * app itself drives its real navigation -> ViewModels -> ConnectionManager -> core-network
+ * against a [HttpsMockServer] standing in for the Ratatoskr server.
+ *
+ * This layer asserts user-visible outcomes and flow; the wire-level mechanics (token rotation,
+ * error taxonomy, enum fallback, concurrency) are the component layer's job (see
+ * core-network `Factory*ComponentTest`) and are deliberately not re-checked here.
+ *
+ * Synchronisation: Material3 spinners animate forever, so `mainClock.autoAdvance = false`
+ * keeps idle-syncs from hanging on them, and [awaitTag]/[awaitText]/[awaitContentDescription]
+ * poll for the post-load nodes. Methods run in name order; `aSmoke...` runs first so a broken
+ * sync assumption fails fast and unambiguously.
+ */
+@RunWith(AndroidJUnit4::class)
+@FixMethodOrder(MethodSorters.NAME_ASCENDING)
+class AppFlowTest {
+
+    private val reset = ClearAppStateRule()
+    private val server = HttpsMockServer()
+    private val compose = createAndroidComposeRule<MainActivity>()
+
+    // reset (clear persisted state) -> start MockWebServer -> launch MainActivity.
+    @get:Rule
+    val chain: RuleChain = RuleChain.outerRule(reset).around(server).around(compose)
+
+    private fun str(id: Int): String = compose.activity.getString(id)
+
+    private fun installServer(dispatcher: RatatoskrDispatcher = RatatoskrDispatcher()) {
+        // autoAdvance off: otherwise the test clock chases the spinners' infinite animation and
+        // never idles, hanging every implicit sync. Nothing else drives the clock.
+        compose.mainClock.autoAdvance = false
+        server.server.dispatcher = dispatcher
+    }
+
+    /** Connect (type URL, confirm the shown certificate) then submit sign-in. */
+    private fun connectTrustAndSubmitSignIn() {
+        compose.awaitText(str(R.string.connect_action_connect))
+        compose.onNode(hasSetTextAction()).performTextReplacement(server.baseUrl)
+        compose.onNodeWithText(str(R.string.connect_action_connect)).performClick()
+
+        // The confirm card shows the served leaf's fingerprint - asserting it equals the
+        // fixture's is the "confirm the certificate we were shown" step.
+        compose.awaitText(server.fingerprint)
+        compose.onNodeWithText(server.fingerprint).assertIsDisplayed()
+        compose.onNodeWithText(str(R.string.connect_action_trust)).performClick()
+
+        compose.awaitText(str(R.string.signin_action))
+        compose.onNode(hasSetTextAction() and hasImeAction(ImeAction.Next)).performTextInput("lars")
+        compose.onNode(hasSetTextAction() and hasImeAction(ImeAction.Done)).performTextInput("secret")
+        compose.onNodeWithText(str(R.string.signin_action)).performClick()
+    }
+
+    @Test
+    fun aSmoke_appLaunchesToTheConnectScreen() {
+        installServer()
+        // If autoAdvance=false does not tame the startup spinner, this hangs to timeout and
+        // fails here - before any flow is attempted.
+        compose.awaitText(str(R.string.connect_action_connect))
+        compose.onNodeWithText(str(R.string.connect_action_connect)).assertIsDisplayed()
+    }
+
+    @Test
+    fun connectSignInLibrarySpeakersNowPlaying() {
+        installServer()
+        connectTrustAndSubmitSignIn()
+
+        // Library -> open the first book.
+        compose.awaitTag(UiTestTags.LIBRARY_ROW)
+        compose.onAllNodesWithTag(UiTestTags.LIBRARY_ROW)[0].performClick()
+
+        // Speakers -> pick the first speaker -> startSession -> Now playing.
+        compose.awaitTag(UiTestTags.SPEAKER_ROW)
+        compose.onAllNodesWithTag(UiTestTags.SPEAKER_ROW)[0].performClick()
+
+        // The first poll returns a playing session, so the control shows "Pause".
+        compose.awaitContentDescription(str(R.string.nowplaying_action_pause))
+
+        // Pause -> control flips to "Play".
+        compose.onNodeWithContentDescription(str(R.string.nowplaying_action_pause)).performClick()
+        compose.awaitContentDescription(str(R.string.nowplaying_action_play))
+
+        // Resume -> back to "Pause".
+        compose.onNodeWithContentDescription(str(R.string.nowplaying_action_play)).performClick()
+        compose.awaitContentDescription(str(R.string.nowplaying_action_pause))
+
+        // Seek: the slider is still playing afterwards (loose assertion - see plan risk 5).
+        compose.onNodeWithTag(UiTestTags.NOWPLAYING_SEEK)
+            .performSemanticsAction(SemanticsActions.SetProgress) { it(120f) }
+        compose.onNodeWithContentDescription(str(R.string.nowplaying_action_pause)).assertIsDisplayed()
+
+        // Stop -> back to the library.
+        compose.onNodeWithContentDescription(str(R.string.nowplaying_action_stop)).performClick()
+        compose.awaitTag(UiTestTags.LIBRARY_ROW)
+    }
+
+    @Test
+    fun connectRejectsAnUnreachableServer() {
+        installServer()
+        compose.awaitText(str(R.string.connect_action_connect))
+        // Nothing listens on :1, so certificate inspection fails -> the error/retry card.
+        compose.onNode(hasSetTextAction()).performTextReplacement("https://localhost:1")
+        compose.onNodeWithText(str(R.string.connect_action_connect)).performClick()
+        compose.awaitText(str(R.string.connect_action_retry))
+        compose.onNodeWithText(str(R.string.connect_action_retry)).assertIsDisplayed()
+    }
+
+    @Test
+    fun signInFailureKeepsTheUserOnSignIn() {
+        installServer(RatatoskrDispatcher(login = { MockResponse().setResponseCode(401) }))
+        connectTrustAndSubmitSignIn()
+        // Login was rejected: the sign-in action returns (not submitting) and we did not
+        // navigate to the library.
+        compose.awaitText(str(R.string.signin_action))
+        compose.onNodeWithText(str(R.string.signin_action)).assertIsDisplayed()
+        compose.onAllNodesWithTag(UiTestTags.LIBRARY_ROW).assertCountEquals(0)
+    }
+
+    @Test
+    fun emptyLibraryShowsTheEmptyState() {
+        installServer(RatatoskrDispatcher(libraryPage = WireFixtures.libraryPageJson(items = emptyList())))
+        connectTrustAndSubmitSignIn()
+        compose.awaitText(str(R.string.library_empty_title))
+        compose.onAllNodesWithTag(UiTestTags.LIBRARY_ROW).assertCountEquals(0)
+    }
+}
