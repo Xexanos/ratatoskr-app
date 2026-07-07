@@ -6,12 +6,9 @@
 package io.github.xexanos.ratatoskr.ui
 
 import androidx.compose.ui.semantics.SemanticsActions
-import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasImeAction
-import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.test.printToString
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -78,17 +75,8 @@ class AppFlowTest {
         compose.onNode(hasSetTextAction()).performTextReplacement(server.baseUrl)
         compose.onNodeWithText(str(R.string.connect_action_connect)).performClick()
 
-        // Wait for the confirm state (its Trust button). If it never arrives, dump the screen
-        // so the failure shows why (e.g. a connect Error message) rather than a bare timeout.
-        try {
-            compose.awaitText(str(R.string.connect_action_trust))
-        } catch (e: ComposeTimeoutException) {
-            throw AssertionError(
-                "Confirm state not reached after connect. Screen tree:\n" +
-                    compose.onRoot(useUnmergedTree = true).printToString(),
-                e,
-            )
-        }
+        // Wait for the confirm state (its Trust button); awaitText dumps the screen on timeout.
+        compose.awaitText(str(R.string.connect_action_trust))
         // The confirm card shows the served leaf's fingerprint; asserting it matches the
         // fixture's is the "confirm the certificate we were shown" check.
         compose.onNodeWithText(server.fingerprint).assertExists()
