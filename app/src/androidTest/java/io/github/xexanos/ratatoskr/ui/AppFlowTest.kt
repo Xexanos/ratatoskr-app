@@ -167,4 +167,28 @@ class AppFlowTest {
         compose.awaitText(str(R.string.library_empty_title))
         compose.onAllNodesWithTag(UiTestTags.LIBRARY_ROW).assertCountEquals(0)
     }
+
+    @Test
+    fun signOutFromSettingsReturnsToSignIn() {
+        connectTrustAndSubmitSignIn()
+        compose.awaitTag(UiTestTags.LIBRARY_ROW)
+        compose.onNodeWithContentDescription(str(R.string.library_settings)).performClick()
+        compose.awaitText(str(R.string.settings_sign_out))
+        compose.onNodeWithText(str(R.string.settings_sign_out)).performClick()
+        // Signing out clears the tokens and routes back to sign-in.
+        compose.awaitText(str(R.string.signin_action))
+        compose.onNodeWithText(str(R.string.signin_action)).assertIsDisplayed()
+    }
+
+    @Test
+    fun forgetCertificateFromSettingsReturnsToConnect() {
+        connectTrustAndSubmitSignIn()
+        compose.awaitTag(UiTestTags.LIBRARY_ROW)
+        compose.onNodeWithContentDescription(str(R.string.library_settings)).performClick()
+        compose.awaitText(str(R.string.settings_forget_cert))
+        compose.onNodeWithText(str(R.string.settings_forget_cert)).performClick()
+        // Forgetting the certificate drops the trusted server and routes back to connect.
+        compose.awaitText(str(R.string.connect_action_connect))
+        compose.onNodeWithText(str(R.string.connect_action_connect)).assertIsDisplayed()
+    }
 }
