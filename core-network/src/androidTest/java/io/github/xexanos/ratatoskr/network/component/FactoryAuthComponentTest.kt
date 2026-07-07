@@ -3,7 +3,7 @@
  * Copyright (C) 2026  Ratatoskr contributors
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
-package io.github.xexanos.ratatoskr.network.integration
+package io.github.xexanos.ratatoskr.network.component
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.xexanos.ratatoskr.network.FakeTokenAccess
@@ -31,7 +31,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * whole bearer + authenticator + refresh-endpoint wiring is exercised end-to-end.
  */
 @RunWith(AndroidJUnit4::class)
-class FactoryAuthIntegrationTest {
+class FactoryAuthComponentTest {
 
     @get:Rule val https = HttpsMockServer()
 

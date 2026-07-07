@@ -3,7 +3,7 @@
  * Copyright (C) 2026  Ratatoskr contributors
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
-package io.github.xexanos.ratatoskr.network.integration
+package io.github.xexanos.ratatoskr.network.component
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.xexanos.ratatoskr.network.FakeTokenAccess
@@ -24,7 +24,7 @@ import org.junit.runner.RunWith
  * Moshi (`Upstream` carries the parsed code/message).
  */
 @RunWith(AndroidJUnit4::class)
-class FactoryErrorMappingIntegrationTest {
+class FactoryErrorMappingComponentTest {
 
     @get:Rule val https = HttpsMockServer()
 

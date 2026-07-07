@@ -3,7 +3,7 @@
  * Copyright (C) 2026  Ratatoskr contributors
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
-package io.github.xexanos.ratatoskr.network.integration
+package io.github.xexanos.ratatoskr.network.component
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.xexanos.ratatoskr.network.FakeTokenAccess
@@ -29,7 +29,7 @@ import org.junit.runner.RunWith
  * It stays a documented gap (SPEC section 9).
  */
 @RunWith(AndroidJUnit4::class)
-class FactoryTlsPinIntegrationTest {
+class FactoryTlsPinComponentTest {
 
     @get:Rule val https = HttpsMockServer()
 

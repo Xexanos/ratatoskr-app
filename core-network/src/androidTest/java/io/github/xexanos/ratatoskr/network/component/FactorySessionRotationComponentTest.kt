@@ -3,7 +3,7 @@
  * Copyright (C) 2026  Ratatoskr contributors
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
-package io.github.xexanos.ratatoskr.network.integration
+package io.github.xexanos.ratatoskr.network.component
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.preferencesDataStoreFile
@@ -37,7 +37,7 @@ import org.junit.runner.RunWith
  * adoption actually persists through encryption on the device, not just an in-memory fake.
  */
 @RunWith(AndroidJUnit4::class)
-class FactorySessionRotationIntegrationTest {
+class FactorySessionRotationComponentTest {
 
     @get:Rule val https = HttpsMockServer()
     @get:Rule val testName = TestName()
