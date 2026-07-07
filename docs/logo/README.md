@@ -3,21 +3,21 @@
 Working directory for the logo design. GPL-3.0-or-later; derived from CC0
 artwork (see `upstream/README.md`).
 
-- `ratatoskr-mark.svg` — the squirrel mark. The tail is drawn as sound waves
+- `ratatoskr-mark.svg` - the squirrel mark. The tail is drawn as sound waves
   (the messenger carries audio), and the fade encodes sound growing quieter
   with distance. Hand-edited in Inkscape; **source of truth**, never
   overwritten by the generator.
-- `ratatoskr-knot-woven.svg` — the frame: single-strand (2,9) torus-knot ring
+- `ratatoskr-knot-woven.svg` - the frame: single-strand (2,9) torus-knot ring
   with the over/under weave carved in as real geometry (transparent gaps).
   Generated; shape tweaks go through the parameters in `GenerateLogo.kt`.
-- `ratatoskr-logo.svg` — woven frame + mark composed. Generated.
-- `ratatoskr-lockup.svg` — framed logo + "Ratatoskr" wordmark. Generated.
-- `ratatoskr-logo-dark.svg`, `ratatoskr-lockup-dark.svg` — the same artwork
+- `ratatoskr-logo.svg` - woven frame + mark composed. Generated.
+- `ratatoskr-lockup.svg` - framed logo + "Ratatoskr" wordmark. Generated.
+- `ratatoskr-logo-dark.svg`, `ratatoskr-lockup-dark.svg` - the same artwork
   recolored for dark backgrounds (palette below). Generated.
-- `ratatoskr-wordmark.svg` — the wordmark outlines: "Ratatoskr" set in
+- `ratatoskr-wordmark.svg` - the wordmark outlines: "Ratatoskr" set in
   **Norse Bold** by Joël Carrouché. The font's freeware license permits
   logo/artwork use and app embedding but forbids redistribution of the font
-  file — so the `.otf` must **never** be committed to this repository; only
+  file - so the `.otf` must **never** be committed to this repository; only
   the rendered outlines live here. Committed so normal generator runs stay
   offline.
 
@@ -42,16 +42,16 @@ single source with the SVGs. The launcher icon
 fade-tail squirrel on the warm paper background, plus a monochrome layer for
 themed icons (API 33+).
 
-Palette (decided 2026-07-05): copper squirrel — body #A93B28, tail fade
-#C56A4F → #F1BEA4 (inner → outer/tip) — inside the ash-leaf green frame
+Palette (decided 2026-07-05): copper squirrel - body #A93B28, tail fade
+#C56A4F -> #F1BEA4 (inner -> outer/tip) - inside the ash-leaf green frame
 **#4F6B35** ("Eschenlaub", E1; Yggdrasil is an ash). Agreed fallback if the
 green ever feels too dominant: #3A5230 ("Eschenkrone", E2). Background #FBF1E9.
 The app's M3 color scheme derives from this pair (copper primary, ash-green
 secondary; see `ui/theme/Color.kt`).
 
 Dark-background palette: the frame swaps to **#8CAB64**, and the copper ramp
-shifts two steps toward its light end — body #CF7B60, tail fade
-#D98C71 → #F8DCC6 — so the tail keeps fading on dark backgrounds. The mapping
+shifts two steps toward its light end - body #CF7B60, tail fade
+#D98C71 -> #F8DCC6 - so the tail keeps fading on dark backgrounds. The mapping
 lives in `DARK_COLORS` in `GenerateLogo.kt`.
 
 History note: the generator started as a Python tool (shapely/svgpathtools)

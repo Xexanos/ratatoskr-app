@@ -19,9 +19,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.materialIcon
-import androidx.compose.material.icons.materialPath
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -39,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -51,6 +53,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
+import io.github.xexanos.ratatoskr.R
 import io.github.xexanos.ratatoskr.data.ConnectionManager
 import io.github.xexanos.ratatoskr.network.domain.ApiResult
 import io.github.xexanos.ratatoskr.network.domain.LibraryItemSummary
@@ -189,7 +192,7 @@ fun NowPlayingScreen(
             .padding(horizontal = 24.dp, vertical = 16.dp),
     ) {
         Text(
-            text = "NOW PLAYING",
+            text = stringResource(R.string.nowplaying_header),
             style = MaterialTheme.typography.labelMedium,
             letterSpacing = 2.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -206,7 +209,7 @@ fun NowPlayingScreen(
             session == null ->
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
-                        state.error ?: "Nothing is playing right now.",
+                        state.error ?: stringResource(R.string.nowplaying_nothing_playing),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
@@ -267,7 +270,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.NowPlayingContent(
     var dragging by remember { mutableStateOf(false) }
     var sliderPosition by remember { mutableFloatStateOf(session.positionSeconds.toFloat()) }
     // Keyed on the server position only (not `dragging`): follow the server while the user
-    // isn't dragging, but do NOT re-run the instant a drag is released — otherwise it would
+    // isn't dragging, but do NOT re-run the instant a drag is released - otherwise it would
     // snap the thumb back to the last polled value before the seek round-trips. After release
     // it resumes following on the next poll (by which time the seek has normally landed).
     LaunchedEffect(session.positionSeconds) {
@@ -301,18 +304,20 @@ private fun androidx.compose.foundation.layout.ColumnScope.NowPlayingContent(
     ) {
         val playing = session.state == PlaybackState.PLAYING
         CircleControl(
-            icon = if (playing) PauseIcon else Icons.Filled.PlayArrow,
-            contentDescription = if (playing) "Pause" else "Play",
+            icon = if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+            contentDescription = stringResource(
+                if (playing) R.string.nowplaying_action_pause else R.string.nowplaying_action_play,
+            ),
             size = 76.dp,
-            iconSize = 40.dp,
+            iconSize = 36.dp,
             container = MaterialTheme.colorScheme.primary,
             content = MaterialTheme.colorScheme.onPrimary,
             elevation = 6.dp,
             onClick = { if (playing) onPause() else onResume() },
         )
         CircleControl(
-            icon = StopIcon,
-            contentDescription = "Stop",
+            icon = Icons.Filled.Stop,
+            contentDescription = stringResource(R.string.nowplaying_action_stop),
             size = 56.dp,
             iconSize = 28.dp,
             container = MaterialTheme.colorScheme.surfaceVariant,
@@ -337,21 +342,31 @@ private fun androidx.compose.foundation.layout.ColumnScope.NowPlayingContent(
 
 @Composable
 private fun CoverArt(title: String) {
+    val initial = title.trim().firstOrNull()?.uppercase()
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         Surface(
             modifier = Modifier.size(260.dp),
-            shape = RoundedCornerShape(28.dp),
+            shape = MaterialTheme.shapes.extraLarge,
             color = MaterialTheme.colorScheme.secondaryContainer,
             shadowElevation = 8.dp,
             tonalElevation = 2.dp,
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Text(
-                    text = title.trim().firstOrNull()?.uppercase() ?: "♪",
-                    style = MaterialTheme.typography.displayLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                )
+                if (initial != null) {
+                    Text(
+                        text = initial,
+                        style = MaterialTheme.typography.displayLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                } else {
+                    Icon(
+                        Icons.Default.MusicNote,
+                        contentDescription = null,
+                        modifier = Modifier.size(96.dp),
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                }
             }
         }
     }
@@ -359,13 +374,13 @@ private fun CoverArt(title: String) {
 
 @Composable
 private fun StateChip(state: PlaybackState) {
-    val (label, dot) = when (state) {
-        PlaybackState.PLAYING -> "Playing" to MaterialTheme.colorScheme.primary
-        PlaybackState.PAUSED -> "Paused" to MaterialTheme.colorScheme.onSurfaceVariant
-        PlaybackState.BUFFERING -> "Buffering" to MaterialTheme.colorScheme.onSurfaceVariant
-        PlaybackState.FINISHED -> "Finished" to MaterialTheme.colorScheme.primary
-        PlaybackState.STOPPED -> "Stopped" to MaterialTheme.colorScheme.onSurfaceVariant
-        PlaybackState.UNKNOWN -> "—" to MaterialTheme.colorScheme.onSurfaceVariant
+    val (labelRes, dot) = when (state) {
+        PlaybackState.PLAYING -> R.string.nowplaying_state_playing to MaterialTheme.colorScheme.primary
+        PlaybackState.PAUSED -> R.string.nowplaying_state_paused to MaterialTheme.colorScheme.onSurfaceVariant
+        PlaybackState.BUFFERING -> R.string.nowplaying_state_buffering to MaterialTheme.colorScheme.onSurfaceVariant
+        PlaybackState.FINISHED -> R.string.nowplaying_state_finished to MaterialTheme.colorScheme.primary
+        PlaybackState.STOPPED -> R.string.nowplaying_state_stopped to MaterialTheme.colorScheme.onSurfaceVariant
+        PlaybackState.UNKNOWN -> R.string.nowplaying_state_unknown to MaterialTheme.colorScheme.onSurfaceVariant
     }
     Surface(
         shape = RoundedCornerShape(50),
@@ -378,7 +393,7 @@ private fun StateChip(state: PlaybackState) {
         ) {
             Box(Modifier.size(8.dp).background(dot, CircleShape))
             Text(
-                label,
+                stringResource(labelRes),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -421,36 +436,6 @@ private fun CircleControl(
     }
 }
 
-// The material-icons core set ships PlayArrow but not Pause or Stop; those live only in
-// the much larger extended-icons artifact. Rather than pull that in, draw the two shapes
-// here on the same 24dp grid the Material icons use.
-private val PauseIcon: ImageVector = materialIcon(name = "Ratatoskr.Pause") {
-    materialPath {
-        moveTo(6f, 19f)
-        horizontalLineToRelative(4f)
-        verticalLineTo(5f)
-        horizontalLineTo(6f)
-        verticalLineToRelative(14f)
-        close()
-        moveTo(14f, 5f)
-        verticalLineToRelative(14f)
-        horizontalLineToRelative(4f)
-        verticalLineTo(5f)
-        horizontalLineToRelative(-4f)
-        close()
-    }
-}
-
-private val StopIcon: ImageVector = materialIcon(name = "Ratatoskr.Stop") {
-    materialPath {
-        moveTo(6f, 6f)
-        horizontalLineToRelative(12f)
-        verticalLineToRelative(12f)
-        horizontalLineTo(6f)
-        close()
-    }
-}
-
 private fun formatTime(seconds: Double): String {
     val total = seconds.toLong().coerceAtLeast(0)
     val h = total / 3600
@@ -488,7 +473,7 @@ private fun NowPlayingPreviewScaffold(
         Surface {
             Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp)) {
                 Text(
-                    text = "NOW PLAYING",
+                    text = stringResource(R.string.nowplaying_header),
                     style = MaterialTheme.typography.labelMedium,
                     letterSpacing = 2.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -500,7 +485,7 @@ private fun NowPlayingPreviewScaffold(
                     }
                     session == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
-                            error ?: "Nothing is playing right now.",
+                            error ?: stringResource(R.string.nowplaying_nothing_playing),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
@@ -513,17 +498,17 @@ private fun NowPlayingPreviewScaffold(
     }
 }
 
-@Preview(name = "Now playing — playing", widthDp = 360, heightDp = 800)
+@Preview(name = "Now playing - playing", widthDp = 360, heightDp = 800)
 @Composable
 internal fun NowPlayingPlayingPreview() =
     NowPlayingPreviewScaffold(previewSession(PlaybackState.PLAYING))
 
-@Preview(name = "Now playing — paused", widthDp = 360, heightDp = 800)
+@Preview(name = "Now playing - paused", widthDp = 360, heightDp = 800)
 @Composable
 internal fun NowPlayingPausedPreview() =
     NowPlayingPreviewScaffold(previewSession(PlaybackState.PAUSED))
 
-@Preview(name = "Now playing — nothing playing", widthDp = 360, heightDp = 800)
+@Preview(name = "Now playing - nothing playing", widthDp = 360, heightDp = 800)
 @Composable
 internal fun NowPlayingEmptyPreview() =
     NowPlayingPreviewScaffold(session = null)

@@ -49,7 +49,7 @@ class RatatoskrClient internal constructor(
 
     /**
      * Releases the underlying OkHttp resources (dispatcher threads and pooled sockets). Call
-     * when this client is replaced — the owner does so on a server/certificate change — so the
+     * when this client is replaced - the owner does so on a server/certificate change - so the
      * old HTTP stack does not linger until GC (SPEC section 13).
      */
     fun close() = closeAction()

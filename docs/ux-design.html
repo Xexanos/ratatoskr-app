@@ -1,0 +1,1171 @@
+<title>Ratatoskr · UX Design v1</title>
+<style>
+  :root {
+    --paper: #F4EDE6;
+    --card: #FFFDFB;
+    --ink: #2A1F19;
+    --muted: #7A695F;
+    --copper: #A93B28;
+    --copper-deep: #872F1F;
+    --ash: #4F6B35;
+    --ash-soft: #D1E8B0;
+    --dust: #F4DED5;
+    --line: #E2D3C8;
+    --sans: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+    --mono: "Cascadia Mono", Consolas, ui-monospace, monospace;
+  }
+  html { background: var(--paper); }
+  body {
+    font-family: var(--sans);
+    color: var(--ink);
+    line-height: 1.6;
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 64px 32px 96px; }
+  a { color: var(--copper); }
+  :focus-visible { outline: 2px solid var(--copper); outline-offset: 2px; border-radius: 4px; }
+
+  /* ---------- page typography ---------- */
+  .eyebrow {
+    font-size: 12px; font-weight: 600; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--ash); margin: 0 0 8px;
+  }
+  h1 {
+    font-size: 40px; font-weight: 700; letter-spacing: -0.02em;
+    line-height: 1.15; margin: 0 0 16px; text-wrap: balance;
+  }
+  h2 {
+    font-size: 26px; font-weight: 700; letter-spacing: -0.015em;
+    margin: 0 0 12px; text-wrap: balance;
+  }
+  h3 { font-size: 18px; font-weight: 650; margin: 0 0 8px; }
+  .lede { font-size: 17px; max-width: 640px; color: #4A3C33; margin: 0; }
+  section { margin-top: 96px; }
+  .section-head { max-width: 680px; margin-bottom: 40px; }
+  .section-head p { color: #4A3C33; margin: 0; }
+  .kicker { display: inline-flex; align-items: baseline; gap: 12px; }
+  .kicker .no { font-family: var(--mono); font-size: 13px; color: var(--copper); font-weight: 600; }
+  code, .mono { font-family: var(--mono); font-size: 0.92em; }
+  code { background: var(--dust); padding: 1px 6px; border-radius: 4px; }
+
+  /* ---------- header ---------- */
+  header.page { display: flex; gap: 40px; align-items: flex-start; flex-wrap: wrap; }
+  header.page .logo { width: 96px; height: 96px; flex: none; }
+  header.page .head-text { flex: 1; min-width: 320px; }
+  .meta-row { display: flex; gap: 24px; flex-wrap: wrap; margin-top: 24px; }
+  .meta-row .m { font-size: 13px; color: var(--muted); }
+  .meta-row .m b { color: var(--ink); font-weight: 600; }
+
+  /* ---------- principle cards ---------- */
+  .principles { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; }
+  .principle {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 24px;
+  }
+  .principle .pn {
+    font-family: var(--mono); font-size: 12px; color: var(--ash); font-weight: 600;
+    display: block; margin-bottom: 12px; letter-spacing: 0.08em;
+  }
+  .principle h3 { margin-bottom: 8px; }
+  .principle p { margin: 0; font-size: 14px; color: #55463C; }
+
+  /* ---------- flow ---------- */
+  .flow-scroll { overflow-x: auto; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 24px; }
+  .flow-note { font-size: 14px; color: var(--muted); margin-top: 12px; }
+
+  /* ---------- tokens ---------- */
+  .swatch-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 12px; margin-bottom: 8px; }
+  .swatch { border-radius: 10px; overflow: hidden; border: 1px solid var(--line); background: var(--card); }
+  .swatch .chip { height: 56px; }
+  .swatch .lbl { padding: 8px 10px; }
+  .swatch .lbl .n { font-size: 12px; font-weight: 600; display: block; }
+  .swatch .lbl .h { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .token-sub { font-size: 13px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin: 32px 0 12px; }
+  table.tokens { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; font-size: 14px; }
+  table.tokens th, table.tokens td { text-align: left; padding: 10px 16px; border-bottom: 1px solid var(--line); vertical-align: baseline; }
+  table.tokens tr:last-child td { border-bottom: none; }
+  table.tokens th { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; background: #FAF4EE; }
+  .table-scroll { overflow-x: auto; border-radius: 12px; }
+  .space-demo { display: flex; align-items: flex-end; gap: 20px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 24px; flex-wrap: wrap; }
+  .space-demo .s { display: flex; flex-direction: column; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .space-demo .bar { width: 28px; background: var(--ash-soft); border: 1px solid var(--ash); border-radius: 4px; }
+
+  /* ---------- screen sections ---------- */
+  .screen-flex { display: flex; flex-wrap: wrap; gap: 48px; align-items: flex-start; }
+  .phones { display: flex; gap: 32px; flex-wrap: wrap; }
+  .decisions { flex: 1; min-width: 300px; max-width: 560px; }
+  .decisions ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 20px; }
+  .decisions li { display: flex; gap: 14px; font-size: 15px; color: #4A3C33; }
+  .decisions li b { color: var(--ink); }
+  .dnum {
+    flex: none; width: 26px; height: 26px; border-radius: 50%;
+    background: var(--copper); color: #fff; font-size: 13px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center; margin-top: 2px;
+  }
+  .delta {
+    margin-top: 28px; background: #EDF3E2; border: 1px solid #C4D8A4;
+    border-radius: 12px; padding: 16px 20px; font-size: 14px; color: #33471E;
+  }
+  .delta .dt { font-weight: 700; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; display: block; margin-bottom: 6px; color: var(--ash); }
+  .delta ul { margin: 0; padding-left: 18px; }
+  .delta li { margin: 4px 0; }
+  .phone-cap { font-size: 13px; color: var(--muted); text-align: center; margin-top: 12px; }
+
+  /* ================= phone mockups ================= */
+  .phone-slot { width: 320px; flex: none; }
+  .phone {
+    width: 320px; height: 676px; border-radius: 28px;
+    background: #FFFBF8; color: #211A17;
+    border: 1px solid #E0CFC4;
+    box-shadow: 0 24px 48px -20px rgba(105, 58, 34, 0.28), 0 4px 12px rgba(105, 58, 34, 0.10);
+    overflow: hidden; position: relative;
+    display: flex; flex-direction: column;
+    font-family: Roboto, var(--sans);
+    font-size: 14px; line-height: 1.4;
+  }
+  .phone * { box-sizing: border-box; }
+  .phone.dark {
+    background: #1A120F; color: #F1DFD9; border-color: #3A2A22;
+    box-shadow: 0 24px 48px -20px rgba(30, 12, 4, 0.55), 0 4px 12px rgba(30, 12, 4, 0.3);
+  }
+  .sbar {
+    height: 32px; flex: none; display: flex; align-items: center;
+    justify-content: space-between; padding: 0 20px; font-size: 12px; font-weight: 600;
+  }
+  .sbar .sicons { display: flex; gap: 5px; align-items: center; }
+  .sbar svg { width: 13px; height: 13px; }
+  .gbar {
+    position: absolute; bottom: 7px; left: 50%; transform: translateX(-50%);
+    width: 104px; height: 4px; border-radius: 2px; background: currentColor; opacity: 0.28;
+  }
+  .body { flex: 1; display: flex; flex-direction: column; overflow: hidden; padding-bottom: 18px; }
+
+  /* mockup atoms */
+  .topbar { height: 56px; flex: none; display: flex; align-items: center; gap: 4px; padding: 0 8px 0 16px; }
+  .topbar .tt { font-size: 21px; font-weight: 500; flex: 1; letter-spacing: -0.01em; }
+  .iconbtn { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex: none; }
+  .iconbtn svg { width: 22px; height: 22px; }
+  .btn {
+    height: 52px; border-radius: 26px; display: flex; align-items: center; justify-content: center;
+    gap: 8px; font-size: 15px; font-weight: 600; padding: 0 24px;
+  }
+  .btn-filled { background: #A93B28; color: #fff; box-shadow: inset 0 1px 0 rgba(255,255,255,0.22); }
+  .dark .btn-filled { background: #FFB4A3; color: #641D0E; box-shadow: none; }
+  .btn-text { color: #A93B28; height: 44px; }
+  .btn svg { width: 18px; height: 18px; }
+  .tfield {
+    height: 56px; border: 1px solid #85736C; border-radius: 8px;
+    display: flex; align-items: center; padding: 0 16px; gap: 10px; position: relative;
+    color: #211A17;
+  }
+  .tfield .fl {
+    position: absolute; top: -8px; left: 12px; padding: 0 4px; background: #FFFBF8;
+    font-size: 11px; color: #53433D;
+  }
+  .tfield svg { width: 20px; height: 20px; color: #53433D; flex: none; }
+  .helper { font-size: 12px; color: #53433D; padding: 6px 16px 0; }
+  .searchbar {
+    height: 52px; border-radius: 26px; background: #F6EAE2; display: flex; align-items: center;
+    gap: 12px; padding: 0 18px; color: #53433D; flex: none;
+  }
+  .searchbar svg { width: 20px; height: 20px; flex: none; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 12px;
+    border-radius: 15px; font-size: 12.5px; font-weight: 600;
+  }
+  .chip svg { width: 14px; height: 14px; }
+  .chip-ash { background: #D1E8B0; color: #121F04; }
+  .dark .chip-ash { background: #395020; color: #D1E8B0; }
+  .divider { height: 1px; background: #EADCD3; margin: 0 16px; flex: none; }
+  .dark .divider { background: #3A2A22; }
+
+  .cover {
+    border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    font-weight: 700; flex: none; letter-spacing: 0.02em;
+  }
+  .cv-copper { background: linear-gradient(145deg, #A93B28, #C56A4F); color: #FFE9E2; }
+  .cv-ash    { background: linear-gradient(145deg, #4F6B35, #6E8C49); color: #EAF4D8; }
+  .cv-dusk   { background: linear-gradient(145deg, #872F1F, #A93B28); color: #FFDAD2; }
+  .cv-moss   { background: linear-gradient(145deg, #395020, #4F6B35); color: #D1E8B0; }
+  .cv-sand   { background: linear-gradient(145deg, #E8C9B8, #F4DED5); color: #872F1F; }
+
+  .lrow { display: flex; gap: 14px; padding: 12px 16px; align-items: center; flex: none; }
+  .lrow .cover { width: 54px; height: 54px; font-size: 17px; }
+  .lrow .lmain { flex: 1; min-width: 0; }
+  .lrow .lt { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lrow .la { font-size: 12.5px; color: #53433D; margin-top: 1px; }
+  .pline { display: flex; align-items: center; gap: 8px; margin-top: 7px; }
+  .ptrack { flex: 1; height: 4px; border-radius: 2px; background: #F4DED5; overflow: hidden; }
+  .pfill { height: 100%; border-radius: 2px; background: #A93B28; }
+  .plabel { font-size: 11px; color: #53433D; font-variant-numeric: tabular-nums; flex: none; }
+  .done { color: #4F6B35; display: flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600; margin-top: 7px; }
+  .done svg { width: 13px; height: 13px; }
+
+  .miniplayer {
+    margin: 8px 12px 6px; border-radius: 16px; background: #FFDAD2; color: #3E0400;
+    display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 12px;
+    position: relative; overflow: hidden; flex: none;
+    box-shadow: 0 6px 16px -6px rgba(105, 58, 34, 0.35);
+  }
+  .miniplayer .mp-progress { position: absolute; top: 0; left: 0; height: 3px; background: #A93B28; width: 38%; }
+  .miniplayer .cover { width: 40px; height: 40px; font-size: 13px; border-radius: 6px; }
+  .miniplayer .mt { font-size: 13.5px; font-weight: 700; }
+  .miniplayer .ms { font-size: 11.5px; opacity: 0.75; font-variant-numeric: tabular-nums; }
+  .miniplayer .mp-btn {
+    width: 42px; height: 42px; border-radius: 50%; background: #A93B28; color: #fff;
+    display: flex; align-items: center; justify-content: center; flex: none; margin-left: auto;
+  }
+  .miniplayer .mp-btn svg { width: 18px; height: 18px; }
+
+  .speaker-row { display: flex; gap: 14px; padding: 14px 16px; align-items: center; flex: none; }
+  .speaker-row .sic {
+    width: 44px; height: 44px; border-radius: 12px; background: #F4DED5; color: #53433D;
+    display: flex; align-items: center; justify-content: center; flex: none;
+  }
+  .speaker-row .sic svg { width: 22px; height: 22px; }
+  .speaker-row .sn { font-size: 15px; font-weight: 600; }
+  .speaker-row .ss { font-size: 12.5px; color: #53433D; margin-top: 1px; }
+  .speaker-row .smain { flex: 1; }
+
+  .certcard {
+    margin: 0 16px; border: 1px solid #E0CFC4; border-radius: 16px; background: #FFF6F1;
+    overflow: hidden; flex: none;
+  }
+  .certcard .crow { display: flex; justify-content: space-between; gap: 12px; padding: 10px 16px; font-size: 13px; border-bottom: 1px solid #F0E2D9; }
+  .certcard .crow .ck { color: #53433D; flex: none; }
+  .certcard .crow .cvl { font-weight: 600; text-align: right; }
+  .fingerprint {
+    padding: 12px 16px 14px; background: #F4DED5; font-family: var(--mono);
+    font-size: 12px; letter-spacing: 0.04em; line-height: 1.75; color: #3E2A22;
+  }
+  .fingerprint .fpl { font-family: var(--sans); font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em; color: #53433D; display: block; margin-bottom: 4px; }
+
+  .settings-h { font-size: 12px; font-weight: 700; letter-spacing: 0.1em; color: #4F6B35; padding: 20px 16px 6px; flex: none; }
+  .srow { display: flex; align-items: center; gap: 14px; padding: 12px 16px; flex: none; }
+  .srow .sic2 { width: 24px; height: 24px; color: #53433D; flex: none; }
+  .srow .sic2 svg { width: 22px; height: 22px; }
+  .srow .st { font-size: 14.5px; font-weight: 600; }
+  .srow .ssub { font-size: 12px; color: #53433D; margin-top: 1px; }
+  .srow .chev { margin-left: auto; color: #85736C; flex: none; width: 20px; height: 20px; }
+  .srow .chev svg { width: 20px; height: 20px; }
+  .srow.danger .st { color: #A93B28; }
+  .srow.danger .sic2 { color: #A93B28; }
+
+  /* now playing (dark) */
+  .np-glow {
+    position: absolute; top: 104px; left: 50%; transform: translateX(-50%);
+    width: 280px; height: 280px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(207,123,96,0.32), rgba(207,123,96,0) 68%);
+    pointer-events: none;
+  }
+  .np-cover {
+    width: 196px; height: 196px; border-radius: 24px; margin: 0 auto;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 46px; font-weight: 700;
+    box-shadow: 0 18px 42px -12px rgba(0,0,0,0.6);
+    position: relative;
+  }
+  .np-title { text-align: center; font-size: 20px; font-weight: 700; margin-top: 18px; letter-spacing: -0.01em; }
+  .np-author { text-align: center; font-size: 13px; color: #D8C2B9; margin-top: 3px; }
+  .np-chiprow { display: flex; justify-content: center; margin-top: 12px; }
+  .pulse-dot { width: 7px; height: 7px; border-radius: 50%; background: #B5D18B; }
+  @media (prefers-reduced-motion: no-preference) {
+    .pulse-dot { animation: pulse 1.8s ease-in-out infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+  }
+  .np-chapter { text-align: center; font-size: 12.5px; font-weight: 600; color: #D8C2B9; margin-top: 18px; letter-spacing: 0.02em; }
+  .np-slider { padding: 0 24px; margin-top: 8px; }
+  .np-track { height: 4px; border-radius: 2px; background: #53433D; position: relative; }
+  .np-fill { position: absolute; left: 0; top: 0; height: 100%; width: 56%; background: #FFB4A3; border-radius: 2px; }
+  .np-thumb { position: absolute; left: 56%; top: 50%; transform: translate(-50%,-50%); width: 16px; height: 16px; border-radius: 50%; background: #FFB4A3; box-shadow: 0 2px 6px rgba(0,0,0,0.5); }
+  .np-times { display: flex; justify-content: space-between; font-size: 12px; color: #D8C2B9; margin-top: 8px; font-variant-numeric: tabular-nums; }
+  .np-book { padding: 0 24px; margin-top: 14px; }
+  .np-book .bt { height: 3px; border-radius: 1.5px; background: #53433D; position: relative; overflow: hidden; }
+  .np-book .bf { position: absolute; left: 0; top: 0; height: 100%; width: 38%; background: #B5D18B; border-radius: 1.5px; }
+  .np-book .bl { display: flex; justify-content: space-between; font-size: 10.5px; color: #A08D85; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .np-controls { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 22px; }
+  .np-ch { width: 40px; height: 40px; border-radius: 50%; color: #D8C2B9; display: flex; align-items: center; justify-content: center; }
+  .np-ch svg { width: 24px; height: 24px; }
+  .np-skip { width: 52px; height: 52px; border-radius: 50%; border: 1px solid #53433D; color: #F1DFD9; display: flex; align-items: center; justify-content: center; }
+  .np-skip svg { width: 28px; height: 28px; }
+  .np-play {
+    width: 72px; height: 72px; border-radius: 50%; background: #FFB4A3; color: #641D0E;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 10px 26px -8px rgba(255,180,163,0.45);
+  }
+  .np-play svg { width: 30px; height: 30px; }
+  .np-stop { display: flex; justify-content: center; margin-top: 18px; }
+  .np-stop .chip { background: #2E211B; color: #D8C2B9; height: 36px; border-radius: 18px; padding: 0 16px; }
+
+  /* empty / warning states */
+  .state-center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0 36px; gap: 8px; }
+  .state-center .knot { width: 72px; height: 72px; opacity: 0.55; margin-bottom: 8px; }
+  .state-center .et { font-size: 16px; font-weight: 700; }
+  .state-center .es { font-size: 13px; color: #53433D; }
+  .warnhead {
+    width: 76px; height: 76px; border-radius: 50%; background: #FFDAD2; color: #A93B28;
+    display: flex; align-items: center; justify-content: center; margin: 0 auto 18px;
+  }
+  .warnhead svg { width: 36px; height: 36px; }
+
+  /* ---------- knot loader ---------- */
+  .loader-flex { display: flex; gap: 40px; flex-wrap: wrap; align-items: flex-start; }
+  .knot-demo {
+    width: 300px; flex: none; background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 40px 0 16px; display: flex; flex-direction: column;
+    align-items: center; gap: 20px;
+  }
+  .knot-demo .kd-cap { font-size: 12.5px; color: var(--muted); text-align: center; padding: 0 20px; }
+  /* Knot loader: the real woven knot (ash) as a static background, with a copper squirrel
+     + comet overlay tracing the strand's own centreline. Animation is embedded in the SVG
+     via SMIL — this is the checked-in docs/logo/ratatoskr-spinner.svg the generator emits. */
+  #ratSpinner { display: block; }
+  @media (prefers-reduced-motion: reduce) {
+    /* Rest the knot, drop the moving overlay; text carries the wait. */
+    #ratSpinner .rat-spin { display: none; }
+  }
+
+  footer { margin-top: 96px; border-top: 1px solid var(--line); padding-top: 24px; font-size: 13px; color: var(--muted); display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+</style>
+
+<!-- ============ icon sprite ============ -->
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="ic-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="1.8"/><line x1="16" y1="16" x2="21" y2="21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="ic-gear" viewBox="0 0 24 24"><g fill="currentColor"><rect x="11.1" y="1.5" width="1.8" height="4" rx="0.9"/><rect x="11.1" y="1.5" width="1.8" height="4" rx="0.9" transform="rotate(45 12 12)"/><rect x="11.1" y="1.5" width="1.8" height="4" rx="0.9" transform="rotate(90 12 12)"/><rect x="11.1" y="1.5" width="1.8" height="4" rx="0.9" transform="rotate(135 12 12)"/><rect x="11.1" y="1.5" width="1.8" height="4" rx="0.9" transform="rotate(180 12 12)"/><rect x="11.1" y="1.5" width="1.8" height="4" rx="0.9" transform="rotate(225 12 12)"/><rect x="11.1" y="1.5" width="1.8" height="4" rx="0.9" transform="rotate(270 12 12)"/><rect x="11.1" y="1.5" width="1.8" height="4" rx="0.9" transform="rotate(315 12 12)"/></g><circle cx="12" cy="12" r="6.4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="2.6" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  <symbol id="ic-back" viewBox="0 0 24 24"><path d="M15 5 L8 12 L15 19" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="ic-chevron" viewBox="0 0 24 24"><path d="M9.5 5.5 L16 12 L9.5 18.5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="ic-play" viewBox="0 0 24 24"><path d="M8 5.4 L18.6 12 L8 18.6 Z" fill="currentColor"/></symbol>
+  <symbol id="ic-pause" viewBox="0 0 24 24"><rect x="6.4" y="5" width="3.6" height="14" rx="1.2" fill="currentColor"/><rect x="14" y="5" width="3.6" height="14" rx="1.2" fill="currentColor"/></symbol>
+  <symbol id="ic-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor"/></symbol>
+  <symbol id="ic-prev" viewBox="0 0 24 24"><rect x="6" y="6" width="2.2" height="12" rx="1" fill="currentColor"/><path d="M18 6 L10 12 L18 18 Z" fill="currentColor"/></symbol>
+  <symbol id="ic-next" viewBox="0 0 24 24"><path d="M6 6 L14 12 L6 18 Z" fill="currentColor"/><rect x="15.8" y="6" width="2.2" height="12" rx="1" fill="currentColor"/></symbol>
+  <symbol id="ic-r10" viewBox="0 0 24 24"><path d="M12 4 A8 8 0 1 0 20 12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M12 1.2 L8.6 4 L12 6.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><text x="12" y="15.4" text-anchor="middle" font-size="7.4" font-weight="700" fill="currentColor" font-family="sans-serif">10</text></symbol>
+  <symbol id="ic-f10" viewBox="0 0 24 24"><path d="M12 4 A8 8 0 1 1 4 12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M12 1.2 L15.4 4 L12 6.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><text x="12" y="15.4" text-anchor="middle" font-size="7.4" font-weight="700" fill="currentColor" font-family="sans-serif">10</text></symbol>
+  <symbol id="ic-speaker" viewBox="0 0 24 24"><rect x="6.5" y="3.5" width="11" height="17" rx="2.4" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="14.4" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="8" r="1.3" fill="currentColor"/></symbol>
+  <symbol id="ic-group" viewBox="0 0 24 24"><rect x="3.5" y="5" width="8" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="7.5" cy="14" r="2.1" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="7.5" cy="8.6" r="1" fill="currentColor"/><rect x="14" y="7.5" width="6.5" height="11.5" rx="1.8" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="17.2" cy="14.8" r="1.7" fill="none" stroke="currentColor" stroke-width="1.3"/></symbol>
+  <symbol id="ic-shield" viewBox="0 0 24 24"><path d="M12 2.8 L19.5 5.6 V11 C19.5 16 16.4 19.7 12 21.2 C7.6 19.7 4.5 16 4.5 11 V5.6 Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M8.8 11.6 L11.2 14 L15.4 9.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="ic-warning" viewBox="0 0 24 24"><path d="M12 3.2 L22 20 H2 Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><line x1="12" y1="9.4" x2="12" y2="14.4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><circle cx="12" cy="17.3" r="1.15" fill="currentColor"/></symbol>
+  <symbol id="ic-eye" viewBox="0 0 24 24"><path d="M2.5 12 C5 7.2 8.4 5 12 5 C15.6 5 19 7.2 21.5 12 C19 16.8 15.6 19 12 19 C8.4 19 5 16.8 2.5 12 Z" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+  <symbol id="ic-person" viewBox="0 0 24 24"><circle cx="12" cy="8.2" r="3.6" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M4.8 20 C6 16.4 8.8 14.6 12 14.6 C15.2 14.6 18 16.4 19.2 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+  <symbol id="ic-server" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="6.4" rx="1.8" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="3.5" y="13.1" width="17" height="6.4" rx="1.8" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="7.2" cy="7.7" r="1.1" fill="currentColor"/><circle cx="7.2" cy="16.3" r="1.1" fill="currentColor"/></symbol>
+  <symbol id="ic-logout" viewBox="0 0 24 24"><path d="M14 4.5 H7 A2 2 0 0 0 5 6.5 V17.5 A2 2 0 0 0 7 19.5 H14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M11 12 H20 M16.6 8.4 L20.2 12 L16.6 15.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="ic-check" viewBox="0 0 24 24"><path d="M4.5 12.6 L9.6 17.6 L19.5 6.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="ic-lock" viewBox="0 0 24 24"><rect x="5.5" y="10.4" width="13" height="9.6" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8.4 10.4 V7.6 A3.6 3.6 0 0 1 15.6 7.6 V10.4" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="15.2" r="1.4" fill="currentColor"/></symbol>
+  <symbol id="ic-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6" fill="none" stroke="currentColor" stroke-width="1.6"/><line x1="12" y1="11" x2="12" y2="16.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="7.8" r="1.1" fill="currentColor"/></symbol>
+  <symbol id="ic-wifi" viewBox="0 0 24 24"><path d="M3 9.5 C8.5 4.5 15.5 4.5 21 9.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M6.5 13.5 C10 10.5 14 10.5 17.5 13.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="17.5" r="1.8" fill="currentColor"/></symbol>
+  <symbol id="ic-batt" viewBox="0 0 24 24"><rect x="3" y="8" width="16" height="8.6" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="5" y="10" width="9" height="4.6" rx="0.8" fill="currentColor"/><rect x="20.2" y="10.6" width="2" height="3.4" rx="0.8" fill="currentColor"/></symbol>
+</svg>
+
+<!-- reusable logo symbols (referenced by mockups and the loader demo) -->
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="logo-knot" viewBox="-8 -8 272 272">
+    <path d="M152.51,17.74 L146.47,11.10 L140.65,5.67 L134.64,1.08 L128.00,-2.99 L119.59,2.32 L111.79,8.87 L104.18,16.94 L95.45,27.86 L106.19,30.29 L112.40,22.71 L117.67,17.10 L122.55,12.69 L128.00,8.67 L135.23,14.20 L142.63,21.62 L149.58,30.00 L165.65,50.98 L175.66,61.98 L181.33,66.99 L187.36,71.45 L194.56,75.97 L202.83,80.53 L203.41,69.50 L191.01,61.79 L185.77,57.68 L180.90,53.10 L172.45,43.49 L152.51,17.74 Z M75.90,27.78 L67.01,26.58 L59.06,26.16 L51.50,26.50 L43.80,27.66 L40.77,37.13 L39.01,47.16 L38.36,58.23 L38.70,72.21 L48.49,67.17 L48.38,57.37 L48.80,49.68 L49.70,43.17 L51.29,36.58 L60.39,36.18 L70.83,37.10 L81.54,39.06 L107.33,44.80 L122.07,46.79 L129.64,46.98 L137.12,46.52 L145.55,45.36 L154.81,43.54 L148.16,34.71 L133.71,36.78 L127.05,36.99 L120.37,36.62 L107.73,34.69 L75.90,27.78 Z M23.67,84.72 L16.09,89.51 L9.73,94.30 L4.16,99.42 L-1.00,105.25 L2.77,114.46 L7.87,123.28 L14.49,132.17 L23.73,142.66 L27.99,132.51 L21.61,125.08 L16.99,118.91 L13.49,113.35 L10.48,107.28 L17.19,101.12 L25.78,95.12 L35.24,89.73 L58.69,77.55 L71.26,69.60 L77.18,64.89 L82.61,59.72 L88.32,53.42 L94.25,46.07 L83.48,43.57 L73.74,54.45 L68.78,58.89 L63.42,62.90 L52.49,69.55 L23.67,84.72 Z M20.26,161.91 L17.53,170.45 L15.73,178.21 L14.76,185.71 L14.56,193.49 L23.37,198.12 L32.94,201.60 L43.73,204.16 L57.55,206.25 L54.29,195.74 L44.62,194.15 L37.12,192.40 L30.86,190.38 L24.65,187.67 L25.83,178.64 L28.56,168.52 L32.34,158.31 L42.47,133.91 L47.00,119.74 L48.50,112.32 L49.34,104.87 L49.66,96.37 L49.48,86.93 L39.63,91.94 L39.16,106.54 L38.21,113.13 L36.68,119.64 L32.58,131.76 L20.26,161.91 Z M67.16,222.97 L70.66,231.53 L74.27,238.63 L78.35,245.00 L83.20,251.09 L92.92,248.97 L102.49,245.49 L112.40,240.51 L124.34,233.23 L115.07,227.27 L106.65,232.27 L99.77,235.75 L93.68,238.22 L87.19,240.14 L82.29,232.46 L77.87,222.96 L74.20,212.71 L66.28,187.50 L60.63,173.74 L57.02,167.09 L52.87,160.84 L47.66,154.12 L41.45,147.01 L37.13,157.18 L46.15,168.67 L49.66,174.32 L52.67,180.30 L57.33,192.21 L67.16,222.97 Z M142.44,239.86 L150.62,244.17 L157.95,247.28 L165.17,249.54 L172.80,251.09 L178.89,243.22 L183.98,234.40 L188.37,224.22 L192.83,210.96 L181.91,212.36 L178.67,221.60 L175.64,228.68 L172.56,234.49 L168.81,240.14 L160.13,237.41 L150.64,232.97 L141.24,227.47 L118.96,213.25 L105.79,206.34 L98.75,203.57 L91.56,201.45 L83.25,199.66 L73.92,198.20 L77.15,208.77 L91.44,211.77 L97.76,213.84 L103.91,216.48 L115.14,222.62 L142.44,239.86 Z M210.96,204.40 L220.00,202.45 L227.62,200.12 L234.60,197.21 L241.44,193.49 L241.04,183.55 L239.27,173.53 L236.10,162.90 L230.99,149.88 L223.52,157.97 L226.98,167.14 L229.21,174.51 L230.59,180.93 L231.35,187.67 L222.94,191.16 L212.81,193.86 L202.08,195.69 L175.88,199.12 L161.35,202.28 L154.17,204.69 L147.30,207.69 L139.78,211.66 L131.70,216.54 L140.96,222.56 L153.83,215.67 L160.02,213.19 L166.42,211.26 L178.96,208.75 L210.96,204.40 Z M240.67,133.20 L246.33,125.89 L250.67,119.22 L254.15,112.50 L257.00,105.25 L250.31,97.89 L242.50,91.35 L233.24,85.25 L220.96,78.56 L220.44,89.56 L228.98,94.36 L235.42,98.57 L240.61,102.61 L245.52,107.28 L241.32,115.36 L235.30,123.93 L228.26,132.23 L210.39,151.70 L201.29,163.47 L197.34,169.92 L194.00,176.64 L190.80,184.52 L187.74,193.45 L198.71,192.11 L204.14,178.55 L207.29,172.68 L210.95,167.09 L218.95,157.10 L240.67,133.20 Z M217.65,59.56 L217.29,50.33 L216.32,42.42 L214.67,35.04 L212.20,27.66 L202.34,26.32 L192.16,26.32 L181.14,27.61 L167.43,30.37 L174.10,39.13 L183.73,37.32 L191.38,36.40 L197.94,36.16 L204.71,36.59 L206.68,45.47 L207.59,55.91 L207.52,66.80 L206.35,93.20 L206.95,108.06 L208.07,115.54 L209.83,122.84 L212.43,130.93 L215.83,139.73 L223.37,131.66 L218.82,117.78 L217.46,111.26 L216.67,104.62 L216.37,91.83 L217.65,59.56 Z" fill="#85736C" fill-rule="evenodd"/>
+  </symbol>
+  <symbol id="logo-mark" viewBox="-8 -8 272 272">
+    <path d="M152.51,17.74 L146.47,11.10 L140.65,5.67 L134.64,1.08 L128.00,-2.99 L119.59,2.32 L111.79,8.87 L104.18,16.94 L95.45,27.86 L106.19,30.29 L112.40,22.71 L117.67,17.10 L122.55,12.69 L128.00,8.67 L135.23,14.20 L142.63,21.62 L149.58,30.00 L165.65,50.98 L175.66,61.98 L181.33,66.99 L187.36,71.45 L194.56,75.97 L202.83,80.53 L203.41,69.50 L191.01,61.79 L185.77,57.68 L180.90,53.10 L172.45,43.49 L152.51,17.74 Z M75.90,27.78 L67.01,26.58 L59.06,26.16 L51.50,26.50 L43.80,27.66 L40.77,37.13 L39.01,47.16 L38.36,58.23 L38.70,72.21 L48.49,67.17 L48.38,57.37 L48.80,49.68 L49.70,43.17 L51.29,36.58 L60.39,36.18 L70.83,37.10 L81.54,39.06 L107.33,44.80 L122.07,46.79 L129.64,46.98 L137.12,46.52 L145.55,45.36 L154.81,43.54 L148.16,34.71 L133.71,36.78 L127.05,36.99 L120.37,36.62 L107.73,34.69 L75.90,27.78 Z M23.67,84.72 L16.09,89.51 L9.73,94.30 L4.16,99.42 L-1.00,105.25 L2.77,114.46 L7.87,123.28 L14.49,132.17 L23.73,142.66 L27.99,132.51 L21.61,125.08 L16.99,118.91 L13.49,113.35 L10.48,107.28 L17.19,101.12 L25.78,95.12 L35.24,89.73 L58.69,77.55 L71.26,69.60 L77.18,64.89 L82.61,59.72 L88.32,53.42 L94.25,46.07 L83.48,43.57 L73.74,54.45 L68.78,58.89 L63.42,62.90 L52.49,69.55 L23.67,84.72 Z M20.26,161.91 L17.53,170.45 L15.73,178.21 L14.76,185.71 L14.56,193.49 L23.37,198.12 L32.94,201.60 L43.73,204.16 L57.55,206.25 L54.29,195.74 L44.62,194.15 L37.12,192.40 L30.86,190.38 L24.65,187.67 L25.83,178.64 L28.56,168.52 L32.34,158.31 L42.47,133.91 L47.00,119.74 L48.50,112.32 L49.34,104.87 L49.66,96.37 L49.48,86.93 L39.63,91.94 L39.16,106.54 L38.21,113.13 L36.68,119.64 L32.58,131.76 L20.26,161.91 Z M67.16,222.97 L70.66,231.53 L74.27,238.63 L78.35,245.00 L83.20,251.09 L92.92,248.97 L102.49,245.49 L112.40,240.51 L124.34,233.23 L115.07,227.27 L106.65,232.27 L99.77,235.75 L93.68,238.22 L87.19,240.14 L82.29,232.46 L77.87,222.96 L74.20,212.71 L66.28,187.50 L60.63,173.74 L57.02,167.09 L52.87,160.84 L47.66,154.12 L41.45,147.01 L37.13,157.18 L46.15,168.67 L49.66,174.32 L52.67,180.30 L57.33,192.21 L67.16,222.97 Z M142.44,239.86 L150.62,244.17 L157.95,247.28 L165.17,249.54 L172.80,251.09 L178.89,243.22 L183.98,234.40 L188.37,224.22 L192.83,210.96 L181.91,212.36 L178.67,221.60 L175.64,228.68 L172.56,234.49 L168.81,240.14 L160.13,237.41 L150.64,232.97 L141.24,227.47 L118.96,213.25 L105.79,206.34 L98.75,203.57 L91.56,201.45 L83.25,199.66 L73.92,198.20 L77.15,208.77 L91.44,211.77 L97.76,213.84 L103.91,216.48 L115.14,222.62 L142.44,239.86 Z M210.96,204.40 L220.00,202.45 L227.62,200.12 L234.60,197.21 L241.44,193.49 L241.04,183.55 L239.27,173.53 L236.10,162.90 L230.99,149.88 L223.52,157.97 L226.98,167.14 L229.21,174.51 L230.59,180.93 L231.35,187.67 L222.94,191.16 L212.81,193.86 L202.08,195.69 L175.88,199.12 L161.35,202.28 L154.17,204.69 L147.30,207.69 L139.78,211.66 L131.70,216.54 L140.96,222.56 L153.83,215.67 L160.02,213.19 L166.42,211.26 L178.96,208.75 L210.96,204.40 Z M240.67,133.20 L246.33,125.89 L250.67,119.22 L254.15,112.50 L257.00,105.25 L250.31,97.89 L242.50,91.35 L233.24,85.25 L220.96,78.56 L220.44,89.56 L228.98,94.36 L235.42,98.57 L240.61,102.61 L245.52,107.28 L241.32,115.36 L235.30,123.93 L228.26,132.23 L210.39,151.70 L201.29,163.47 L197.34,169.92 L194.00,176.64 L190.80,184.52 L187.74,193.45 L198.71,192.11 L204.14,178.55 L207.29,172.68 L210.95,167.09 L218.95,157.10 L240.67,133.20 Z M217.65,59.56 L217.29,50.33 L216.32,42.42 L214.67,35.04 L212.20,27.66 L202.34,26.32 L192.16,26.32 L181.14,27.61 L167.43,30.37 L174.10,39.13 L183.73,37.32 L191.38,36.40 L197.94,36.16 L204.71,36.59 L206.68,45.47 L207.59,55.91 L207.52,66.80 L206.35,93.20 L206.95,108.06 L208.07,115.54 L209.83,122.84 L212.43,130.93 L215.83,139.73 L223.37,131.66 L218.82,117.78 L217.46,111.26 L216.67,104.62 L216.37,91.83 L217.65,59.56 Z" fill="#4F6B35" fill-rule="evenodd"/>
+    <g transform="translate(57.6,56.5) scale(0.55)"><path fill="#C56A4F" d="M 102.14453,91.707031 C 75.88387,107.83383 58.388797,136.81742 58.388672,169.92969 c 0,26.24358 10.989932,49.8941 28.623047,66.60547 0.78917,0.0287 1.606685,0.0645 2.388672,0.0645 h 13.798829 c -21.700005,-14.2 -36.100001,-38.99883 -36.000001,-66.79883 0,-4.6 0.401562,-9.10039 1.101562,-13.40039 0.9,-5.3 2.19961,-10.40078 4.09961,-15.30078 4.6,-12.2 12.3,-22.99961 22,-31.59961 3.931025,-5.43652 6.883519,-11.153028 7.744139,-17.792969 z"/><path fill="#CF7B60" d="m 100.54883,74.9375 c -34.212592,17.872891 -57.538997,53.68416 -57.539064,94.99219 0,23.98286 7.863534,46.11295 21.154296,63.95508 3.994665,1.1882 8.055807,2.01583 12.144532,2.42382 -15.837028,-17.59471 -25.480469,-40.87153 -25.480469,-66.3789 1.42e-4,-37.40057 20.735424,-70.006176 51.324215,-86.935549 -0.0436,-0.3653 -0.0948,-0.729088 -0.15234,-1.09375 -0.28228,-2.301653 -0.7723,-4.633659 -1.45117,-6.962891 z"/><path fill="#D98C71" d="M 94.142578,60.931641 C 54.631684,81.246153 27.630927,122.41046 27.630859,169.92969 c 0,18.28302 3.997424,35.62541 11.166016,51.20117 4.147092,2.98474 8.519875,5.64518 13.048828,7.88281 C 41.438637,211.7536 35.449219,191.53542 35.449219,169.92969 35.449291,125.44985 60.83345,86.84854 97.892578,67.835938 c -1.076559,-2.353764 -2.333276,-4.667189 -3.75,-6.904297 z"/><path fill="#E29D82" d="M 84.048828,48.875 C 41.253167,72.264996 12.250034,117.68638 12.25,169.92969 c 0,9.2829 0.916003,18.35034 2.662109,27.11719 3.38757,4.8158 7.343596,9.48164 11.742188,13.81835 C 22.383104,197.99201 20.070312,184.22918 20.070312,169.92969 20.070384,119.96778 48.3014,76.550596 89.669922,54.773438 87.935064,52.678657 86.054753,50.699076 84.048828,48.875 Z"/><path fill="#EBAE93" d="m 69.447266,39.585938 c -7.324582,4.540725 -14.237402,9.682721 -20.669922,15.355468 -0.211199,4.300932 -1.072405,9.059358 -3.115235,13.839844 9.407794,-9.713153 20.15685,-18.119803 31.947266,-24.919922 -2.592641,-1.705867 -5.324231,-3.151449 -8.162109,-4.27539 z M 31.289062,86.109375 C 17.717138,96.750193 10.173095,108.56836 6.1992188,120.19922 2.1992187,129.59922 0,140.00039 0,150.90039 c 0,8 1.2003906,15.70039 3.4003906,22.90039 0.4690006,1.46954 0.9773844,2.92923 1.5214844,4.37305 -0.152752,-2.72874 -0.2304688,-5.47744 -0.2304688,-8.24414 2.01e-5,-31.20438 9.8456698,-60.12409 26.5976558,-83.820315 z"/><path fill="#F1BEA4" d="m 55.800781,36.900391 c -3.1,0 -6.20039,0.30039 -9.40039,0.90039 0,0 1.159601,3.003328 1.876953,7.705078 3.611981,-2.960556 7.354682,-5.765894 11.21875,-8.408203 -1.22161,-0.130105 -2.453527,-0.197265 -3.695313,-0.197265 z"/><path fill="#A93B28" fill-rule="evenodd" d="M253,142.2c0,0.1,0,0.2,0,0.3c0,0.2,0,0.3,0,0.4c0,5.9-4.8,10.7-10.7,10.7h-18.7c-2.8,2.2-5.6,4.7-8.6,7c-0.9,0.7-1.8,1.3-2.7,1.9c-1,0.8-2,1.4-3.1,2c-0.8,0.3-1.6,0.8-2.3,1.1c-2.7,1.2-5.5,2-8.5,2c-0.2,0-0.3,0-0.6,0c-0.9,0-1.9-0.1-2.8-0.2c-8.5-0.9-12.6-6-16.4-13.2c-0.1-0.1-0.2-0.2-0.3-0.3c-2.7-3.2-5.1-4.9-7.1-5.7c-6.6-4.2-14.4-6.8-22.7-6.9l0.6,4.1c20.9,0.7,37.7,17.8,37.7,38.9c0,11.9-5.5,22.6-13.9,29.7c6.6,1,12.2,4.9,15.7,10.2c1.1,1.7,2,3.7,2.7,5.7c0.7,2.1,1.1,4.5,1.1,6.8h-4.8h-5.2h-12.2h-23.7h-30.2c-16.4-7.8-30.1-21.3-37.2-38c-3-6.9-4.9-14.5-5.6-22.3c-0.7-4.2-1-8.6-1-12.9c0-18.6,20.9-57.1,52.1-65.9c0,0,23.8-9.1,26.6-10.2c24.2-10,16.9-23.3,23-32.8c7.3-11.5,17.3-12.4,17.3-12.4L205,25.8l4.7-5.5c3.6,0,6.5,12.7,7,23.4c27.4,12.8,31.4,40.9,31.4,52c0,12-6.3,17.9-15.6,20.3c-4.2,1-10,1.3-15.3,1.3c-6.2,0-11.5-0.4-11.5-0.4c0,0.9,7.3,15.1,7.3,15.1h20.2c1.2-0.1,2.6-0.2,3.8-0.2c1.2,0,2.4,0.1,3.7,0.2h1.6c3,0,5.7,1.3,7.7,3.3c1.3,1.2,2.1,2.4,2.3,3.8C252.8,140.2,253,141.2,253,142.2z M207.1,72c0,4.1,3.3,7.5,7.5,7.5s7.5-3.3,7.5-7.5c0-4.1-3.3-7.5-7.5-7.5S207,67.9,207.1,72z"/></g>
+  </symbol>
+</svg>
+
+<div class="wrap">
+
+  <!-- ============ header ============ -->
+  <header class="page">
+    <svg class="logo" viewBox="-8 -8 272 272" role="img" aria-label="Ratatoskr logo"><use href="#logo-mark"/></svg>
+    <div class="head-text">
+      <p class="eyebrow">Ratatoskr · Android · v1</p>
+      <h1>UX design for the Ratatoskr app</h1>
+      <p class="lede">Ratatoskr is a remote control: play Audiobookshelf audiobooks on Sonos speakers, with progress synced back. The design turns that technical role into a stance — calm, warm, honest about state. Six screens, one active session, no distractions.</p>
+      <div class="meta-row">
+        <span class="m"><b>Foundation</b> · docs/SPEC.md §12–13</span>
+        <span class="m"><b>Palette</b> · Color.kt (copper / ash leaf)</span>
+        <span class="m"><b>System</b> · Material 3, Compose</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ============ principles ============ -->
+  <section>
+    <div class="section-head">
+      <p class="eyebrow">Principles</p>
+      <h2>Four rules every screen decision hangs on</h2>
+    </div>
+    <div class="principles">
+      <div class="principle">
+        <span class="pn">P1</span>
+        <h3>The server owns the truth</h3>
+        <p>The app shows state, it doesn’t own it. Every screen therefore has a designed loading, empty and error state — “nothing here” is a normal state, not an accident. Positions advance locally between polls and correct themselves quietly.</p>
+      </div>
+      <div class="principle">
+        <span class="pn">P2</span>
+        <h3>Thumb first</h3>
+        <p>Each screen’s primary action sits in the bottom third: the connect button, the sign-in button, play/pause. All touch targets are at least 48&thinsp;dp. The top of the screen is for reading, the bottom for acting.</p>
+      </div>
+      <div class="principle">
+        <span class="pn">P3</span>
+        <h3>Warm and calm</h3>
+        <p>Listening to audiobooks is an evening ritual, not a feed. 60/30/10: warm neutrals carry the surface, dark warm gray the text, and copper is reserved for exactly one primary action per screen. Ash green marks the secondary — status, chips, success.</p>
+      </div>
+      <div class="principle">
+        <span class="pn">P4</span>
+        <h3>Make trust visible</h3>
+        <p>Self-signed certificate, self-hosted server: the app explains what it verifies. The fingerprint is formatted to be readable, trusting is a deliberate act, and a certificate change is loud — never quietly dismissible.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ flow ============ -->
+  <section>
+    <div class="section-head">
+      <p class="eyebrow">User flow</p>
+      <h2>Set up once — after that: library → speaker → listen</h2>
+      <p>Connect and sign-in are one-time hurdles and disappear from the back stack afterwards. The library is home; from there it’s two taps to a playing audiobook.</p>
+    </div>
+    <div class="flow-scroll">
+      <svg viewBox="0 0 960 292" width="960" height="292" role="img" aria-label="Navigation flow of the app" font-family="Segoe UI, sans-serif">
+        <defs>
+          <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 Z" fill="#A93B28"/>
+          </marker>
+          <marker id="arr-mut" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 Z" fill="#8A7A70"/>
+          </marker>
+        </defs>
+        <text x="20" y="26" font-size="12" fill="#8A7A70">Start destination by state: no server → Connect · no tokens → Sign in · otherwise Library</text>
+
+        <g font-size="14" font-weight="600" text-anchor="middle">
+          <rect x="20" y="56" width="150" height="56" rx="12" fill="#FFFDFB" stroke="#E2D3C8"/>
+          <text x="95" y="80" fill="#2A1F19">Connect</text>
+          <text x="95" y="98" font-size="11" font-weight="400" fill="#8A7A70">URL + certificate</text>
+
+          <rect x="212" y="56" width="150" height="56" rx="12" fill="#FFFDFB" stroke="#E2D3C8"/>
+          <text x="287" y="80" fill="#2A1F19">Sign in</text>
+          <text x="287" y="98" font-size="11" font-weight="400" fill="#8A7A70">ABS credentials</text>
+
+          <rect x="404" y="56" width="150" height="56" rx="12" fill="#FFDAD2" stroke="#A93B28" stroke-width="1.5"/>
+          <text x="479" y="80" fill="#3E0400">Library</text>
+          <text x="479" y="98" font-size="11" font-weight="400" fill="#872F1F">Hub · search</text>
+
+          <rect x="596" y="56" width="150" height="56" rx="12" fill="#FFFDFB" stroke="#E2D3C8"/>
+          <text x="671" y="80" fill="#2A1F19">Speakers</text>
+          <text x="671" y="98" font-size="11" font-weight="400" fill="#8A7A70">Pick target = start</text>
+
+          <rect x="788" y="56" width="150" height="56" rx="12" fill="#FFFDFB" stroke="#E2D3C8"/>
+          <text x="863" y="80" fill="#2A1F19">Now playing</text>
+          <text x="863" y="98" font-size="11" font-weight="400" fill="#8A7A70">Transport + position</text>
+
+          <rect x="404" y="196" width="150" height="56" rx="12" fill="#FFFDFB" stroke="#E2D3C8"/>
+          <text x="479" y="220" fill="#2A1F19">Settings</text>
+          <text x="479" y="238" font-size="11" font-weight="400" fill="#8A7A70">Server · account</text>
+        </g>
+
+        <g stroke="#A93B28" stroke-width="1.6" fill="none">
+          <line x1="170" y1="84" x2="204" y2="84" marker-end="url(#arr)"/>
+          <line x1="362" y1="84" x2="396" y2="84" marker-end="url(#arr)"/>
+          <line x1="554" y1="84" x2="588" y2="84" marker-end="url(#arr)"/>
+          <line x1="746" y1="84" x2="780" y2="84" marker-end="url(#arr)"/>
+        </g>
+        <g font-size="10.5" fill="#A93B28" text-anchor="middle">
+          <text x="571" y="72">Tap a book</text>
+          <text x="763" y="72">Session starts</text>
+        </g>
+
+        <line x1="479" y1="112" x2="479" y2="188" stroke="#8A7A70" stroke-width="1.4" marker-end="url(#arr-mut)"/>
+
+        <g stroke="#8A7A70" stroke-width="1.3" stroke-dasharray="5 4" fill="none">
+          <path d="M863 112 C 863 158 620 158 560 128" marker-end="url(#arr-mut)"/>
+          <path d="M404 224 C 240 224 130 180 96 118" marker-end="url(#arr-mut)"/>
+          <path d="M554 224 C 700 250 340 268 287 118" marker-end="url(#arr-mut)"/>
+        </g>
+        <g font-size="10.5" fill="#8A7A70">
+          <text x="700" y="152">Stop → back, progress saved</text>
+          <text x="160" y="196">Forget certificate</text>
+          <text x="560" y="242">Sign out</text>
+        </g>
+      </svg>
+    </div>
+    <p class="flow-note">The mini player (see Library) is the second path from the library to Now playing — the active session is reachable in one tap from anywhere, without its own route.</p>
+  </section>
+
+  <!-- ============ tokens ============ -->
+  <section>
+    <div class="section-head">
+      <p class="eyebrow">Design tokens</p>
+      <h2>The brand supplies the palette, Material 3 the grid</h2>
+      <p>All values come from <code>ui/theme/Color.kt</code> and the logo: copper (the squirrel) as primary, ash-leaf green (the Yggdrasil frame) as secondary, on warm neutrals. Dynamic color is deliberately off — the brand stays consistent.</p>
+    </div>
+
+    <p class="token-sub">Colors · Light</p>
+    <div class="swatch-grid">
+      <div class="swatch"><div class="chip" style="background:#FFFBF8; border-bottom:1px solid #EFE3DA"></div><div class="lbl"><span class="n">Background</span><span class="h">#FFFBF8</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#211A17"></div><div class="lbl"><span class="n">On background</span><span class="h">#211A17</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#A93B28"></div><div class="lbl"><span class="n">Primary · copper</span><span class="h">#A93B28</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#FFDAD2"></div><div class="lbl"><span class="n">Primary container</span><span class="h">#FFDAD2</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#4F6B35"></div><div class="lbl"><span class="n">Secondary · ash leaf</span><span class="h">#4F6B35</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#D1E8B0"></div><div class="lbl"><span class="n">Secondary container</span><span class="h">#D1E8B0</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#F4DED5"></div><div class="lbl"><span class="n">Surface variant</span><span class="h">#F4DED5</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#85736C"></div><div class="lbl"><span class="n">Outline</span><span class="h">#85736C</span></div></div>
+    </div>
+    <p class="token-sub">Colors · Dark</p>
+    <div class="swatch-grid">
+      <div class="swatch"><div class="chip" style="background:#1A120F"></div><div class="lbl"><span class="n">Background</span><span class="h">#1A120F</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#F1DFD9"></div><div class="lbl"><span class="n">On background</span><span class="h">#F1DFD9</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#FFB4A3"></div><div class="lbl"><span class="n">Primary</span><span class="h">#FFB4A3</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#872F1F"></div><div class="lbl"><span class="n">Primary container</span><span class="h">#872F1F</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#B5D18B"></div><div class="lbl"><span class="n">Secondary</span><span class="h">#B5D18B</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#395020"></div><div class="lbl"><span class="n">Secondary container</span><span class="h">#395020</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#53433D"></div><div class="lbl"><span class="n">Surface variant</span><span class="h">#53433D</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#A08D85"></div><div class="lbl"><span class="n">Outline</span><span class="h">#A08D85</span></div></div>
+    </div>
+
+    <p class="token-sub">Typography — four sizes, two weights</p>
+    <div class="table-scroll">
+      <table class="tokens">
+        <tr><th>Role (M3)</th><th>Size / weight</th><th>Used for</th></tr>
+        <tr><td><code>headlineSmall</code></td><td>24 sp · Semibold</td><td>Screen headlines (Connect, Sign in)</td></tr>
+        <tr><td><code>titleMedium</code></td><td>16 sp · Semibold</td><td>Book titles, row titles, buttons</td></tr>
+        <tr><td><code>bodyMedium</code></td><td>14 sp · Regular</td><td>Body copy, authors, descriptions</td></tr>
+        <tr><td><code>labelSmall</code></td><td>11–12 sp · Semibold, +0.5–2 sp tracking</td><td>Eyebrows (“PLAYING ON”), chips, time labels</td></tr>
+        <tr><td colspan="3" style="color:var(--muted); font-size:13px">Numbers (positions, durations, fingerprints) are always tabular or monospace so nothing jitters. Typeface: system (Roboto), no bundled font — keeps the F-Droid build small.</td></tr>
+      </table>
+    </div>
+
+    <p class="token-sub">Spacing — 4/8-point grid</p>
+    <div class="space-demo">
+      <div class="s"><div class="bar" style="height:4px"></div>4</div>
+      <div class="s"><div class="bar" style="height:8px"></div>8</div>
+      <div class="s"><div class="bar" style="height:12px"></div>12</div>
+      <div class="s"><div class="bar" style="height:16px"></div>16</div>
+      <div class="s"><div class="bar" style="height:24px"></div>24</div>
+      <div class="s"><div class="bar" style="height:32px"></div>32</div>
+      <div class="s" style="flex:1; min-width:220px; align-items:flex-start; text-align:left; font-family:var(--sans); font-size:13px; color:#55463C">
+        Screen margins 16&thinsp;dp · list rows 12&thinsp;dp vertical · group breaks are twice the in-group gap (16 → 32). Touch targets ≥ 48&thinsp;dp.
+      </div>
+    </div>
+
+    <p class="token-sub">Shape</p>
+    <div class="table-scroll">
+      <table class="tokens">
+        <tr><th>Radius</th><th>Used for</th></tr>
+        <tr><td><code>8 dp</code></td><td>Text fields, cover thumbnails</td></tr>
+        <tr><td><code>16 dp</code></td><td>Cards (certificate, mini player), speaker icons</td></tr>
+        <tr><td><code>24–28 dp</code></td><td>Now-playing cover, dialogs</td></tr>
+        <tr><td><code>full</code></td><td>Buttons, search field, chips — the app’s friendly base shape</td></tr>
+      </table>
+    </div>
+
+    <p class="token-sub">Iconography</p>
+    <p style="max-width:640px; color:#4A3C33; margin:0 0 16px;">One icon family: <b>Material Symbols</b> (<code>androidx.compose.material.icons</code>, already used across the app). <b>No emoji as UI glyphs</b> — emoji render in the device’s own emoji font, so they differ across manufacturers and OS versions, can’t take the brand tint, and read as decoration to TalkBack. Material icons are bundled vectors: identical everywhere, tintable, and each carries a label.</p>
+    <div class="table-scroll">
+      <table class="tokens">
+        <tr><th>Rule</th><th>Value</th></tr>
+        <tr><td>Family / weight</td><td>Material Symbols; <b>filled</b> for primary/active affordances (transport), outlined elsewhere — one weight per surface</td></tr>
+        <tr><td>Color</td><td>Tint via the theme role (<code>onSurface</code>, <code>primary</code> for the key action) — never a hardcoded color</td></tr>
+        <tr><td>Size / target</td><td>24 dp glyph inside a ≥ 48 dp touch target</td></tr>
+        <tr><td>Accessibility</td><td>A real <code>contentDescription</code> (from <code>strings.xml</code>); <code>null</code> only when the icon is decorative or merged into a labeled parent</td></tr>
+        <tr><td>Transport set</td><td><code>PlayArrow</code> · <code>Pause</code> · <code>Stop</code>; skips <code>Replay10</code>/<code>Forward10</code>; chapters <code>SkipPrevious</code>/<code>SkipNext</code></td></tr>
+        <tr><td>Placeholders</td><td>Missing cover art → the title’s initial on a brand gradient, with a tinted <code>MenuBook</code>/<code>LibraryMusic</code> icon as fallback — not a “♪” emoji</td></tr>
+        <tr><td colspan="2" style="color:var(--muted); font-size:13px">F-Droid: <code>material-icons-core</code> is Apache-2.0 with no Play Services. Prefer core; if a glyph lives only in <code>-extended</code> (e.g. <code>Replay10</code>), ship it as a small local vector rather than pulling the whole extended set. The UX gate flags emoji glyphs in <code>Text(…)</code> so they can’t creep back in.</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ 01 connect ============ -->
+  <section>
+    <div class="section-head">
+      <div class="kicker"><span class="no">01 / 06</span><p class="eyebrow" style="margin:0">Connect</p></div>
+      <h2>Connect and trust — one decision, not a form</h2>
+      <p>The first screen decides whether the app feels trustworthy. Trust-on-first-use isn’t hidden away; it’s staged as a deliberate, understandable step.</p>
+    </div>
+    <div class="screen-flex">
+      <div class="phones">
+        <div class="phone-slot">
+          <div class="phone">
+            <div class="sbar"><span>21:47</span><span class="sicons"><svg><use href="#ic-wifi"/></svg><svg><use href="#ic-batt"/></svg></span></div>
+            <div class="body" style="padding: 0 20px 18px;">
+              <div style="flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; gap:0;">
+                <svg viewBox="-8 -8 272 272" style="width:132px; height:132px;"><use href="#logo-mark"/></svg>
+                <div style="font-size:22px; font-weight:700; margin-top:20px; letter-spacing:-0.01em;">Connect to your server</div>
+                <div style="font-size:13.5px; color:#53433D; text-align:center; margin-top:8px; max-width:250px;">Enter the address of your Ratatoskr server. You’ll review its certificate in the next step.</div>
+              </div>
+              <div style="flex:none;">
+                <div class="tfield"><span class="fl">Server URL</span><svg><use href="#ic-server"/></svg><span class="mono" style="font-size:13.5px; flex:1; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">ratatoskr.home.arpa:8443</span></div>
+                <div class="helper">Host and port, HTTPS only.</div>
+                <div class="btn btn-filled" style="margin-top:20px;">Connect</div>
+              </div>
+            </div>
+            <div class="gbar"></div>
+          </div>
+          <p class="phone-cap">Idle — the logo as sender, the action in the thumb zone</p>
+        </div>
+        <div class="phone-slot">
+          <div class="phone">
+            <div class="sbar"><span>21:47</span><span class="sicons"><svg><use href="#ic-wifi"/></svg><svg><use href="#ic-batt"/></svg></span></div>
+            <div class="body">
+              <div class="topbar"><div class="iconbtn"><svg><use href="#ic-back"/></svg></div><div class="tt">Do you trust this server?</div></div>
+              <div style="padding: 4px 16px 16px; font-size:13px; color:#53433D;">First connection to <b class="mono" style="font-size:12.5px">ratatoskr.home.arpa:8443</b>. Compare the fingerprint with the one your server shows.</div>
+              <div class="certcard">
+                <div class="crow"><span class="ck">Subject</span><span class="cvl">CN=ratatoskr.home.arpa</span></div>
+                <div class="crow"><span class="ck">Issuer</span><span class="cvl">CN=ratatoskr.home.arpa (self-signed)</span></div>
+                <div class="crow" style="border-bottom:none"><span class="ck">Valid until</span><span class="cvl">14 Mar 2028</span></div>
+                <div class="fingerprint">
+                  <span class="fpl">SHA-256 FINGERPRINT</span>
+                  3A:7F:B2:0C:91:5E:D8:44<br>
+                  6B:2A:F0:9D:17:C3:88:5A<br>
+                  E4:61:0B:7C:D2:39:AF:96<br>
+                  50:8E:13:C7:2B:64:F9:D4
+                </div>
+              </div>
+              <div style="display:flex; align-items:center; gap:8px; padding: 14px 18px 0; font-size:12px; color:#53433D;">
+                <svg style="width:16px; height:16px; flex:none; color:#4F6B35"><use href="#ic-shield"/></svg>
+                The fingerprint is pinned. If it ever changes, the app will warn you before connecting.
+              </div>
+              <div style="flex:1"></div>
+              <div style="padding: 0 16px;">
+                <div class="btn btn-filled">Trust and continue</div>
+                <div class="btn btn-text" style="margin-top:6px;">Cancel</div>
+              </div>
+            </div>
+            <div class="gbar"></div>
+          </div>
+          <p class="phone-cap">Confirm — the fingerprint as a readable artifact</p>
+        </div>
+      </div>
+      <div class="decisions">
+        <h3>Decisions</h3>
+        <ol>
+          <li><span class="dnum">1</span><span><b>The fingerprint is the centerpiece,</b> not fine print: monospace, wrapped into groups of eight, on its own surface. That makes it genuinely comparable, line by line, against the server’s terminal output.</span></li>
+          <li><span class="dnum">2</span><span><b>Explain instead of alarm.</b> “Self-signed” is the normal case for a home server. The copy states what the app does (pin the fingerprint, warn on change) — which builds more trust than a yellow exclamation mark.</span></li>
+          <li><span class="dnum">3</span><span><b>“Trust and continue” is the screen’s only copper action;</b> Cancel is deliberately text-only. The hierarchy says: this is the one decision here.</span></li>
+          <li><span class="dnum">4</span><span><b>The logo appears only in the idle state.</b> Once the certificate shows, the brand steps aside — that screen belongs to the facts.</span></li>
+        </ol>
+        <div class="delta">
+          <span class="dt">Δ vs. current implementation</span>
+          <ul>
+            <li>Fingerprint grouped instead of one long string; certificate data as a card with key-value rows.</li>
+            <li>Pinning explanation with shield icon added; a visible Cancel action (today only “Try again” in the error state).</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 02 sign-in ============ -->
+  <section>
+    <div class="section-head">
+      <div class="kicker"><span class="no">02 / 06</span><p class="eyebrow" style="margin:0">Sign in</p></div>
+      <h2>Signing in with context: where do these credentials go?</h2>
+      <p>The credentials belong to Audiobookshelf; the recipient is the user’s own server. The screen shows both — and promises the outcome that matters (staying signed in), not implementation details.</p>
+    </div>
+    <div class="screen-flex">
+      <div class="phones">
+        <div class="phone-slot">
+          <div class="phone">
+            <div class="sbar"><span>21:47</span><span class="sicons"><svg><use href="#ic-wifi"/></svg><svg><use href="#ic-batt"/></svg></span></div>
+            <div class="body" style="padding: 0 20px 18px;">
+              <div style="padding-top:36px;">
+                <span class="chip chip-ash"><svg><use href="#ic-lock"/></svg>ratatoskr.home.arpa · trusted</span>
+                <div style="font-size:24px; font-weight:700; margin-top:20px;">Sign in</div>
+                <div style="font-size:13.5px; color:#53433D; margin-top:6px;">Use your Audiobookshelf username and password.</div>
+              </div>
+              <div style="margin-top:28px; display:flex; flex-direction:column; gap:20px;">
+                <div class="tfield"><span class="fl">Username</span><svg><use href="#ic-person"/></svg><span>alex</span></div>
+                <div class="tfield"><span class="fl">Password</span><svg><use href="#ic-lock"/></svg><span style="letter-spacing:3px; flex:1;">••••••••••</span><svg><use href="#ic-eye"/></svg></div>
+              </div>
+              <div class="helper" style="padding-top:10px;">You’ll stay signed in on this device.</div>
+              <div style="flex:1"></div>
+              <div class="btn btn-filled">Sign in</div>
+            </div>
+            <div class="gbar"></div>
+          </div>
+          <p class="phone-cap">Idle — a trust chip instead of an anonymous form</p>
+        </div>
+      </div>
+      <div class="decisions">
+        <h3>Decisions</h3>
+        <ol>
+          <li><span class="dnum">1</span><span><b>The server chip at the top</b> (lock + host + “trusted”) links this step to the certificate decision from a moment ago — the user knows where the credentials go.</span></li>
+          <li><span class="dnum">2</span><span><b>Promise the outcome, not the mechanism.</b> The helper says “You’ll stay signed in on this device” — true because the encrypted refresh token keeps the session alive across restarts (SPEC §5). The copy deliberately makes <em>no</em> claim about password storage, so a future “remember credentials for automatic re-login” option can be added without contradicting anything we advertised earlier.</span></li>
+          <li><span class="dnum">3</span><span><b>Password visibility toggle</b> (eye) — long generated passwords are common with ABS, and typing them blind produces failed attempts.</span></li>
+          <li><span class="dnum">4</span><span><b>Errors appear inline below the fields</b> (“Wrong username or password”) and the button stays enabled — no dialog, no lost input.</span></li>
+        </ol>
+        <div class="delta">
+          <span class="dt">Δ vs. current implementation</span>
+          <ul>
+            <li>Server context chip and stay-signed-in helper are new; password toggle is new.</li>
+            <li>The button moves from the end of the form into the thumb zone (pinned at the bottom).</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 03 library ============ -->
+  <section>
+    <div class="section-head">
+      <div class="kicker"><span class="no">03 / 06</span><p class="eyebrow" style="margin:0">Library</p></div>
+      <h2>The library is home — and carries the active session</h2>
+      <p>There is exactly one active session (SPEC §3). The design takes that seriously: a docked mini player keeps it permanently visible from the library and one tap away.</p>
+    </div>
+    <div class="screen-flex">
+      <div class="phones">
+        <div class="phone-slot">
+          <div class="phone">
+            <div class="sbar"><span>21:47</span><span class="sicons"><svg><use href="#ic-wifi"/></svg><svg><use href="#ic-batt"/></svg></span></div>
+            <div class="body" style="padding-bottom:14px;">
+              <div class="topbar"><div class="tt">Library</div><div class="iconbtn"><svg><use href="#ic-gear"/></svg></div></div>
+              <div style="padding: 2px 16px 12px;"><div class="searchbar"><svg><use href="#ic-search"/></svg>Search title or author</div></div>
+              <div style="flex:1; overflow:hidden; display:flex; flex-direction:column;">
+                <div class="lrow">
+                  <div class="cover cv-copper">PH</div>
+                  <div class="lmain">
+                    <div class="lt">Project Hail Mary</div>
+                    <div class="la">Andy Weir</div>
+                    <div class="pline"><div class="ptrack"><div class="pfill" style="width:38%"></div></div><span class="plabel">9 h 58 min left</span></div>
+                  </div>
+                </div>
+                <div class="divider"></div>
+                <div class="lrow">
+                  <div class="cover cv-ash">TH</div>
+                  <div class="lmain">
+                    <div class="lt">The Hobbit</div>
+                    <div class="la">J. R. R. Tolkien</div>
+                    <div class="pline"><div class="ptrack"><div class="pfill" style="width:62%"></div></div><span class="plabel">4 h 12 min left</span></div>
+                  </div>
+                </div>
+                <div class="divider"></div>
+                <div class="lrow">
+                  <div class="cover cv-sand">TM</div>
+                  <div class="lmain">
+                    <div class="lt">The Martian</div>
+                    <div class="la">Andy Weir</div>
+                    <div class="done"><svg><use href="#ic-check"/></svg>Finished</div>
+                  </div>
+                </div>
+                <div class="divider"></div>
+                <div class="lrow">
+                  <div class="cover cv-moss">D</div>
+                  <div class="lmain">
+                    <div class="lt">Dune</div>
+                    <div class="la">Frank Herbert</div>
+                    <div class="pline"><div class="ptrack"></div><span class="plabel">21 h 02 min</span></div>
+                  </div>
+                </div>
+                <div class="divider"></div>
+                <div class="lrow">
+                  <div class="cover cv-dusk">NW</div>
+                  <div class="lmain">
+                    <div class="lt">The Name of the Wind</div>
+                    <div class="la">Patrick Rothfuss</div>
+                    <div class="pline"><div class="ptrack"><div class="pfill" style="width:15%"></div></div><span class="plabel">23 h 44 min left</span></div>
+                  </div>
+                </div>
+              </div>
+              <div class="miniplayer">
+                <div class="mp-progress"></div>
+                <div class="cover cv-copper">PH</div>
+                <div>
+                  <div class="mt">Project Hail Mary</div>
+                  <div class="ms">Playing on Living Room · 6:12:45</div>
+                </div>
+                <div class="mp-btn"><svg><use href="#ic-pause"/></svg></div>
+              </div>
+            </div>
+            <div class="gbar"></div>
+          </div>
+          <p class="phone-cap">Loaded, with the active session in the mini player</p>
+        </div>
+      </div>
+      <div class="decisions">
+        <h3>Decisions</h3>
+        <ol>
+          <li><span class="dnum">1</span><span><b>A mini player instead of a “Now playing” text button.</b> It exists only while a session is active, shows book, speaker and position, offers pause directly, and opens the full Now-playing screen on tap. It feeds off the same <code>getCurrentSession</code> polling — no new route, no new module.</span></li>
+          <li><span class="dnum">2</span><span><b>Every row answers “where was I?”:</b> a progress bar plus time remaining (“4 h 12 min left”). Raw percentages are a server number; time remaining is the user’s question.</span></li>
+          <li><span class="dnum">3</span><span><b>Cover placeholders from the brand palette</b> (initials on copper/ash gradients) until the contract delivers cover art — the list looks finished from day one, not broken.</span></li>
+          <li><span class="dnum">4</span><span><b>Search as a round M3 search bar</b> directly under the app bar — searching is this screen’s main job next to resuming. Finished books show a green check instead of a full bar.</span></li>
+        </ol>
+        <div class="delta">
+          <span class="dt">Δ vs. current implementation</span>
+          <ul>
+            <li>The text-button row (“Now playing” / “Settings”) is replaced by an M3 top bar with a gear icon plus the mini player.</li>
+            <li>List rows gain cover placeholders, progress bars and time remaining instead of a plain text label.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 04 speakers ============ -->
+  <section>
+    <div class="section-head">
+      <div class="kicker"><span class="no">04 / 06</span><p class="eyebrow" style="margin:0">Speakers</p></div>
+      <h2>Choosing a speaker means playing — with clear context</h2>
+      <p>One tap on a speaker starts the session (that’s how it’s implemented today, and it’s right). To keep that single tap from being a surprise, the screen shows <em>what</em> starts and <em>where</em> it resumes.</p>
+    </div>
+    <div class="screen-flex">
+      <div class="phones">
+        <div class="phone-slot">
+          <div class="phone">
+            <div class="sbar"><span>21:47</span><span class="sicons"><svg><use href="#ic-wifi"/></svg><svg><use href="#ic-batt"/></svg></span></div>
+            <div class="body">
+              <div class="topbar"><div class="iconbtn"><svg><use href="#ic-back"/></svg></div><div class="tt">Choose a speaker</div></div>
+              <div style="margin: 4px 16px 8px; display:flex; gap:12px; align-items:center; background:#F6EAE2; border-radius:16px; padding:12px 14px;">
+                <div class="cover cv-copper" style="width:44px; height:44px; font-size:14px;">PH</div>
+                <div style="min-width:0;">
+                  <div style="font-size:13.5px; font-weight:700;">Project Hail Mary</div>
+                  <div style="font-size:12px; color:#53433D;">Resumes at 6:12:45</div>
+                </div>
+              </div>
+              <div class="speaker-row">
+                <div class="sic" style="background:#D1E8B0; color:#33471E;"><svg><use href="#ic-speaker"/></svg></div>
+                <div class="smain">
+                  <div class="sn">Living Room</div>
+                  <div class="ss">Sonos Arc</div>
+                </div>
+                <span class="chip chip-ash">Last used</span>
+              </div>
+              <div class="divider"></div>
+              <div class="speaker-row">
+                <div class="sic"><svg><use href="#ic-speaker"/></svg></div>
+                <div class="smain">
+                  <div class="sn">Kitchen</div>
+                  <div class="ss">Sonos One SL</div>
+                </div>
+              </div>
+              <div class="divider"></div>
+              <div class="speaker-row">
+                <div class="sic"><svg><use href="#ic-speaker"/></svg></div>
+                <div class="smain">
+                  <div class="sn">Bedroom</div>
+                  <div class="ss">Sonos Beam</div>
+                </div>
+              </div>
+              <div class="divider"></div>
+              <div class="speaker-row">
+                <div class="sic"><svg><use href="#ic-group"/></svg></div>
+                <div class="smain">
+                  <div class="sn">Living Room + Kitchen</div>
+                  <div class="ss">Group · 2 speakers</div>
+                </div>
+              </div>
+              <div style="flex:1"></div>
+              <div class="helper" style="text-align:center; padding-bottom:8px;">Tapping a speaker starts playback there.</div>
+            </div>
+            <div class="gbar"></div>
+          </div>
+          <p class="phone-cap">Book context on top, last-used speaker marked</p>
+        </div>
+      </div>
+      <div class="decisions">
+        <h3>Decisions</h3>
+        <ol>
+          <li><span class="dnum">1</span><span><b>A context card at the top:</b> cover, title and — crucially — <b>“Resumes at 6:12:45”</b>. That the server knows the position and resumes automatically is the system’s best feature; this is where it becomes visible for the first time.</span></li>
+          <li><span class="dnum">2</span><span><b>A “Last used” chip in ash green</b> makes the most common case the fastest: last night’s speaker sits marked at the top.</span></li>
+          <li><span class="dnum">3</span><span><b>Groups look different from single speakers</b> (double icon, “Group · 2 speakers”) — the app doesn’t manage groups, but it must display them honestly.</span></li>
+          <li><span class="dnum">4</span><span><b>The hint “Tapping a speaker starts playback”</b> makes the row semantics explicit. While starting, a spinner replaces the chosen row’s icon and the other rows become inactive.</span></li>
+        </ol>
+        <div class="delta">
+          <span class="dt">Δ vs. current implementation</span>
+          <ul>
+            <li>Context card with book and resume position is new (the <code>itemId</code> is already in the route).</li>
+            <li>Speaker icons, “Last used” chip and the explanatory footer are new; ordering: last used first.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 05 now playing ============ -->
+  <section>
+    <div class="section-head">
+      <div class="kicker"><span class="no">05 / 06</span><p class="eyebrow" style="margin:0">Now playing</p></div>
+      <h2>The heart of the app — chapter-first, like the official ABS player</h2>
+      <p>This is where users spend their time, often in low light — so the showcase is the dark variant (light follows the same rules). The transport layout follows the official Audiobookshelf app: chapter progress as the primary slider, book progress as a second thin bar, chapter skip on the outside.</p>
+    </div>
+    <div class="screen-flex">
+      <div class="phones">
+        <div class="phone-slot">
+          <div class="phone dark">
+            <div class="sbar"><span>21:47</span><span class="sicons"><svg><use href="#ic-wifi"/></svg><svg><use href="#ic-batt"/></svg></span></div>
+            <div class="np-glow"></div>
+            <div class="body" style="position:relative;">
+              <div class="topbar">
+                <div class="iconbtn"><svg><use href="#ic-back"/></svg></div>
+                <div style="flex:1; text-align:center;">
+                  <div style="font-size:10.5px; font-weight:700; letter-spacing:0.18em; color:#D8C2B9;">PLAYING ON</div>
+                  <div style="font-size:13.5px; font-weight:600; margin-top:1px;">Living Room</div>
+                </div>
+                <div class="iconbtn" style="visibility:hidden"></div>
+              </div>
+              <div style="margin-top:12px;">
+                <div class="np-cover cv-copper">PH</div>
+              </div>
+              <div class="np-title">Project Hail Mary</div>
+              <div class="np-author">Andy Weir · 16:10 h</div>
+              <div class="np-chiprow"><span class="chip chip-ash"><span class="pulse-dot"></span>Playing</span></div>
+              <div class="np-chapter">Chapter 12</div>
+              <div class="np-slider">
+                <div class="np-track"><div class="np-fill"></div><div class="np-thumb"></div></div>
+                <div class="np-times"><span>12:04</span><span>−9:31</span></div>
+              </div>
+              <div class="np-book">
+                <div class="bt"><div class="bf"></div></div>
+                <div class="bl"><span>Book · 38%</span><span>−9:57:40</span></div>
+              </div>
+              <div class="np-controls">
+                <div class="np-ch"><svg><use href="#ic-prev"/></svg></div>
+                <div class="np-skip"><svg><use href="#ic-r10"/></svg></div>
+                <div class="np-play"><svg><use href="#ic-pause"/></svg></div>
+                <div class="np-skip"><svg><use href="#ic-f10"/></svg></div>
+                <div class="np-ch"><svg><use href="#ic-next"/></svg></div>
+              </div>
+              <div class="np-stop"><span class="chip"><svg style="width:13px;height:13px"><use href="#ic-stop"/></svg>Stop listening</span></div>
+            </div>
+            <div class="gbar"></div>
+          </div>
+          <p class="phone-cap">Dark · playing — chapter slider primary, book bar secondary</p>
+        </div>
+      </div>
+      <div class="decisions">
+        <h3>Decisions</h3>
+        <ol>
+          <li><span class="dnum">1</span><span><b>“PLAYING ON Living Room” sits at the very top.</b> For a remote, the most important information isn’t what’s playing but <em>where</em> — the audio comes from a device in the room, not from the phone.</span></li>
+          <li><span class="dnum">2</span><span><b>Chapter-first progress, like the official ABS app:</b> the interactive slider covers the current chapter (elapsed left, remaining right), and a thin ash-green bar underneath shows the whole book. Copper = now, ash = the whole tree. Dragging the chapter slider is still one absolute <code>seekSession</code> under the hood.</span></li>
+          <li><span class="dnum">3</span><span><b>Five transport controls in ABS order:</b> previous chapter · −10 s · play/pause (72 dp, copper) · +10 s · next chapter. The 10-second default mirrors ABS’s player default; the amount becomes a client setting later. Chapter skips are seeks to chapter marks — no new server capability.</span></li>
+          <li><span class="dnum">4</span><span><b>Stop is small, labeled and set apart:</b> “Stop listening”. It ends the session; the confirmation that progress was saved arrives as a snackbar back in the library, so the button can speak the user’s language instead of the system’s.</span></li>
+          <li><span class="dnum">5</span><span><b>The status chip is the only motion</b> (a softly pulsing dot while playing, static when paused/buffering). During a seek it shows “Buffering” until the server confirms. Position advances locally between polls and corrects quietly (SPEC §3).</span></li>
+        </ol>
+        <div class="delta">
+          <span class="dt">Δ vs. current implementation</span>
+          <ul>
+            <li>Speaker name in the header, chapter slider + book bar, and chapter skip buttons are new. <b>Chapter navigation requires a SPEC §2 revision (currently listed as out of scope) and an additive contract change (chapter marks on item/session)</b> — flagged in the implementation table.</li>
+            <li>±10 s jumps are new (via existing <code>seekSession</code>); Stop moves out of the transport row into a labeled chip; the current single book slider becomes the thin secondary bar.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 06 settings ============ -->
+  <section>
+    <div class="section-head">
+      <div class="kicker"><span class="no">06 / 06</span><p class="eyebrow" style="margin:0">Settings</p></div>
+      <h2>Three groups, no surprises</h2>
+      <p>Settings is small in this app — server, account, about. The structure makes the two destructive actions (forget certificate, sign out) findable but not accidentally tappable.</p>
+    </div>
+    <div class="screen-flex">
+      <div class="phones">
+        <div class="phone-slot">
+          <div class="phone">
+            <div class="sbar"><span>21:47</span><span class="sicons"><svg><use href="#ic-wifi"/></svg><svg><use href="#ic-batt"/></svg></span></div>
+            <div class="body">
+              <div class="topbar"><div class="iconbtn"><svg><use href="#ic-back"/></svg></div><div class="tt">Settings</div></div>
+              <div class="settings-h">SERVER</div>
+              <div class="srow">
+                <div class="sic2"><svg><use href="#ic-server"/></svg></div>
+                <div><div class="st">Server address</div><div class="ssub mono" style="font-size:11.5px">https://ratatoskr.home.arpa:8443</div></div>
+              </div>
+              <div class="srow">
+                <div class="sic2"><svg><use href="#ic-shield"/></svg></div>
+                <div><div class="st">Certificate</div><div class="ssub">SHA-256 · 3A:7F:B2:0C:… · trusted 12 Jun 2026</div></div>
+                <div class="chev"><svg><use href="#ic-chevron"/></svg></div>
+              </div>
+              <div class="srow danger">
+                <div class="sic2"><svg><use href="#ic-warning"/></svg></div>
+                <div><div class="st">Forget certificate &amp; re-trust</div><div class="ssub">You’ll confirm the server’s fingerprint again</div></div>
+              </div>
+              <div class="divider" style="margin-top:8px;"></div>
+              <div class="settings-h">ACCOUNT</div>
+              <div class="srow">
+                <div class="sic2"><svg><use href="#ic-person"/></svg></div>
+                <div><div class="st">Signed in as alex</div><div class="ssub">Audiobookshelf, via your Ratatoskr server</div></div>
+              </div>
+              <div class="srow danger">
+                <div class="sic2"><svg><use href="#ic-logout"/></svg></div>
+                <div><div class="st">Sign out</div><div class="ssub">Removes the stored tokens from this device</div></div>
+              </div>
+              <div class="divider" style="margin-top:8px;"></div>
+              <div class="settings-h">ABOUT</div>
+              <div class="srow">
+                <div class="sic2"><svg><use href="#ic-info"/></svg></div>
+                <div><div class="st">Ratatoskr 1.0.0</div><div class="ssub">GPL-3.0-or-later · Source code</div></div>
+                <div class="chev"><svg><use href="#ic-chevron"/></svg></div>
+              </div>
+              <div style="flex:1"></div>
+            </div>
+            <div class="gbar"></div>
+          </div>
+          <p class="phone-cap">Grouped list; destructive rows in copper with consequence subtitles</p>
+        </div>
+      </div>
+      <div class="decisions">
+        <h3>Decisions</h3>
+        <ol>
+          <li><span class="dnum">1</span><span><b>Destructive actions are copper list rows with a subtitle</b> naming the consequence (“Removes the stored tokens…”) — instead of two equally loud buttons. Both additionally get a confirmation dialog.</span></li>
+          <li><span class="dnum">2</span><span><b>The certificate is inspectable:</b> the row shows the fingerprint prefix and trust date; tapping opens the full view (same layout as Connect’s confirm step — recognition, not relearning).</span></li>
+          <li><span class="dnum">3</span><span><b>“Signed in as alex” explains the architecture in passing</b> (“Audiobookshelf, via your Ratatoskr server”) — the one place where the app states its role.</span></li>
+          <li><span class="dnum">4</span><span><b>Version + license are table stakes for the F-Droid audience:</b> GPL and a source-code link belong visibly in the app, not just in the repo.</span></li>
+        </ol>
+        <div class="delta">
+          <span class="dt">Δ vs. current implementation</span>
+          <ul>
+            <li>Two free-standing buttons become grouped rows with icons, subtitles and confirmation dialogs.</li>
+            <li>Certificate detail view and the About group (version, license, source) are new.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ states & moments ============ -->
+  <section>
+    <div class="section-head">
+      <p class="eyebrow">States &amp; moments</p>
+      <h2>The edges of the system: empty, warned, finished</h2>
+      <p>The peak–end rule, translated to a remote: the peak is the moment the room starts to sound; the end is the stop, which must feel like progress — not like loss.</p>
+    </div>
+    <div class="phones" style="margin-bottom:40px;">
+      <div class="phone-slot">
+        <div class="phone">
+          <div class="sbar"><span>21:47</span><span class="sicons"><svg><use href="#ic-wifi"/></svg><svg><use href="#ic-batt"/></svg></span></div>
+          <div class="body">
+            <div class="topbar"><div class="iconbtn"><svg><use href="#ic-back"/></svg></div><div class="tt">Certificate changed</div></div>
+            <div class="state-center" style="flex:none; padding-top:26px;">
+              <div class="warnhead"><svg><use href="#ic-warning"/></svg></div>
+              <div class="et" style="font-size:18px;">This server’s certificate<br>has changed</div>
+              <div class="es" style="margin-top:6px;">The fingerprint no longer matches the one you trusted on 12 Jun 2026. If you didn’t change your server’s certificate, <b>do not continue</b>.</div>
+            </div>
+            <div class="certcard" style="margin-top:20px;">
+              <div class="fingerprint" style="background:#FFDAD2;">
+                <span class="fpl" style="color:#872F1F;">NEW SHA-256 FINGERPRINT</span>
+                C9:12:6E:A4:0F:B7:33:D8<br>
+                71:5C:E2:98:1B:44:AD:06<br>
+                8F:D3:29:70:C6:5B:E1:9A<br>
+                34:B8:07:F2:6D:C1:58:E7
+              </div>
+            </div>
+            <div style="flex:1"></div>
+            <div style="padding:0 16px;">
+              <div class="btn" style="border:1.5px solid #A93B28; color:#A93B28; font-weight:700;">Trust the new certificate</div>
+              <div class="btn btn-filled" style="margin-top:10px; background:#211A17;">Don’t connect</div>
+            </div>
+          </div>
+          <div class="gbar"></div>
+        </div>
+        <p class="phone-cap">Certificate change — the only deliberately loud screen</p>
+      </div>
+      <div class="phone-slot">
+        <div class="phone">
+          <div class="sbar"><span>21:47</span><span class="sicons"><svg><use href="#ic-wifi"/></svg><svg><use href="#ic-batt"/></svg></span></div>
+          <div class="body">
+            <div class="topbar"><div class="tt">Library</div><div class="iconbtn"><svg><use href="#ic-gear"/></svg></div></div>
+            <div style="padding: 2px 16px 12px;"><div class="searchbar" style="color:#211A17;"><svg style="color:#53433D"><use href="#ic-search"/></svg>kafka</div></div>
+            <div class="state-center">
+              <svg class="knot" viewBox="-8 -8 272 272"><use href="#logo-knot"/></svg>
+              <div class="et">No results for “kafka”</div>
+              <div class="es">Try a different title or author. The search covers your whole Audiobookshelf library.</div>
+            </div>
+          </div>
+          <div class="gbar"></div>
+        </div>
+        <p class="phone-cap">Empty search — the knot as a quiet brand moment</p>
+      </div>
+    </div>
+    <div class="principles">
+      <div class="principle">
+        <span class="pn">PEAK</span>
+        <h3>Playback start</h3>
+        <p>After the speaker tap the app switches to Now playing, the knot loader runs while the server connects to the speaker, the cover scales in gently, and the chip goes Buffering → Playing. No confetti — the real effect happens in the room. The app just confirms it calmly.</p>
+      </div>
+      <div class="principle">
+        <span class="pn">END</span>
+        <h3>Stop with a receipt</h3>
+        <p>“Stop listening” returns to the library; a snackbar says “Progress saved to Audiobookshelf” and the book’s row visibly carries the new bar position. Ending a session is a receipt, not a loss.</p>
+      </div>
+      <div class="principle">
+        <span class="pn">EMPTY</span>
+        <h3>Emptiness as guidance</h3>
+        <p>No speakers found → “Check that your Sonos speakers are on the same network as your server” plus a retry. Every empty state names whose state it mirrors (server, network, search) and what to do about it.</p>
+      </div>
+      <div class="principle">
+        <span class="pn">ERR</span>
+        <h3>Errors stay local</h3>
+        <p>Errors appear where the action was: inline under form fields, as a banner above lists, never as a global dialog. Retry is always the first offered action; an expired sign-in leads cleanly to the sign-in screen.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ motion & loading ============ -->
+  <section>
+    <div class="section-head">
+      <p class="eyebrow">Motion &amp; loading</p>
+      <h2>The knot as the app’s pulse</h2>
+      <p>For waits the user actually feels — inspecting the certificate, connecting to a speaker, the first library load — the knot from the logo becomes the loading indicator: the real woven knot holds still while a copper squirrel runs its strand, trailing a fade along the band. Ratatoskr, running the tree.</p>
+    </div>
+    <div class="loader-flex">
+      <div class="knot-demo">
+        <svg id="ratSpinner" viewBox="-8 -8 272 272" width="176" height="176" role="img" aria-label="Loading indicator: the Ratatoskr knot with a copper squirrel running the strand">
+          <path d="M152.51,17.74 L146.47,11.10 L140.65,5.67 L134.64,1.08 L128.00,-2.99 L119.59,2.32 L111.79,8.87 L104.18,16.94 L95.45,27.86 L106.19,30.29 L112.40,22.71 L117.67,17.10 L122.55,12.69 L128.00,8.67 L135.23,14.20 L142.63,21.62 L149.58,30.00 L165.65,50.98 L175.66,61.98 L181.33,66.99 L187.36,71.45 L194.56,75.97 L202.83,80.53 L203.41,69.50 L191.01,61.79 L185.77,57.68 L180.90,53.10 L172.45,43.49 L152.51,17.74 Z M75.90,27.78 L67.01,26.58 L59.06,26.16 L51.50,26.50 L43.80,27.66 L40.77,37.13 L39.01,47.16 L38.36,58.23 L38.70,72.21 L48.49,67.17 L48.38,57.37 L48.80,49.68 L49.70,43.17 L51.29,36.58 L60.39,36.18 L70.83,37.10 L81.54,39.06 L107.33,44.80 L122.07,46.79 L129.64,46.98 L137.12,46.52 L145.55,45.36 L154.81,43.54 L148.16,34.71 L133.71,36.78 L127.05,36.99 L120.37,36.62 L107.73,34.69 L75.90,27.78 Z M23.67,84.72 L16.09,89.51 L9.73,94.30 L4.16,99.42 L-1.00,105.25 L2.77,114.46 L7.87,123.28 L14.49,132.17 L23.73,142.66 L27.99,132.51 L21.61,125.08 L16.99,118.91 L13.49,113.35 L10.48,107.28 L17.19,101.12 L25.78,95.12 L35.24,89.73 L58.69,77.55 L71.26,69.60 L77.18,64.89 L82.61,59.72 L88.32,53.42 L94.25,46.07 L83.48,43.57 L73.74,54.45 L68.78,58.89 L63.42,62.90 L52.49,69.55 L23.67,84.72 Z M20.26,161.91 L17.53,170.45 L15.73,178.21 L14.76,185.71 L14.56,193.49 L23.37,198.12 L32.94,201.60 L43.73,204.16 L57.55,206.25 L54.29,195.74 L44.62,194.15 L37.12,192.40 L30.86,190.38 L24.65,187.67 L25.83,178.64 L28.56,168.52 L32.34,158.31 L42.47,133.91 L47.00,119.74 L48.50,112.32 L49.34,104.87 L49.66,96.37 L49.48,86.93 L39.63,91.94 L39.16,106.54 L38.21,113.13 L36.68,119.64 L32.58,131.76 L20.26,161.91 Z M67.16,222.97 L70.66,231.53 L74.27,238.63 L78.35,245.00 L83.20,251.09 L92.92,248.97 L102.49,245.49 L112.40,240.51 L124.34,233.23 L115.07,227.27 L106.65,232.27 L99.77,235.75 L93.68,238.22 L87.19,240.14 L82.29,232.46 L77.87,222.96 L74.20,212.71 L66.28,187.50 L60.63,173.74 L57.02,167.09 L52.87,160.84 L47.66,154.12 L41.45,147.01 L37.13,157.18 L46.15,168.67 L49.66,174.32 L52.67,180.30 L57.33,192.21 L67.16,222.97 Z M142.44,239.86 L150.62,244.17 L157.95,247.28 L165.17,249.54 L172.80,251.09 L178.89,243.22 L183.98,234.40 L188.37,224.22 L192.83,210.96 L181.91,212.36 L178.67,221.60 L175.64,228.68 L172.56,234.49 L168.81,240.14 L160.13,237.41 L150.64,232.97 L141.24,227.47 L118.96,213.25 L105.79,206.34 L98.75,203.57 L91.56,201.45 L83.25,199.66 L73.92,198.20 L77.15,208.77 L91.44,211.77 L97.76,213.84 L103.91,216.48 L115.14,222.62 L142.44,239.86 Z M210.96,204.40 L220.00,202.45 L227.62,200.12 L234.60,197.21 L241.44,193.49 L241.04,183.55 L239.27,173.53 L236.10,162.90 L230.99,149.88 L223.52,157.97 L226.98,167.14 L229.21,174.51 L230.59,180.93 L231.35,187.67 L222.94,191.16 L212.81,193.86 L202.08,195.69 L175.88,199.12 L161.35,202.28 L154.17,204.69 L147.30,207.69 L139.78,211.66 L131.70,216.54 L140.96,222.56 L153.83,215.67 L160.02,213.19 L166.42,211.26 L178.96,208.75 L210.96,204.40 Z M240.67,133.20 L246.33,125.89 L250.67,119.22 L254.15,112.50 L257.00,105.25 L250.31,97.89 L242.50,91.35 L233.24,85.25 L220.96,78.56 L220.44,89.56 L228.98,94.36 L235.42,98.57 L240.61,102.61 L245.52,107.28 L241.32,115.36 L235.30,123.93 L228.26,132.23 L210.39,151.70 L201.29,163.47 L197.34,169.92 L194.00,176.64 L190.80,184.52 L187.74,193.45 L198.71,192.11 L204.14,178.55 L207.29,172.68 L210.95,167.09 L218.95,157.10 L240.67,133.20 Z M217.65,59.56 L217.29,50.33 L216.32,42.42 L214.67,35.04 L212.20,27.66 L202.34,26.32 L192.16,26.32 L181.14,27.61 L167.43,30.37 L174.10,39.13 L183.73,37.32 L191.38,36.40 L197.94,36.16 L204.71,36.59 L206.68,45.47 L207.59,55.91 L207.52,66.80 L206.35,93.20 L206.95,108.06 L208.07,115.54 L209.83,122.84 L212.43,130.93 L215.83,139.73 L223.37,131.66 L218.82,117.78 L217.46,111.26 L216.67,104.62 L216.37,91.83 L217.65,59.56 Z" fill="#4F6B35" fill-rule="evenodd" stroke="none"/>
+          <defs><path id="ratatoskr-route" d="M236.43,190.60 C213.03,204.13 182.81,199.57 157.41,208.81 C132.02,218.06 111.80,240.97 85.18,245.65 C67.79,224.95 67.04,194.41 53.52,171.00 C40.01,147.59 13.93,131.66 4.70,106.26 C22.06,85.54 52.02,79.49 72.72,62.12 C93.43,44.75 104.59,16.30 128.00,2.80 C151.41,16.30 162.57,44.75 183.28,62.12 C203.98,79.49 233.94,85.54 251.30,106.26 C242.07,131.66 215.99,147.59 202.48,171.00 C188.96,194.41 188.21,224.95 170.82,245.65 C144.20,240.97 123.98,218.06 98.59,208.81 C73.19,199.57 42.97,204.13 19.57,190.60 C19.56,163.57 38.61,139.68 43.31,113.07 C48.00,86.45 38.26,57.48 47.52,32.09 C74.14,27.38 100.97,42.00 128.00,42.00 C155.03,42.00 181.86,27.38 208.48,32.09 C217.74,57.48 208.00,86.45 212.69,113.07 C217.39,139.68 236.44,163.57 236.43,190.60 Z" fill="none" pathLength="1000"/></defs>
+          <g class="rat-spin">
+          <use href="#ratatoskr-route" stroke="#A93B28" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" opacity="0.30" stroke-dasharray="36 964"><animate attributeName="stroke-dashoffset" dur="2.4s" repeatCount="indefinite" calcMode="linear" values="36;-964"/></use>
+          <use href="#ratatoskr-route" stroke="#A93B28" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" opacity="0.30" stroke-dasharray="73 927"><animate attributeName="stroke-dashoffset" dur="2.4s" repeatCount="indefinite" calcMode="linear" values="73;-927"/></use>
+          <use href="#ratatoskr-route" stroke="#A93B28" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" opacity="0.30" stroke-dasharray="110 890"><animate attributeName="stroke-dashoffset" dur="2.4s" repeatCount="indefinite" calcMode="linear" values="110;-890"/></use>
+          <use href="#ratatoskr-route" stroke="#A93B28" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" opacity="0.30" stroke-dasharray="146 854"><animate attributeName="stroke-dashoffset" dur="2.4s" repeatCount="indefinite" calcMode="linear" values="146;-854"/></use>
+          <use href="#ratatoskr-route" stroke="#A93B28" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" opacity="0.30" stroke-dasharray="183 817"><animate attributeName="stroke-dashoffset" dur="2.4s" repeatCount="indefinite" calcMode="linear" values="183;-817"/></use>
+          <use href="#ratatoskr-route" stroke="#A93B28" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" opacity="0.30" stroke-dasharray="220 780"><animate attributeName="stroke-dashoffset" dur="2.4s" repeatCount="indefinite" calcMode="linear" values="220;-780"/></use>
+          <circle class="rat-runner" r="12" fill="#A93B28" opacity="0.22"><animateMotion dur="2.4s" repeatCount="indefinite" calcMode="paced"><mpath href="#ratatoskr-route"/></animateMotion></circle>
+          <circle class="rat-runner" r="6.5" fill="#A93B28"><animateMotion dur="2.4s" repeatCount="indefinite" calcMode="paced"><mpath href="#ratatoskr-route"/></animateMotion></circle>
+          </g>
+        </svg>
+        <div class="kd-cap">Live, embedded straight in the SVG (SMIL): the real woven knot sits underneath untouched, while a copper squirrel runs the strand’s own centreline trailing a comet fade. The generator emits this as <code>docs/logo/ratatoskr-spinner.svg</code>.</div>
+      </div>
+      <div class="decisions" style="max-width:620px;">
+        <h3>Rules</h3>
+        <ol>
+          <li><span class="dnum">1</span><span><b>The knot loader is for felt waits only</b> — certificate inspection, session start on a speaker, first library load. Short inline waits (search results, a pull-to-refresh) keep the standard M3 circular indicator; two spinners on one screen is one too many.</span></li>
+          <li><span class="dnum">2</span><span><b>The real knot, not an approximation.</b> The background is the exact woven knot from the logo — nothing recoloured or cut out. On top, the squirrel runs that knot’s own strand centreline (the very curve the ribbon is buffered from, spikes and all), so it weaves over itself right where the logo does, instead of jumping between disconnected sub-shapes. One linear loop (≈ 2.4 s) reads as travel, not a blink.</span></li>
+          <li><span class="dnum">3</span><span><b>Reduced motion is respected:</b> with animations off (read <code>ANIMATOR_DURATION_SCALE</code>, exposed via a <code>LocalReducedMotion</code>), the knot renders static at full opacity and the wait is communicated by text (“Connecting to Living Room…”). The demo on this page does the same via <code>prefers-reduced-motion</code>.</span></li>
+          <li><span class="dnum">4</span><span><b>A real comet, embedded in the SVG.</b> A copper head at the squirrel ramps to transparent along ~a fifth of the strand behind it (arc length, so the fade hugs the band). It needs no JavaScript — the generator writes it as SMIL: a dash travelling the centreline plus the dot on an <code>animateMotion</code> path, so it animates as a plain SVG. Android’s <code>VectorDrawable</code> can’t run SMIL, so the app redraws the same in a <code>Canvas</code>: the centreline as a <code>Path</code>, a head offset on an infinite transition, the trail via <code>PathMeasure.getSegment</code> with an alpha ramp, the runner via <code>getPosTan</code>. No new dependency, no server involvement.</span></li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ implementation ============ -->
+  <section>
+    <div class="section-head">
+      <p class="eyebrow">Implementation</p>
+      <h2>What this design changes in the code — and what it doesn’t</h2>
+    </div>
+    <div class="table-scroll">
+      <table class="tokens">
+        <tr><th>Proposal</th><th>Effort / footprint</th><th>SPEC compatibility</th></tr>
+        <tr><td><b>Mini player in the library</b></td><td>One composable + existing session polling</td><td>No new screen, no new module — §13 untouched</td></tr>
+        <tr><td><b>Chapter navigation &amp; dual progress</b></td><td>UI is presentation math over absolute seek once chapter marks exist</td><td><b>Needs a SPEC §2 revision</b> (chapter navigation UI is currently out of scope) <b>and an additive contract change</b> (chapter marks on library item / session), proposed to the server repo per §4</td></tr>
+        <tr><td><b>±10 s jumps in Now playing</b></td><td>Two buttons on the existing <code>seekSession</code>; 10 s default mirrors the ABS player, amount becomes a client setting later</td><td>No chapter knowledge, no server change</td></tr>
+        <tr><td><b>Resume position on the Speakers screen</b></td><td>Item data is already available via the route</td><td>Pure display of server state</td></tr>
+        <tr><td><b>Speaker name in Now playing</b></td><td>From the server’s <code>Session</code></td><td>Pure display of server state</td></tr>
+        <tr><td><b>Knot loading indicator</b></td><td>Generator emits <code>ratatoskr-spinner.svg</code> (SMIL); app redraws it in Compose (<code>Canvas</code> + <code>PathMeasure</code>); honors reduced motion</td><td>No dependency added, no server involvement</td></tr>
+        <tr><td><b>Cover art in lists</b></td><td>Once the contract provides it; initials placeholders until then</td><td>Contract change goes through the server repo (§4)</td></tr>
+        <tr><td colspan="3" style="color:var(--muted); font-size:13px">Unchanged: the six screens and two modules (§13), the tech stack (§12), the TOFU mechanics (§6), and the rule that no domain logic lives on the phone.</td></tr>
+      </table>
+    </div>
+
+    <p class="token-sub">Localization is part of the UX</p>
+    <div class="table-scroll">
+      <table class="tokens">
+        <tr><td style="width:220px"><b>English is the source language</b></td><td>All UI copy in this document is the English source of truth and lives in <code>strings.xml</code> from day one — no hardcoded strings in composables.</td></tr>
+        <tr><td><b>German is the first added locale</b></td><td>Ships once the v1 copy settles, together with per-locale fastlane metadata for F-Droid.</td></tr>
+        <tr><td><b>Layouts survive +30% text</b></td><td>German runs long. Buttons and labels wrap or shrink gracefully; no fixed-width text containers; mock layouts are validated against the longer locale.</td></tr>
+        <tr><td><b>Numbers and times via locale APIs</b></td><td>Durations, dates and the decimal comma come from <code>java.time</code> / ICU formatting, never from string concatenation.</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    <span>Ratatoskr · UX design v1 · July 2026</span>
+    <span>Sources: docs/SPEC.md · ui/theme/Color.kt · docs/logo/ · GPL-3.0-or-later</span>
+  </footer>
+</div>

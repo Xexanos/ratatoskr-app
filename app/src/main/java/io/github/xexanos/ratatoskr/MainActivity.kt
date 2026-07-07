@@ -59,7 +59,7 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Launch routing (SPEC section 13): no trusted server → connect; no stored tokens →
+     * Launch routing (SPEC section 13): no trusted server -> connect; no stored tokens ->
      * sign-in; otherwise the library. Runs off the main thread: on a cold start the DataStore
      * reads and the Keystore-backed decrypt in authSession() are blocking, so resolving this
      * inside onCreate would risk dropped launch frames or an ANR.

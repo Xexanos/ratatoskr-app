@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -37,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -129,14 +129,14 @@ private fun SignInContent(
         )
         Spacer(Modifier.height(24.dp))
         Text(
-            "Sign in to Audiobookshelf",
+            stringResource(R.string.signin_title),
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.SemiBold,
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            "Use your existing username and password.",
+            stringResource(R.string.signin_subtitle),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -145,7 +145,7 @@ private fun SignInContent(
         OutlinedTextField(
             value = username,
             onValueChange = { username = it },
-            label = { Text("Username") },
+            label = { Text(stringResource(R.string.signin_username_label)) },
             leadingIcon = {
                 Icon(
                     Icons.Default.Person,
@@ -155,14 +155,14 @@ private fun SignInContent(
             },
             singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-            shape = RoundedCornerShape(16.dp),
+            shape = MaterialTheme.shapes.large,
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(16.dp))
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
-            label = { Text("Password") },
+            label = { Text(stringResource(R.string.signin_password_label)) },
             leadingIcon = {
                 Icon(
                     Icons.Default.Lock,
@@ -176,14 +176,14 @@ private fun SignInContent(
                 keyboardType = KeyboardType.Password,
                 imeAction = ImeAction.Done,
             ),
-            shape = RoundedCornerShape(16.dp),
+            shape = MaterialTheme.shapes.large,
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(24.dp))
 
         if (state is SignInUiState.Error) {
             Surface(
-                shape = RoundedCornerShape(16.dp),
+                shape = MaterialTheme.shapes.large,
                 color = MaterialTheme.colorScheme.errorContainer,
                 modifier = Modifier.fillMaxWidth(),
             ) {
@@ -209,7 +209,7 @@ private fun SignInContent(
                     strokeWidth = 2.dp,
                 )
             } else {
-                Text("Sign in")
+                Text(stringResource(R.string.signin_action))
             }
         }
     }
@@ -217,19 +217,19 @@ private fun SignInContent(
 
 // --- Previews (render in Android Studio without a running server) --------------------------
 
-@Preview(name = "Sign in — idle", widthDp = 360, heightDp = 800)
+@Preview(name = "Sign in - idle", widthDp = 360, heightDp = 800)
 @Composable
 internal fun SignInIdlePreview() = RatatoskrTheme {
     Surface { SignInContent(SignInUiState.Idle) { _, _ -> } }
 }
 
-@Preview(name = "Sign in — error", widthDp = 360, heightDp = 800)
+@Preview(name = "Sign in - error", widthDp = 360, heightDp = 800)
 @Composable
 internal fun SignInErrorPreview() = RatatoskrTheme {
     Surface { SignInContent(SignInUiState.Error("Sign-in expired. Please sign in again.")) { _, _ -> } }
 }
 
-@Preview(name = "Sign in — submitting", widthDp = 360, heightDp = 800)
+@Preview(name = "Sign in - submitting", widthDp = 360, heightDp = 800)
 @Composable
 private fun SignInSubmittingPreview() = RatatoskrTheme {
     Surface { SignInContent(SignInUiState.Submitting) { _, _ -> } }

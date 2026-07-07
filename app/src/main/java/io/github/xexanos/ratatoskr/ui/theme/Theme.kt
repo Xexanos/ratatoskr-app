@@ -7,13 +7,16 @@ package io.github.xexanos.ratatoskr.ui.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 
 private val DarkColorScheme = darkColorScheme(
     primary = CopperPrimaryDark,
@@ -49,6 +52,16 @@ private val LightColorScheme = lightColorScheme(
     outline = OutlineLight,
 )
 
+// The app's corner-radius scale - the single source of truth for shapes, so screens use
+// MaterialTheme.shapes.* rather than literal RoundedCornerShape(n.dp). Values match the radii
+// the screens were built with (12 / 16 / 20 dp).
+private val AppShapes = Shapes(
+    small = RoundedCornerShape(8.dp),
+    medium = RoundedCornerShape(12.dp),
+    large = RoundedCornerShape(16.dp),
+    extraLarge = RoundedCornerShape(20.dp),
+)
+
 @Composable
 fun RatatoskrTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -69,6 +82,7 @@ fun RatatoskrTheme(
 
     MaterialTheme(
         colorScheme = colorScheme,
+        shapes = AppShapes,
         typography = Typography,
         content = content,
     )

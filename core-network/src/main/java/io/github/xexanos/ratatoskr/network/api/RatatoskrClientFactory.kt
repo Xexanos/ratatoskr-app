@@ -29,7 +29,7 @@ import java.util.concurrent.TimeUnit
  * [PlaybackState]. The kotlin generator's enum adapter throws on an unrecognised value, which
  * would fail the whole `Session` response; instead a future/unknown state deserializes to a
  * benign [PlaybackState.stopped] so an older app keeps working against a newer server
- * (SPEC section 4). STOPPED is the neutral choice — it never implies audio is playing.
+ * (SPEC section 4). STOPPED is the neutral choice - it never implies audio is playing.
  */
 internal fun ratatoskrMoshi(): Moshi =
     Serializer.moshi.newBuilder()
@@ -58,7 +58,7 @@ object RatatoskrClientFactory {
         val sslSocketFactory = PinnedTrustManager.socketFactory(trustManager)
 
         // Logging is off by default. If raised for debugging it must stay at BASIC or below and
-        // keep Authorization redacted — never log tokens, headers, or bodies (SPEC section 11).
+        // keep Authorization redacted - never log tokens, headers, or bodies (SPEC section 11).
         val logging = HttpLoggingInterceptor().apply {
             redactHeader("Authorization")
             level = HttpLoggingInterceptor.Level.NONE

@@ -46,7 +46,7 @@ import org.junit.runner.RunWith
 
 /**
  * Accessibility conformance checks (SPEC section 9): runs the Accessibility Test
- * Framework — the same checks behind Accessibility Scanner — over every screen
+ * Framework - the same checks behind Accessibility Scanner - over every screen
  * preview. The checks cover missing/unspeakable labels, touch-target size, color
  * contrast and traversal order; a violation fails the test.
  *

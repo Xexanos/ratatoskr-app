@@ -20,7 +20,7 @@ import javax.net.ssl.X509TrustManager
 /**
  * Fetches a server's leaf certificate so the connect screen can show its fingerprint for
  * trust-on-first-use (SPEC section 6). The client built here trusts everything and MUST
- * only ever be used to read the certificate chain — never for real API traffic.
+ * only ever be used to read the certificate chain - never for real API traffic.
  */
 class CertificateInspector {
 

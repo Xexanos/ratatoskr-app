@@ -20,10 +20,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -41,7 +43,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -50,10 +52,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.xexanos.ratatoskr.R
 import io.github.xexanos.ratatoskr.data.ConnectionManager
 import io.github.xexanos.ratatoskr.network.domain.ApiResult
 import io.github.xexanos.ratatoskr.network.domain.LibraryItemSummary
 import io.github.xexanos.ratatoskr.network.domain.Progress
+import io.github.xexanos.ratatoskr.ui.EmptyState
 import io.github.xexanos.ratatoskr.ui.theme.RatatoskrTheme
 import io.github.xexanos.ratatoskr.ui.toMessage
 import kotlinx.coroutines.FlowPreview
@@ -161,7 +165,7 @@ private fun LibraryContent(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                "Library",
+                stringResource(R.string.library_title),
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f),
@@ -169,14 +173,14 @@ private fun LibraryContent(
             IconButton(onClick = onOpenNowPlaying) {
                 Icon(
                     Icons.Default.PlayArrow,
-                    contentDescription = "Now playing",
+                    contentDescription = stringResource(R.string.library_now_playing),
                     tint = MaterialTheme.colorScheme.primary,
                 )
             }
             IconButton(onClick = onOpenSettings) {
                 Icon(
                     Icons.Default.Settings,
-                    contentDescription = "Settings",
+                    contentDescription = stringResource(R.string.library_settings),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -185,7 +189,7 @@ private fun LibraryContent(
         OutlinedTextField(
             value = query,
             onValueChange = onQueryChange,
-            placeholder = { Text("Search your audiobooks") },
+            placeholder = { Text(stringResource(R.string.library_search_placeholder)) },
             leadingIcon = {
                 Icon(
                     Icons.Default.Search,
@@ -194,7 +198,7 @@ private fun LibraryContent(
                 )
             },
             singleLine = true,
-            shape = RoundedCornerShape(16.dp),
+            shape = MaterialTheme.shapes.large,
             modifier = Modifier.fillMaxWidth(),
         )
         when {
@@ -228,43 +232,23 @@ private fun LibraryContent(
 
 @Composable
 private fun EmptyLibrary(query: String) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(horizontal = 32.dp),
-        ) {
-            Text(
-                if (query.isBlank()) "📚" else "🔍",
-                style = MaterialTheme.typography.displaySmall,
-                // Decorative: the headline below carries the meaning. Keeping the emoji
-                // out of the semantics tree spares TalkBack the noise and the fixed
-                // emoji colors the text-contrast check.
-                modifier = Modifier.clearAndSetSemantics {},
-            )
-            Text(
-                if (query.isBlank()) "Your library is empty" else "No matches",
-                style = MaterialTheme.typography.titleMedium,
-                textAlign = TextAlign.Center,
-            )
-            Text(
-                if (query.isBlank()) {
-                    "Audiobooks from your Audiobookshelf server will show up here."
-                } else {
-                    "No audiobooks match “$query”. Try a shorter search."
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-        }
-    }
+    EmptyState(
+        icon = if (query.isBlank()) Icons.AutoMirrored.Filled.MenuBook else Icons.Default.SearchOff,
+        title = stringResource(
+            if (query.isBlank()) R.string.library_empty_title else R.string.library_no_results_title,
+        ),
+        body = if (query.isBlank()) {
+            stringResource(R.string.library_empty_body)
+        } else {
+            stringResource(R.string.library_no_results_body, query)
+        },
+    )
 }
 
 @Composable
 private fun LibraryRow(item: LibraryItemSummary, onClick: () -> Unit) {
     Surface(
-        shape = RoundedCornerShape(20.dp),
+        shape = MaterialTheme.shapes.extraLarge,
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 1.dp,
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
@@ -303,7 +287,7 @@ private fun ProgressLine(progress: Progress?, durationSeconds: Double) {
     Spacer(Modifier.height(8.dp))
     if (progress.isFinished) {
         Text(
-            "Finished",
+            stringResource(R.string.library_finished),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.secondary,
             fontWeight = FontWeight.Medium,
@@ -319,7 +303,7 @@ private fun ProgressLine(progress: Progress?, durationSeconds: Double) {
             )
             Spacer(Modifier.width(8.dp))
             Text(
-                "${(fraction * 100).roundToInt()}%",
+                stringResource(R.string.library_percent, (fraction * 100).roundToInt()),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -329,18 +313,27 @@ private fun ProgressLine(progress: Progress?, durationSeconds: Double) {
 
 @Composable
 private fun CoverThumb(title: String) {
+    val initial = title.trim().firstOrNull()?.uppercase()
     Surface(
         modifier = Modifier.size(56.dp),
-        shape = RoundedCornerShape(12.dp),
+        shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.secondaryContainer,
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Text(
-                text = title.trim().firstOrNull()?.uppercase() ?: "♪",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
-            )
+            if (initial != null) {
+                Text(
+                    text = initial,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
+            } else {
+                Icon(
+                    Icons.Default.MusicNote,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
+            }
         }
     }
 }
@@ -353,7 +346,7 @@ private val previewItems = listOf(
     LibraryItemSummary("3", "Dune", "Frank Herbert", 75_600.0, null, null),
 )
 
-@Preview(name = "Library — loaded", widthDp = 360, heightDp = 800)
+@Preview(name = "Library - loaded", widthDp = 360, heightDp = 800)
 @Composable
 internal fun LibraryLoadedPreview() = RatatoskrTheme {
     Surface {
@@ -368,7 +361,7 @@ internal fun LibraryLoadedPreview() = RatatoskrTheme {
     }
 }
 
-@Preview(name = "Library — empty", widthDp = 360, heightDp = 800)
+@Preview(name = "Library - empty", widthDp = 360, heightDp = 800)
 @Composable
 internal fun LibraryEmptyPreview() = RatatoskrTheme {
     Surface {
@@ -383,7 +376,7 @@ internal fun LibraryEmptyPreview() = RatatoskrTheme {
     }
 }
 
-@Preview(name = "Library — loading", widthDp = 360, heightDp = 800)
+@Preview(name = "Library - loading", widthDp = 360, heightDp = 800)
 @Composable
 internal fun LibraryLoadingPreview() = RatatoskrTheme {
     Surface {

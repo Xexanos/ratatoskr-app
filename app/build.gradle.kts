@@ -27,7 +27,7 @@ android {
             // R8/shrinking is intentionally off for v1. The generated API client uses
             // reflective Moshi adapters (@JsonClass(generateAdapter = false)), so enabling
             // shrinking needs Moshi/Retrofit keep rules validated against a real minified,
-            // on-device run — or, better, switching the generator to Moshi codegen adapters so
+            // on-device run - or, better, switching the generator to Moshi codegen adapters so
             // no reflection is kept at all. Until that is done and verified, ship unshrunk
             // rather than risk a release that only breaks at runtime. Tracked as a follow-up.
             optimization {
@@ -51,6 +51,7 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.core)
+    implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)

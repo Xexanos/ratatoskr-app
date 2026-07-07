@@ -50,7 +50,7 @@ class ConnectionManager(
         return buildMutex.withLock {
             // Re-check inside the lock: another caller may have built it while we waited.
             cached?.let { if (it.key == key) return@withLock it.client }
-            // A cached client for a different key is being replaced — release its HTTP stack.
+            // A cached client for a different key is being replaced - release its HTTP stack.
             cached?.client?.close()
             RatatoskrClientFactory.create(
                 baseUrl = config.baseUrl,

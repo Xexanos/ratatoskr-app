@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Home
@@ -32,12 +31,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.xexanos.ratatoskr.R
 import io.github.xexanos.ratatoskr.data.ConnectionManager
 import io.github.xexanos.ratatoskr.ui.theme.RatatoskrTheme
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -108,16 +109,16 @@ private fun SettingsContent(
 ) {
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         Text(
-            "Settings",
+            stringResource(R.string.settings_title),
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.padding(top = 16.dp),
         )
         Spacer(Modifier.height(24.dp))
 
-        SectionLabel("Server")
+        SectionLabel(stringResource(R.string.settings_section_server))
         Surface(
-            shape = RoundedCornerShape(20.dp),
+            shape = MaterialTheme.shapes.extraLarge,
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 1.dp,
             modifier = Modifier.fillMaxWidth(),
@@ -142,11 +143,17 @@ private fun SettingsContent(
                 Spacer(Modifier.width(16.dp))
                 Column {
                     Text(
-                        state.serverUrl ?: "Not configured",
+                        state.serverUrl ?: stringResource(R.string.settings_not_configured),
                         style = MaterialTheme.typography.titleSmall,
                     )
                     Text(
-                        if (state.serverUrl != null) "Connected over HTTPS" else "Connect from the start screen",
+                        stringResource(
+                            if (state.serverUrl != null) {
+                                R.string.settings_connected
+                            } else {
+                                R.string.settings_not_connected
+                            },
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -155,25 +162,25 @@ private fun SettingsContent(
         }
 
         Spacer(Modifier.height(32.dp))
-        SectionLabel("Security")
+        SectionLabel(stringResource(R.string.settings_section_security))
         OutlinedButton(
             onClick = onForgetCertificate,
             modifier = Modifier.fillMaxWidth().height(52.dp),
         ) {
             Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
-            Text("Forget certificate and re-trust")
+            Text(stringResource(R.string.settings_forget_cert))
         }
         Spacer(Modifier.height(4.dp))
         Text(
-            "Removes the pinned certificate. You will confirm the server's fingerprint again on the next connection.",
+            stringResource(R.string.settings_forget_cert_hint),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 4.dp),
         )
 
         Spacer(Modifier.height(32.dp))
-        SectionLabel("Account")
+        SectionLabel(stringResource(R.string.settings_section_account))
         OutlinedButton(
             onClick = onSignOut,
             colors = ButtonDefaults.outlinedButtonColors(
@@ -183,7 +190,7 @@ private fun SettingsContent(
         ) {
             Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
-            Text("Sign out")
+            Text(stringResource(R.string.settings_sign_out))
         }
     }
 }
@@ -213,7 +220,7 @@ internal fun SettingsPreview() = RatatoskrTheme {
     }
 }
 
-@Preview(name = "Settings — not configured", widthDp = 360, heightDp = 800)
+@Preview(name = "Settings - not configured", widthDp = 360, heightDp = 800)
 @Composable
 private fun SettingsUnconfiguredPreview() = RatatoskrTheme {
     Surface {

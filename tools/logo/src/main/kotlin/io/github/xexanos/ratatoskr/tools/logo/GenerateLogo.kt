@@ -327,8 +327,8 @@ fun wordmarkPaths(font: File): String {
 //
 // One parse of the mark into its paths, shared by the SVG composition (paintMarkSvg) and
 // the VectorDrawable emitter. Parsing once with a single set of assumptions keeps the two
-// outputs from drifting: a path the parser can't read -- e.g. Inkscape rewrote <path/> as
-// <path></path>, or dropped the data-ramp index -- fails here instead of silently vanishing
+// outputs from drifting: a path the parser can't read - e.g. Inkscape rewrote <path/> as
+// <path></path>, or dropped the data-ramp index - fails here instead of silently vanishing
 // from one output while erroring in the other. Each path carries only its ramp index; its
 // color is chosen per theme from COPPER_RAMP (see rampColor).
 
@@ -406,6 +406,51 @@ val WORDMARK_HEADER = """
          the :tools:logo Gradle module (see GenerateLogo.kt). -->
 """.trimIndent() + "\n"
 
+// --- spinner: real woven knot (static) + a copper "squirrel" running the strand (SMIL) ----
+
+/** The strand centreline as one continuous cubic-Bezier path (the ribbon's own spine). */
+fun centerlinePath(): String {
+    val f = { v: Double -> "%.2f".format(Locale.ROOT, v) }
+    val segs = knotSegments()
+    val sb = StringBuilder("M${f(segs.first().p0.x)},${f(segs.first().p0.y)} ")
+    for (c in segs) sb.append("C${f(c.c1.x)},${f(c.c1.y)} ${f(c.c2.x)},${f(c.c2.y)} ${f(c.p3.x)},${f(c.p3.y)} ")
+    return sb.append("Z").toString()
+}
+
+/** Self-contained animated spinner: the real woven knot as a static background, with a copper
+ *  squirrel + comet trail running the strand centreline as an SMIL overlay (docs/ux-design.html).
+ *  VectorDrawable has no SMIL, so the app redraws this in Compose; the SVG is the reference. */
+fun spinnerSvg(): String {
+    val copper = COPPER_RAMP.first()
+    val dur = "2.4s"
+    val k = 6
+    val trail = 220
+    val route = centerlinePath()
+    val bg = "<path d=\"${wovenKnotD()}\" fill=\"$FRAME_LIGHT\" fill-rule=\"evenodd\" stroke=\"none\"/>"
+    val layers = (1..k).joinToString("\n") { i ->
+        val len = trail * i / k
+        "  <use href=\"#ratatoskr-route\" stroke=\"$copper\" stroke-width=\"7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.30\" stroke-dasharray=\"$len ${1000 - len}\">\n" +
+            "    <animate attributeName=\"stroke-dashoffset\" dur=\"$dur\" repeatCount=\"indefinite\" calcMode=\"linear\" values=\"$len;${len - 1000}\"/>\n" +
+            "  </use>"
+    }
+    val runner =
+        "  <circle class=\"rat-runner\" r=\"12\" fill=\"$copper\" opacity=\"0.22\">\n" +
+            "    <animateMotion dur=\"$dur\" repeatCount=\"indefinite\" calcMode=\"paced\"><mpath href=\"#ratatoskr-route\"/></animateMotion>\n" +
+            "  </circle>\n" +
+            "  <circle class=\"rat-runner\" r=\"6.5\" fill=\"$copper\">\n" +
+            "    <animateMotion dur=\"$dur\" repeatCount=\"indefinite\" calcMode=\"paced\"><mpath href=\"#ratatoskr-route\"/></animateMotion>\n" +
+            "  </circle>"
+    return "  <style>\n" +
+        "    @media (prefers-reduced-motion: reduce) { .rat-spin { display: none; } }\n" +
+        "  </style>\n" +
+        "  $bg\n" +
+        "  <defs><path id=\"ratatoskr-route\" d=\"$route\" fill=\"none\" pathLength=\"1000\"/></defs>\n" +
+        "  <g class=\"rat-spin\">\n" +
+        layers + "\n" +
+        runner + "\n" +
+        "  </g>"
+}
+
 fun main(args: Array<String>) {
     var dir = File(System.getProperty("user.dir"))
     while (!File(dir, "docs/logo").isDirectory) {
@@ -445,6 +490,7 @@ fun main(args: Array<String>) {
 
     write("ratatoskr-knot-woven.svg", woven(LIGHT), "-8 -8 272 272")
     write("ratatoskr-logo.svg", logo(LIGHT), "-8 -8 272 272")
+    write("ratatoskr-spinner.svg", spinnerSvg(), "-8 -8 272 272")
     write("ratatoskr-logo-dark.svg", logo(DARK), "-8 -8 272 272")
     write("ratatoskr-lockup.svg", lockup(LIGHT), "0 0 272 350", HEADER + WORDMARK_HEADER)
     write("ratatoskr-lockup-dark.svg", lockup(DARK), "0 0 272 350", HEADER + WORDMARK_HEADER)

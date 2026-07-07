@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.map
 
 /**
  * The non-secret connection settings the app keeps per install (SPEC section 7): the server
- * URL and the confirmed server-certificate fingerprint. Not encrypted — a certificate hash
+ * URL and the confirmed server-certificate fingerprint. Not encrypted - a certificate hash
  * and a URL are public. The auth tokens live in [TokenStore] instead.
  */
 class ConnectionStore(

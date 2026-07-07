@@ -40,7 +40,7 @@ sealed interface RatatoskrError {
      */
     data class CertificateUntrusted(val message: String?) : RatatoskrError
 
-    /** Transport-level failure (no connection, timeout, DNS, …). */
+    /** Transport-level failure (no connection, timeout, DNS, ...). */
     data class Network(val cause: Throwable) : RatatoskrError
 
     /** Anything not otherwise classified. */

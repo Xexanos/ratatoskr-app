@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -39,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -149,14 +149,14 @@ private fun ConnectContent(
         )
         Spacer(Modifier.height(24.dp))
         Text(
-            "Welcome to Ratatoskr",
+            stringResource(R.string.connect_welcome_title),
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.SemiBold,
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            "Connect to your Ratatoskr server to play audiobooks on your Sonos speakers.",
+            stringResource(R.string.connect_welcome_subtitle),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -169,7 +169,7 @@ private fun ConnectContent(
         OutlinedTextField(
             value = url,
             onValueChange = { url = it },
-            label = { Text("Server URL") },
+            label = { Text(stringResource(R.string.connect_server_url_label)) },
             singleLine = true,
             readOnly = urlLocked,
             // A plain readOnly field still looks editable; the lock icon signals the URL is
@@ -178,7 +178,7 @@ private fun ConnectContent(
                 {
                     Icon(
                         Icons.Default.Lock,
-                        contentDescription = "URL locked while confirming the certificate",
+                        contentDescription = stringResource(R.string.connect_url_locked_desc),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -186,7 +186,7 @@ private fun ConnectContent(
                 null
             },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
-            shape = RoundedCornerShape(16.dp),
+            shape = MaterialTheme.shapes.large,
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(16.dp))
@@ -196,14 +196,14 @@ private fun ConnectContent(
                 Button(
                     onClick = { onInspect(url) },
                     modifier = Modifier.fillMaxWidth().height(52.dp),
-                ) { Text("Connect") }
+                ) { Text(stringResource(R.string.connect_action_connect)) }
 
             ConnectUiState.Inspecting -> {
                 Spacer(Modifier.height(8.dp))
                 CircularProgressIndicator()
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "Reading the server certificate…",
+                    stringResource(R.string.connect_inspecting),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -217,7 +217,7 @@ private fun ConnectContent(
 
             is ConnectUiState.Error -> {
                 Surface(
-                    shape = RoundedCornerShape(16.dp),
+                    shape = MaterialTheme.shapes.large,
                     color = MaterialTheme.colorScheme.errorContainer,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
@@ -232,7 +232,7 @@ private fun ConnectContent(
                 Button(
                     onClick = onReset,
                     modifier = Modifier.fillMaxWidth().height(52.dp),
-                ) { Text("Try again") }
+                ) { Text(stringResource(R.string.connect_action_retry)) }
             }
         }
     }
@@ -245,7 +245,7 @@ private fun CertificateCard(
     onCancel: () -> Unit,
 ) {
     Surface(
-        shape = RoundedCornerShape(20.dp),
+        shape = MaterialTheme.shapes.extraLarge,
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 2.dp,
         modifier = Modifier.fillMaxWidth(),
@@ -259,23 +259,26 @@ private fun CertificateCard(
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    "First connection — confirm this certificate",
+                    stringResource(R.string.connect_confirm_title),
                     style = MaterialTheme.typography.titleMedium,
                 )
             }
             Spacer(Modifier.height(16.dp))
-            CertField("Subject", info.subject)
-            CertField("Issuer", info.issuer)
-            CertField("Valid until", info.notAfter.format(DateTimeFormatter.ISO_LOCAL_DATE))
+            CertField(stringResource(R.string.connect_cert_subject_label), info.subject)
+            CertField(stringResource(R.string.connect_cert_issuer_label), info.issuer)
+            CertField(
+                stringResource(R.string.connect_cert_valid_until_label),
+                info.notAfter.format(DateTimeFormatter.ISO_LOCAL_DATE),
+            )
             Spacer(Modifier.height(8.dp))
             Text(
-                "SHA-256 fingerprint",
+                stringResource(R.string.connect_cert_fingerprint_label),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(4.dp))
             Surface(
-                shape = RoundedCornerShape(12.dp),
+                shape = MaterialTheme.shapes.medium,
                 color = MaterialTheme.colorScheme.surfaceVariant,
                 modifier = Modifier.fillMaxWidth(),
             ) {
@@ -288,7 +291,7 @@ private fun CertificateCard(
             }
             Spacer(Modifier.height(12.dp))
             Text(
-                "Compare this fingerprint with the one shown by your server before trusting it.",
+                stringResource(R.string.connect_cert_compare_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -296,12 +299,12 @@ private fun CertificateCard(
             Button(
                 onClick = onTrust,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
-            ) { Text("Trust and continue") }
+            ) { Text(stringResource(R.string.connect_action_trust)) }
             Spacer(Modifier.height(4.dp))
             TextButton(
                 onClick = onCancel,
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("Cancel") }
+            ) { Text(stringResource(R.string.connect_action_cancel)) }
         }
     }
 }
@@ -330,19 +333,19 @@ private val previewCert = CertificateInfo(
         "ab:cd:ef:12:34:56:78:90:ab:cd:ef:12:34:56:78:90",
 )
 
-@Preview(name = "Connect — idle", widthDp = 360, heightDp = 800)
+@Preview(name = "Connect - idle", widthDp = 360, heightDp = 800)
 @Composable
 internal fun ConnectIdlePreview() = RatatoskrTheme {
     Surface { ConnectContent(ConnectUiState.Idle, {}, { _, _ -> }, {}) }
 }
 
-@Preview(name = "Connect — confirm certificate", widthDp = 360, heightDp = 800)
+@Preview(name = "Connect - confirm certificate", widthDp = 360, heightDp = 800)
 @Composable
 internal fun ConnectConfirmPreview() = RatatoskrTheme {
     Surface { ConnectContent(ConnectUiState.Confirm("https://ratatoskr.home:8080", previewCert), {}, { _, _ -> }, {}) }
 }
 
-@Preview(name = "Connect — error", widthDp = 360, heightDp = 800)
+@Preview(name = "Connect - error", widthDp = 360, heightDp = 800)
 @Composable
 internal fun ConnectErrorPreview() = RatatoskrTheme {
     Surface { ConnectContent(ConnectUiState.Error("Could not read the server certificate."), {}, { _, _ -> }, {}) }
