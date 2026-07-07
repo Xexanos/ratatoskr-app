@@ -33,13 +33,6 @@ class HttpsMockServer {
 
     val server = MockWebServer()
 
-    // canonicalHostName is what MockWebServer.url() reports for the loopback address; using it
-    // as the certificate SAN keeps the served cert valid for the URL the tests actually call.
-    private val loopbackHost: String = InetAddress.getByName("localhost").canonicalHostName
-
-    private val served: HeldCertificate =
-        HeldCertificate.Builder().addSubjectAlternativeName(loopbackHost).build()
-
     /** SHA-256 of the served leaf, in the exact form [Fingerprints.sha256] produces. */
     val fingerprint: String get() = Fingerprints.sha256(served.certificate)
 
@@ -82,4 +75,16 @@ class HttpsMockServer {
     }
 
     fun takeRequest(): RecordedRequest = server.takeRequest()
+
+    private companion object {
+        // canonicalHostName is what MockWebServer.url() reports for the loopback address; using
+        // it as the certificate SAN keeps the served cert valid for the URL the tests call.
+        private val loopbackHost: String = InetAddress.getByName("localhost").canonicalHostName
+
+        // Minted once per class load, not per fixture instance: JUnit4 constructs a fresh test
+        // instance (and with it this fixture) for every @Test method, and the certificate
+        // depends on no instance state - regenerating it per test is pure repeat keygen work.
+        private val served: HeldCertificate =
+            HeldCertificate.Builder().addSubjectAlternativeName(loopbackHost).build()
+    }
 }
