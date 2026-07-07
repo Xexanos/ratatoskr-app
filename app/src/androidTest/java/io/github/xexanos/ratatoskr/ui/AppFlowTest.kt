@@ -83,7 +83,7 @@ class AppFlowTest {
         compose.onNodeWithText(str(R.string.connect_action_trust)).performClick()
 
         compose.awaitText(str(R.string.signin_action))
-        compose.onNode(hasSetTextAction() and hasImeAction(ImeAction.Next)).performTextInput("lars")
+        compose.onNode(hasSetTextAction() and hasImeAction(ImeAction.Next)).performTextInput("alex")
         compose.onNode(hasSetTextAction() and hasImeAction(ImeAction.Done)).performTextInput("secret")
         compose.onNodeWithText(str(R.string.signin_action)).performClick()
     }

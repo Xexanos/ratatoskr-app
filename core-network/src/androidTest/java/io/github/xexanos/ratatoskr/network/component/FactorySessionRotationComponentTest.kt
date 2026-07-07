@@ -68,7 +68,7 @@ class FactorySessionRotationComponentTest {
         val store = TokenStore(dataStore, KeystoreCrypto(keyAlias = "ratatoskr.test.$name"))
         runBlocking {
             store.clear()
-            store.save(AuthSession("a0", "r0", AuthUser("7", "lars")))
+            store.save(AuthSession("a0", "r0", AuthUser("7", "alex")))
         }
         return store
     }

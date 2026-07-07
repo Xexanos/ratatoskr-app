@@ -36,7 +36,7 @@ object WireFixtures {
     fun authTokensJson(
         accessToken: String = "a1",
         refreshToken: String = "r1",
-        username: String = "lars",
+        username: String = "alex",
     ): String =
         """{"accessToken":"$accessToken","refreshToken":"$refreshToken",""" +
             """"user":{"id":"7","username":"$username"}}"""
