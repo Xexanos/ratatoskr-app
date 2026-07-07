@@ -17,7 +17,12 @@ import io.github.xexanos.ratatoskr.network.domain.AuthSession
 import io.github.xexanos.ratatoskr.network.domain.AuthUser
 import io.github.xexanos.ratatoskr.network.persist.KeystoreCrypto
 import io.github.xexanos.ratatoskr.network.persist.TokenStore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -37,13 +42,28 @@ class FactorySessionRotationIntegrationTest {
     @get:Rule val https = HttpsMockServer()
     @get:Rule val testName = TestName()
 
-    /** A real Keystore-backed store, isolated per test (unique DataStore file + key alias). */
+    private var storeScope: CoroutineScope? = null
+
+    // DataStore keeps its file registered process-wide until its scope dies; without this a
+    // second DataStore on the same file (rerun, name collision) throws IllegalStateException.
+    @After fun releaseDataStore() {
+        storeScope?.cancel()
+    }
+
+    /**
+     * A real Keystore-backed store, isolated per test. The DataStore file and key alias are
+     * prefixed with the CLASS name, not just the method name: all instrumentation tests share
+     * one process, so a second class adopting this pattern with a same-named test method must
+     * not collide on the file.
+     */
     private fun seededRealStore(): TokenStore {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val dataStore = PreferenceDataStoreFactory.create {
-            context.preferencesDataStoreFile("ratatoskr_test_${testName.methodName}")
+        val name = "${javaClass.simpleName}_${testName.methodName}"
+        val scope = CoroutineScope(Dispatchers.IO + SupervisorJob()).also { storeScope = it }
+        val dataStore = PreferenceDataStoreFactory.create(scope = scope) {
+            context.preferencesDataStoreFile(name)
         }
-        val store = TokenStore(dataStore, KeystoreCrypto(keyAlias = "ratatoskr.test.${testName.methodName}"))
+        val store = TokenStore(dataStore, KeystoreCrypto(keyAlias = "ratatoskr.test.$name"))
         runBlocking {
             store.clear()
             store.save(AuthSession("a0", "r0", AuthUser("7", "lars")))
