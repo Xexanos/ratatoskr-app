@@ -28,7 +28,9 @@ class RatatoskrDispatcher(
 ) : Dispatcher() {
 
     @Volatile private var state = "playing"
-    @Volatile private var position = 10.0
+    // Low start position against a long duration (see session()) so the seek test can move the
+    // slider to a distinct value; a maxed-out slider would clamp SetProgress to a no-op.
+    @Volatile private var position = 30.0
 
     override fun dispatch(request: RecordedRequest): MockResponse {
         val path = request.path.orEmpty().substringBefore('?')
@@ -57,7 +59,8 @@ class RatatoskrDispatcher(
         }
     }
 
-    private fun session() = WireFixtures.sessionJson(state = state, positionSeconds = position)
+    private fun session() =
+        WireFixtures.sessionJson(state = state, positionSeconds = position, durationSeconds = 600.0)
 
     private companion object {
         val POSITION = Regex(""""positionSeconds"\s*:\s*([0-9.]+)""")

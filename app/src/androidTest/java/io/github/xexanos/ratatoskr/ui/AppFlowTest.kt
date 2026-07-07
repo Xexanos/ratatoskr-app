@@ -121,10 +121,11 @@ class AppFlowTest {
         compose.onNodeWithContentDescription(str(R.string.nowplaying_action_play)).performClick()
         compose.awaitContentDescription(str(R.string.nowplaying_action_pause))
 
-        // Seek: the slider is still playing afterwards (loose assertion - see plan risk 5).
+        // Seek to 120s (the fixture runs 0..600s). The position label must update to 2:00,
+        // which proves the drag actually reached onSeek and moved the position - not a no-op.
         compose.onNodeWithTag(UiTestTags.NOWPLAYING_SEEK)
             .performSemanticsAction(SemanticsActions.SetProgress) { it(120f) }
-        compose.onNodeWithContentDescription(str(R.string.nowplaying_action_pause)).assertIsDisplayed()
+        compose.awaitText("2:00")
 
         // Stop -> back to the library.
         compose.onNodeWithContentDescription(str(R.string.nowplaying_action_stop)).performClick()

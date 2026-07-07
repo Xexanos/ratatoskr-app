@@ -21,6 +21,7 @@ object WireFixtures {
     fun sessionJson(
         state: String = "playing",
         positionSeconds: Double = 1.0,
+        durationSeconds: Double = 10.0,
         rotatedTokens: Pair<String, String>? = null,
         extraJson: String = "",
     ): String {
@@ -29,7 +30,7 @@ object WireFixtures {
         } ?: ""
         val extra = if (extraJson.isEmpty()) "" else ",$extraJson"
         return """{"itemId":"i1","speakerId":"s1","state":"$state","positionSeconds":$positionSeconds,""" +
-            """"durationSeconds":10.0,"updatedAt":"2026-07-05T12:00:00Z"$rotated$extra}"""
+            """"durationSeconds":$durationSeconds,"updatedAt":"2026-07-05T12:00:00Z"$rotated$extra}"""
     }
 
     /** An `AuthTokens` response body, as returned by login and refresh. */
