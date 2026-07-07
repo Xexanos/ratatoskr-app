@@ -20,11 +20,14 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.text.input.ImeAction
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.xexanos.ratatoskr.MainActivity
 import io.github.xexanos.ratatoskr.R
+import io.github.xexanos.ratatoskr.RatatoskrApp
 import io.github.xexanos.ratatoskr.network.WireFixtures
 import io.github.xexanos.ratatoskr.network.testutil.HttpsMockServer
+import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.MockResponse
 import org.junit.Before
 import org.junit.Rule
@@ -187,7 +190,11 @@ class AppFlowTest {
         compose.onNodeWithContentDescription(str(R.string.library_settings)).performClick()
         compose.awaitText(str(R.string.settings_forget_cert))
         compose.onNodeWithText(str(R.string.settings_forget_cert)).performClick()
-        // Forgetting the certificate drops the trusted server and routes back to connect.
+        // Core effect: the pinned fingerprint is dropped. (Asserting the store also
+        // disambiguates a forget failure from a navigation failure in the next step.)
+        val container = ApplicationProvider.getApplicationContext<RatatoskrApp>().container
+        compose.waitUntil(5_000) { runBlocking { container.connectionStore.fingerprint() } == null }
+        // ...and the app routes back to connect for re-trust.
         compose.awaitText(str(R.string.connect_action_connect))
         compose.onNodeWithText(str(R.string.connect_action_connect)).assertIsDisplayed()
     }
