@@ -6,6 +6,7 @@
 package io.github.xexanos.ratatoskr.network.api
 
 import io.github.xexanos.ratatoskr.network.FakeTokenAccess
+import io.github.xexanos.ratatoskr.network.WireFixtures
 import io.github.xexanos.ratatoskr.network.domain.ApiResult
 import io.github.xexanos.ratatoskr.network.domain.PlaybackState
 import io.github.xexanos.ratatoskr.network.domain.RatatoskrError
@@ -59,11 +60,7 @@ class RatatoskrClientTest {
 
     @Test
     fun `login stores the returned token pair`() = runBlocking {
-        server.enqueue(
-            MockResponse().setBody(
-                """{"accessToken":"a1","refreshToken":"r1","user":{"id":"7","username":"lars"}}""",
-            ),
-        )
+        server.enqueue(MockResponse().setBody(WireFixtures.authTokensJson()))
 
         val result = client.login("lars", "secret")
 
@@ -120,12 +117,7 @@ class RatatoskrClientTest {
 
     @Test
     fun `startSession hands the stored refresh token to the server`() = runBlocking {
-        server.enqueue(
-            MockResponse().setBody(
-                """{"itemId":"i1","speakerId":"s1","state":"playing","positionSeconds":0.0,
-                   "durationSeconds":10.0,"updatedAt":"2026-07-05T12:00:00Z"}""",
-            ),
-        )
+        server.enqueue(MockResponse().setBody(WireFixtures.sessionJson(positionSeconds = 0.0)))
 
         val result = client.startSession("i1", "s1")
 
@@ -150,13 +142,7 @@ class RatatoskrClientTest {
 
     @Test
     fun `a session response with rotatedTokens is adopted`() = runBlocking {
-        server.enqueue(
-            MockResponse().setBody(
-                """{"itemId":"i1","speakerId":"s1","state":"playing","positionSeconds":1.0,
-                   "durationSeconds":10.0,"updatedAt":"2026-07-05T12:00:00Z",
-                   "rotatedTokens":{"accessToken":"a2","refreshToken":"r2"}}""",
-            ),
-        )
+        server.enqueue(MockResponse().setBody(WireFixtures.sessionJson(rotatedTokens = "a2" to "r2")))
 
         val result = client.currentSession()
 
@@ -167,12 +153,7 @@ class RatatoskrClientTest {
 
     @Test
     fun `a session response without rotatedTokens leaves the stored pair untouched`() = runBlocking {
-        server.enqueue(
-            MockResponse().setBody(
-                """{"itemId":"i1","speakerId":"s1","state":"playing","positionSeconds":1.0,
-                   "durationSeconds":10.0,"updatedAt":"2026-07-05T12:00:00Z"}""",
-            ),
-        )
+        server.enqueue(MockResponse().setBody(WireFixtures.sessionJson()))
 
         client.currentSession()
 
@@ -184,9 +165,7 @@ class RatatoskrClientTest {
     fun `stopSession adopts a rotated pair from a 200 body`() = runBlocking {
         server.enqueue(
             MockResponse().setResponseCode(200).setBody(
-                """{"itemId":"i1","speakerId":"s1","state":"stopped","positionSeconds":5.0,
-                   "durationSeconds":10.0,"updatedAt":"2026-07-05T12:00:00Z",
-                   "rotatedTokens":{"accessToken":"a3","refreshToken":"r3"}}""",
+                WireFixtures.sessionJson(state = "stopped", positionSeconds = 5.0, rotatedTokens = "a3" to "r3"),
             ),
         )
 
@@ -212,12 +191,7 @@ class RatatoskrClientTest {
     fun `an unrecognised playback state falls back instead of failing the response`() = runBlocking {
         // A newer server could report a state this app's enum doesn't know; the response must
         // still deserialize rather than surfacing as an error (SPEC section 4).
-        server.enqueue(
-            MockResponse().setBody(
-                """{"itemId":"i1","speakerId":"s1","state":"warping","positionSeconds":1.0,
-                   "durationSeconds":10.0,"updatedAt":"2026-07-05T12:00:00Z"}""",
-            ),
-        )
+        server.enqueue(MockResponse().setBody(WireFixtures.sessionJson(state = "warping")))
 
         val result = client.currentSession()
 

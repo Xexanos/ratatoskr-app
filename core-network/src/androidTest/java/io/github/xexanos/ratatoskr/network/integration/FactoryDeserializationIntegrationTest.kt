@@ -7,6 +7,7 @@ package io.github.xexanos.ratatoskr.network.integration
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.xexanos.ratatoskr.network.FakeTokenAccess
+import io.github.xexanos.ratatoskr.network.WireFixtures
 import io.github.xexanos.ratatoskr.network.api.RatatoskrClient
 import io.github.xexanos.ratatoskr.network.api.RatatoskrClientFactory
 import io.github.xexanos.ratatoskr.network.domain.ApiResult
@@ -35,12 +36,7 @@ class FactoryDeserializationIntegrationTest {
 
     @Test
     fun unknownPlaybackStateDegradesToStoppedThroughTheFactoryConverter() = runBlocking {
-        https.enqueueJson(
-            """
-            {"itemId":"i1","speakerId":"s1","state":"warping","positionSeconds":1.0,
-             "durationSeconds":10.0,"updatedAt":"2026-07-05T12:00:00Z"}
-            """,
-        )
+        https.enqueueJson(WireFixtures.sessionJson(state = "warping"))
 
         val result = client().currentSession()
 
@@ -50,12 +46,7 @@ class FactoryDeserializationIntegrationTest {
 
     @Test
     fun unknownJsonFieldsAreTolerated() = runBlocking {
-        https.enqueueJson(
-            """
-            {"itemId":"i1","speakerId":"s1","state":"playing","positionSeconds":1.0,
-             "durationSeconds":10.0,"updatedAt":"2026-07-05T12:00:00Z","someFutureField":123}
-            """,
-        )
+        https.enqueueJson(WireFixtures.sessionJson(extraJson = """"someFutureField":123"""))
 
         val result = client().currentSession()
 
@@ -67,12 +58,7 @@ class FactoryDeserializationIntegrationTest {
 
     @Test
     fun aKnownStateDeserializesNormally() = runBlocking {
-        https.enqueueJson(
-            """
-            {"itemId":"i1","speakerId":"s1","state":"paused","positionSeconds":3.0,
-             "durationSeconds":10.0,"updatedAt":"2026-07-05T12:00:00Z"}
-            """,
-        )
+        https.enqueueJson(WireFixtures.sessionJson(state = "paused", positionSeconds = 3.0))
 
         val result = client().currentSession()
 

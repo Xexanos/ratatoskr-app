@@ -10,12 +10,9 @@ import io.github.xexanos.ratatoskr.network.persist.TokenAccess
 import java.util.concurrent.atomic.AtomicReference
 
 /**
- * In-memory [TokenAccess] for the integration tests where the token store is not the point
- * (deserialization, error mapping, TLS). The rotation/refresh tests use the real
- * Keystore-backed [io.github.xexanos.ratatoskr.network.persist.TokenStore] instead, since
- * persistence fidelity is precisely what they verify (SPEC section 9).
- *
- * Mirrors the JVM unit-test fake; androidTest is a separate source set and cannot see it.
+ * In-memory [TokenAccess] shared by the JVM unit tests and the instrumented integration
+ * tests (SPEC section 9: platform pieces faked). Tests where persistence itself is the
+ * point use the real Keystore-backed TokenStore instead.
  */
 class FakeTokenAccess(
     accessToken: String? = null,

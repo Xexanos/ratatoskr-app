@@ -7,6 +7,7 @@ package io.github.xexanos.ratatoskr.network.integration
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.xexanos.ratatoskr.network.FakeTokenAccess
+import io.github.xexanos.ratatoskr.network.WireFixtures
 import io.github.xexanos.ratatoskr.network.api.RatatoskrClient
 import io.github.xexanos.ratatoskr.network.api.RatatoskrClientFactory
 import io.github.xexanos.ratatoskr.network.domain.ApiResult
@@ -39,8 +40,7 @@ class FactoryAuthIntegrationTest {
     ): RatatoskrClient =
         https.track(RatatoskrClientFactory.create(https.baseUrl, https.fingerprint, tokens, sessionActive))
 
-    private val freshTokens =
-        """{"accessToken":"a1","refreshToken":"r1","user":{"id":"7","username":"lars"}}"""
+    private val freshTokens = WireFixtures.authTokensJson(accessToken = "a1", refreshToken = "r1")
 
     @Test
     fun theBearerTokenIsAttachedToRequests() = runBlocking {

@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import io.github.xexanos.ratatoskr.network.WireFixtures
 import io.github.xexanos.ratatoskr.network.api.RatatoskrClient
 import io.github.xexanos.ratatoskr.network.api.RatatoskrClientFactory
 import io.github.xexanos.ratatoskr.network.domain.ApiResult
@@ -56,13 +57,7 @@ class FactorySessionRotationIntegrationTest {
     @Test
     fun aSessionCarryingRotatedTokensIsAdoptedAndPersisted() = runBlocking {
         val store = seededRealStore()
-        https.enqueueJson(
-            """
-            {"itemId":"i1","speakerId":"s1","state":"playing","positionSeconds":1.0,
-             "durationSeconds":10.0,"updatedAt":"2026-07-05T12:00:00Z",
-             "rotatedTokens":{"accessToken":"a2","refreshToken":"r2"}}
-            """,
-        )
+        https.enqueueJson(WireFixtures.sessionJson(rotatedTokens = "a2" to "r2"))
 
         val result = client(store).currentSession()
 
@@ -75,11 +70,7 @@ class FactorySessionRotationIntegrationTest {
     fun stopSessionAdoptsARotatedPairFromA200Body() = runBlocking {
         val store = seededRealStore()
         https.enqueueJson(
-            """
-            {"itemId":"i1","speakerId":"s1","state":"stopped","positionSeconds":5.0,
-             "durationSeconds":10.0,"updatedAt":"2026-07-05T12:00:00Z",
-             "rotatedTokens":{"accessToken":"a3","refreshToken":"r3"}}
-            """,
+            WireFixtures.sessionJson(state = "stopped", positionSeconds = 5.0, rotatedTokens = "a3" to "r3"),
         )
 
         val result = client(store).stopSession()
@@ -104,12 +95,7 @@ class FactorySessionRotationIntegrationTest {
     @Test
     fun startSessionHandsTheStoredRefreshTokenToTheServer() = runBlocking {
         val store = seededRealStore()
-        https.enqueueJson(
-            """
-            {"itemId":"i1","speakerId":"s1","state":"playing","positionSeconds":0.0,
-             "durationSeconds":10.0,"updatedAt":"2026-07-05T12:00:00Z"}
-            """,
-        )
+        https.enqueueJson(WireFixtures.sessionJson(positionSeconds = 0.0))
 
         val result = client(store).startSession("i1", "s1")
 
