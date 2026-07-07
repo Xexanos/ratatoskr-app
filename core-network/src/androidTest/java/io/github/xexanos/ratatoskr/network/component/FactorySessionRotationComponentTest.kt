@@ -5,8 +5,6 @@
  */
 package io.github.xexanos.ratatoskr.network.component
 
-import io.github.xexanos.ratatoskr.network.testutil.HttpsMockServer
-
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -19,6 +17,7 @@ import io.github.xexanos.ratatoskr.network.domain.AuthSession
 import io.github.xexanos.ratatoskr.network.domain.AuthUser
 import io.github.xexanos.ratatoskr.network.persist.KeystoreCrypto
 import io.github.xexanos.ratatoskr.network.persist.TokenStore
+import io.github.xexanos.ratatoskr.network.testutil.HttpsMockServer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
