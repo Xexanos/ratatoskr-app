@@ -14,10 +14,11 @@ import androidx.compose.ui.test.onAllNodesWithText
  * Data-driven waits for the UI integration suite.
  *
  * Screen content arrives from real MockWebServer responses (background call -> ViewModel
- * StateFlow -> recomposition), not from the animation clock. The suite runs with
- * `mainClock.autoAdvance = false` so the Material3 spinners' infinite animation never blocks
- * idle; these helpers poll the semantics tree in real time via [ComposeTestRule.waitUntil]
- * until the awaited node appears, which is the reliable synchronisation primitive here.
+ * StateFlow -> recomposition). [ComposeTestRule.waitUntil] advances the (auto-advancing) clock
+ * and re-checks the condition, so it sees the awaited node appear even across the transient
+ * Material3 load spinners - which clear quickly because MockWebServer answers in milliseconds.
+ * This is the reliable synchronisation primitive here; `waitForIdle` alone would risk hanging
+ * while a spinner is briefly on screen.
  */
 
 private const val DEFAULT_TIMEOUT_MS = 10_000L

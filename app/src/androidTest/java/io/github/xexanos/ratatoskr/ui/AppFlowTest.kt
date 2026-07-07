@@ -43,10 +43,13 @@ import org.junit.runners.MethodSorters
  * error taxonomy, enum fallback, concurrency) are the component layer's job (see
  * core-network `Factory*ComponentTest`) and are deliberately not re-checked here.
  *
- * Synchronisation: Material3 spinners animate forever, so `mainClock.autoAdvance = false`
- * keeps idle-syncs from hanging on them, and [awaitTag]/[awaitText]/[awaitContentDescription]
- * poll for the post-load nodes. Methods run in name order; `aSmoke...` runs first so a broken
- * sync assumption fails fast and unambiguously.
+ * Synchronisation: the clock is left auto-advancing (default). Material3 spinners animate
+ * forever, but here they are transient - MockWebServer answers in milliseconds, so each load
+ * state clears within a frame or two and idle is reached. [awaitTag]/[awaitText]/
+ * [awaitContentDescription] poll for the post-load nodes across those brief spinners. Freezing
+ * the clock (`autoAdvance = false`) is deliberately NOT used: it also freezes recomposition, so
+ * the awaited screens would never render. Methods run in name order; `aSmoke...` runs first so
+ * a broken sync assumption fails fast and unambiguously.
  */
 @RunWith(AndroidJUnit4::class)
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
@@ -63,9 +66,6 @@ class AppFlowTest {
     private fun str(id: Int): String = compose.activity.getString(id)
 
     private fun installServer(dispatcher: RatatoskrDispatcher = RatatoskrDispatcher()) {
-        // autoAdvance off: otherwise the test clock chases the spinners' infinite animation and
-        // never idles, hanging every implicit sync. Nothing else drives the clock.
-        compose.mainClock.autoAdvance = false
         server.server.dispatcher = dispatcher
     }
 
@@ -90,8 +90,8 @@ class AppFlowTest {
     @Test
     fun aSmoke_appLaunchesToTheConnectScreen() {
         installServer()
-        // If autoAdvance=false does not tame the startup spinner, this hangs to timeout and
-        // fails here - before any flow is attempted.
+        // Guards the whole sync approach: the app must render past its startup spinner to the
+        // connect screen. If the wait strategy is wrong this fails here, before any flow.
         compose.awaitText(str(R.string.connect_action_connect))
         compose.onNodeWithText(str(R.string.connect_action_connect)).assertIsDisplayed()
     }
