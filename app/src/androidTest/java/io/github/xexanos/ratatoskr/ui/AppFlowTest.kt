@@ -139,7 +139,10 @@ class AppFlowTest {
         // Nothing listens on :1, so certificate inspection fails -> the error/retry card.
         compose.onNode(hasSetTextAction()).performTextReplacement("https://localhost:1")
         compose.onNodeWithText(str(R.string.connect_action_connect)).performClick()
-        compose.awaitText(str(R.string.connect_action_retry))
+        // Wait longer than CertificateInspector's 15s connect timeout: if the port drops the
+        // SYN instead of refusing it, inspection takes the full 15s to fail, so a 10s wait would
+        // time out before the error/retry card appears.
+        compose.awaitText(str(R.string.connect_action_retry), timeoutMillis = 20_000)
         compose.onNodeWithText(str(R.string.connect_action_retry)).assertIsDisplayed()
     }
 
