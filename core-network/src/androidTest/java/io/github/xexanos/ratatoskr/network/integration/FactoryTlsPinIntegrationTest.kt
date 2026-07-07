@@ -12,10 +12,8 @@ import io.github.xexanos.ratatoskr.network.api.RatatoskrClientFactory
 import io.github.xexanos.ratatoskr.network.domain.ApiResult
 import io.github.xexanos.ratatoskr.network.domain.RatatoskrError
 import kotlinx.coroutines.runBlocking
-import org.junit.After
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
-import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -33,19 +31,10 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class FactoryTlsPinIntegrationTest {
 
-    private val https = HttpsMockServer()
-    private val created = mutableListOf<RatatoskrClient>()
-
-    @Before fun setUp() = https.start()
-
-    @After fun tearDown() {
-        created.forEach { it.close() }
-        https.shutdown()
-    }
+    @get:Rule val https = HttpsMockServer()
 
     private fun client(fingerprint: String?): RatatoskrClient =
-        RatatoskrClientFactory.create(https.baseUrl, fingerprint, FakeTokenAccess("a0", "r0"))
-            .also { created += it }
+        https.track(RatatoskrClientFactory.create(https.baseUrl, fingerprint, FakeTokenAccess("a0", "r0")))
 
     @Test
     fun aMatchingPinnedFingerprintConnects() = runBlocking {

@@ -13,10 +13,9 @@ import io.github.xexanos.ratatoskr.network.domain.ApiResult
 import io.github.xexanos.ratatoskr.network.domain.RatatoskrError
 import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.MockResponse
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
-import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.util.concurrent.CountDownLatch
@@ -32,22 +31,13 @@ import java.util.concurrent.atomic.AtomicInteger
 @RunWith(AndroidJUnit4::class)
 class FactoryAuthIntegrationTest {
 
-    private val https = HttpsMockServer()
-    private val created = mutableListOf<RatatoskrClient>()
-
-    @Before fun setUp() = https.start()
-
-    @After fun tearDown() {
-        created.forEach { it.close() }
-        https.shutdown()
-    }
+    @get:Rule val https = HttpsMockServer()
 
     private fun client(
         tokens: FakeTokenAccess = FakeTokenAccess("a0", "r0"),
         sessionActive: () -> Boolean = { false },
     ): RatatoskrClient =
-        RatatoskrClientFactory.create(https.baseUrl, https.fingerprint, tokens, sessionActive)
-            .also { created += it }
+        https.track(RatatoskrClientFactory.create(https.baseUrl, https.fingerprint, tokens, sessionActive))
 
     private val freshTokens =
         """{"accessToken":"a1","refreshToken":"r1","user":{"id":"7","username":"lars"}}"""

@@ -5,6 +5,7 @@
  */
 package io.github.xexanos.ratatoskr.network.integration
 
+import io.github.xexanos.ratatoskr.network.api.RatatoskrClient
 import io.github.xexanos.ratatoskr.network.tls.Fingerprints
 import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
@@ -12,6 +13,7 @@ import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
 import okhttp3.tls.HandshakeCertificates
 import okhttp3.tls.HeldCertificate
+import org.junit.rules.ExternalResource
 import java.net.InetAddress
 
 /**
@@ -20,18 +22,24 @@ import java.net.InetAddress
  * (`RatatoskrClientFactory.create`) over TLS, exercising Android's actual trust manager and
  * TLS provider rather than a JVM stand-in.
  *
- * The served certificate is minted per instance and is NOT in any system trust store, so the
- * production trust manager's platform check fails and the user-confirmed fingerprint pin
- * decides - which is the primary self-signed / local-CA deployment (SPEC section 6). Pass
- * [fingerprint] as the factory's pin to connect; [wrongFingerprint] to simulate a changed
- * certificate.
+ * The served certificate is NOT in any system trust store, so the production trust manager's
+ * platform check fails and the user-confirmed fingerprint pin decides - which is the primary
+ * self-signed / local-CA deployment (SPEC section 6). Pass [fingerprint] as the factory's pin
+ * to connect; [wrongFingerprint] to simulate a changed certificate.
  *
  * The certificate's SAN is the loopback host name MockWebServer reports, so the production
  * hostname verifier (which the factory does not disable) is satisfied.
+ *
+ * Use as a JUnit rule: it owns the whole per-test lifecycle - the server starts before each
+ * test, and afterwards every client registered via [track] is closed and the server shut
+ * down. Test classes declare `@get:Rule val https = HttpsMockServer()` and build clients as
+ * `https.track(RatatoskrClientFactory.create(...))`; no @Before/@After boilerplate.
  */
-class HttpsMockServer {
+class HttpsMockServer : ExternalResource() {
 
     val server = MockWebServer()
+
+    private val clients = mutableListOf<RatatoskrClient>()
 
     /** SHA-256 of the served leaf, in the exact form [Fingerprints.sha256] produces. */
     val fingerprint: String get() = Fingerprints.sha256(served.certificate)
@@ -46,10 +54,16 @@ class HttpsMockServer {
         "00:11:22:33:44:55:66:77:88:99:aa:bb:cc:dd:ee:ff:" +
             "00:11:22:33:44:55:66:77:88:99:aa:bb:cc:dd:ee:ff"
 
-    /** Base URL WITHOUT the `/v1/` suffix - the factory appends it. Valid after [start]. */
+    /** Base URL WITHOUT the `/v1/` suffix - the factory appends it. Valid once the rule ran. */
     val baseUrl: String get() = server.url("/").toString().trimEnd('/')
 
-    fun start() {
+    /** Registers a client to be closed when the test ends, and returns it. */
+    fun track(client: RatatoskrClient): RatatoskrClient {
+        clients += client
+        return client
+    }
+
+    override fun before() {
         val serverCertificates = HandshakeCertificates.Builder()
             .heldCertificate(served)
             .build()
@@ -57,7 +71,11 @@ class HttpsMockServer {
         server.start()
     }
 
-    fun shutdown() = server.shutdown()
+    override fun after() {
+        clients.forEach { it.close() }
+        clients.clear()
+        server.shutdown()
+    }
 
     fun enqueueJson(body: String, code: Int = 200) = server.enqueue(
         MockResponse()
