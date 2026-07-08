@@ -68,10 +68,10 @@ The strategy above is the target. Current state:
 
 - **Present:** `core-network` unit tests (JUnit4 + MockWebServer); instrumented
   component tests (auth, deserialization, error mapping, session rotation, TLS
-  pinning); accessibility checks across every screen (ATF, WARNING threshold incl.
-  contrast) in the emulator's default theme.
-- **In progress:** the whole-app Compose integration flow.
-- **To add:** running the accessibility checks in both light and dark themes
-  (today each screen preview is checked once, in the system default theme);
-  exposing `testTagsAsResourceId` + `testTag`s for black-box driving; running the
-  instrumented suite on both API 26 and API 36.
+  pinning); the whole-app Compose integration flow (`AppFlowTest`); accessibility
+  checks across every screen (ATF, WARNING threshold incl. contrast) in **both**
+  light and dark themes — the CI script toggles `adb shell cmd uimode night no/yes`
+  around two separate `AccessibilityChecksTest` runs, the second forced with
+  `--rerun` so Gradle can't skip it as up-to-date.
+- **To add:** exposing `testTagsAsResourceId` + `testTag`s for black-box driving;
+  running the instrumented suite on both API 26 and API 36.
