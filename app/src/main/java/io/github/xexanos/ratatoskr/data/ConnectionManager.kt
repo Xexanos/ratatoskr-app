@@ -8,7 +8,7 @@ package io.github.xexanos.ratatoskr.data
 import io.github.xexanos.ratatoskr.network.api.RatatoskrClient
 import io.github.xexanos.ratatoskr.network.api.RatatoskrClientFactory
 import io.github.xexanos.ratatoskr.network.persist.ConnectionStore
-import io.github.xexanos.ratatoskr.network.persist.TokenStore
+import io.github.xexanos.ratatoskr.network.persist.TokenAccess
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 class ConnectionManager(
     val connectionStore: ConnectionStore,
-    val tokenStore: TokenStore,
+    val tokenStore: TokenAccess,
 ) {
     // While a playback session is active the server owns refresh-token rotation, so the
     // client must not refresh independently (SPEC section 5).

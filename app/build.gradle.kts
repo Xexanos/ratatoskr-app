@@ -62,6 +62,11 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.kotlinx.serialization.core)
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.okhttp.mockwebserver)
+    // ViewModel unit tests (SPEC section 9, unit level): reuse the same fakes/fixtures the
+    // instrumented UI integration tests use, so wire-format shapes never diverge between them.
+    testImplementation(testFixtures(project(":core-network")))
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.compose.ui.test.junit4.accessibility)

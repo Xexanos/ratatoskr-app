@@ -66,7 +66,9 @@ black-box. See the central concept's open points.
 
 The strategy above is the target. Current state:
 
-- **Present:** `core-network` unit tests (JUnit4 + MockWebServer); instrumented
+- **Present:** `core-network` unit tests (JUnit4 + MockWebServer); per-screen
+  ViewModel state-transition unit tests (`:app`, JUnit4, against a real
+  `ConnectionStore`/DataStore on the JVM and `HttpsMockServer`); instrumented
   component tests (auth, deserialization, error mapping, session rotation, TLS
   pinning); the whole-app Compose integration flow (`AppFlowTest`); accessibility
   checks across every screen (ATF, WARNING threshold incl. contrast) in **both**
