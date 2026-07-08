@@ -40,6 +40,13 @@ class PinnedTrustManager(
     }
 
     override fun checkServerTrusted(chain: Array<out X509Certificate>, authType: String?) {
+        // Reject an empty chain ourselves, before delegating: the platform trust manager throws
+        // IllegalArgumentException (a RuntimeException) for a zero-length chain, which would
+        // escape the CertificateException catch below and surface to callers as an opaque error
+        // instead of the CertificateException every TOFU trust failure is contracted to throw.
+        if (chain.isEmpty()) {
+            throw CertificateException("Server presented an empty certificate chain.")
+        }
         try {
             platform.checkServerTrusted(chain, authType)
             return
@@ -49,8 +56,7 @@ class PinnedTrustManager(
                     "Server certificate is not trusted and no fingerprint has been confirmed yet.",
                     platformFailure,
                 )
-            val leaf = chain.firstOrNull()
-                ?: throw CertificateException("Server presented an empty certificate chain.", platformFailure)
+            val leaf = chain.first()
             if (!Fingerprints.matches(Fingerprints.sha256(leaf), pin)) {
                 throw CertificateException(
                     "Server certificate fingerprint does not match the confirmed one. " +
