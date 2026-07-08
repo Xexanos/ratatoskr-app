@@ -10,6 +10,7 @@ import io.github.xexanos.ratatoskr.network.api.RatatoskrClientFactory
 import io.github.xexanos.ratatoskr.network.persist.ConnectionStore
 import io.github.xexanos.ratatoskr.network.persist.TokenStore
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -65,19 +66,28 @@ class ConnectionManager(
         }
     }
 
-    /** Drop the cached client after the server or certificate changed, releasing its HTTP stack. */
+    /**
+     * Drop the cached client after the server or certificate changed, releasing its HTTP stack.
+     * Takes [buildMutex] so it cannot race a concurrent [client] build: without it, a build that
+     * started before this call could still overwrite [cached] with a client for the
+     * now-invalidated key after this call has cleared it.
+     */
     suspend fun invalidate() {
-        val toClose = cached?.client
-        cached = null
-        toClose?.let { closeClient(it) }
+        buildMutex.withLock {
+            val toClose = cached?.client
+            cached = null
+            toClose?.let { closeClient(it) }
+        }
     }
 
     // RatatoskrClient.close() evicts the OkHttp connection pool, which flushes and closes live
     // TLS sockets - blocking network I/O. Callers invalidate from viewModelScope
     // (Dispatchers.Main), so closing on the caller's thread throws NetworkOnMainThreadException
     // (and would crash forget-certificate, where a live client exists). Tear down off the main
-    // thread.
+    // thread. NonCancellable: this releases resources for a client that is already unreachable
+    // from `cached`, so it must run to completion even if the caller's coroutine (e.g. a
+    // ViewModel scope cleared by an activity recreation) is cancelled mid-close.
     private suspend fun closeClient(client: RatatoskrClient) {
-        withContext(Dispatchers.IO) { client.close() }
+        withContext(NonCancellable + Dispatchers.IO) { client.close() }
     }
 }
