@@ -74,6 +74,7 @@ The strategy above is the target. Current state:
   checks across every screen (ATF, WARNING threshold incl. contrast) in **both**
   light and dark themes — the CI script toggles `adb shell cmd uimode night no/yes`
   around two separate `AccessibilityChecksTest` runs, the second forced with
-  `--rerun` so Gradle can't skip it as up-to-date.
-- **To add:** exposing `testTagsAsResourceId` + `testTag`s for black-box driving;
-  running the instrumented suite on both API 26 and API 36.
+  `--rerun` so Gradle can't skip it as up-to-date; `testTagsAsResourceId` set high
+  in the hierarchy (`MainActivity`) so the existing `testTag`s are also visible to
+  the black-box E2E harness.
+- **To add:** running the instrumented suite on both API 26 and API 36.
