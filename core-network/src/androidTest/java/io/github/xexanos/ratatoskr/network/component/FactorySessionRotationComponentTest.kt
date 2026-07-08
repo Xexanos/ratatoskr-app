@@ -17,6 +17,7 @@ import io.github.xexanos.ratatoskr.network.domain.AuthSession
 import io.github.xexanos.ratatoskr.network.domain.AuthUser
 import io.github.xexanos.ratatoskr.network.persist.KeystoreCrypto
 import io.github.xexanos.ratatoskr.network.persist.TokenStore
+import io.github.xexanos.ratatoskr.network.testutil.HttpsMockServer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -66,7 +67,7 @@ class FactorySessionRotationComponentTest {
         val store = TokenStore(dataStore, KeystoreCrypto(keyAlias = "ratatoskr.test.$name"))
         runBlocking {
             store.clear()
-            store.save(AuthSession("a0", "r0", AuthUser("7", "lars")))
+            store.save(AuthSession("a0", "r0", AuthUser("7", "alex")))
         }
         return store
     }

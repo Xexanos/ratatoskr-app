@@ -25,7 +25,7 @@ import javax.net.ssl.X509TrustManager
 class CertificateInspector {
 
     suspend fun inspect(baseUrl: String): CertificateInfo = withContext(Dispatchers.IO) {
-        val trustAll = TrustAllManager()
+        val trustAll = CapturingTrustManager()
         val sslContext = SSLContext.getInstance("TLS").apply {
             init(null, arrayOf(trustAll), java.security.SecureRandom())
         }
@@ -40,12 +40,19 @@ class CertificateInspector {
         try {
             val request = Request.Builder().url(healthUrl(baseUrl)).build()
             client.newCall(request).execute().use { response ->
-                val peer = response.handshake?.peerCertificates
-                    ?: error("No TLS handshake; is the server serving HTTPS?")
-                val leaf = peer.firstOrNull() as? X509Certificate
-                    ?: error("Server presented no X.509 certificate.")
-                leaf.toCertificateInfo()
+                if (response.handshake == null) {
+                    error("No TLS handshake; is the server serving HTTPS?")
+                }
             }
+            // Read the leaf from what the trust manager captured DURING the handshake, not from
+            // Response.handshake.peerCertificates: on Android's Conscrypt the latter comes back
+            // empty for a trust-all manager (the peer is treated as unverified, so OkHttp
+            // yields no peer certificates), which would break trust-on-first-use on device.
+            // The trust manager callback receives the real chain - the same path PinnedTrustManager
+            // relies on (SPEC section 6).
+            val leaf = trustAll.leaf
+                ?: error("Server presented no X.509 certificate.")
+            leaf.toCertificateInfo()
         } finally {
             client.dispatcher.executorService.shutdown()
             client.connectionPool.evictAll()
@@ -65,9 +72,21 @@ class CertificateInspector {
         sha256Fingerprint = Fingerprints.sha256(this),
     )
 
-    private class TrustAllManager : X509TrustManager {
+    /**
+     * Trusts every certificate (this client only ever reads the chain, never carries real
+     * traffic) and captures the leaf the server presents during the handshake, which is the
+     * reliable way to read it on Conscrypt.
+     */
+    private class CapturingTrustManager : X509TrustManager {
+        @Volatile var leaf: X509Certificate? = null
+            private set
+
         override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) = Unit
-        override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) = Unit
+
+        override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {
+            if (leaf == null) leaf = chain?.firstOrNull()
+        }
+
         override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
     }
 }

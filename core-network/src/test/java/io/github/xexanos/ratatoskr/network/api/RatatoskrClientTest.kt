@@ -62,12 +62,12 @@ class RatatoskrClientTest {
     fun `login stores the returned token pair`() = runBlocking {
         server.enqueue(MockResponse().setBody(WireFixtures.authTokensJson()))
 
-        val result = client.login("lars", "secret")
+        val result = client.login("alex", "secret")
 
         assertTrue(result is ApiResult.Success)
         assertEquals("a1", tokens.currentAccessTokenBlocking())
         assertEquals("r1", tokens.refreshToken())
-        assertEquals("lars", tokens.savedSession!!.user.username)
+        assertEquals("alex", tokens.savedSession!!.user.username)
     }
 
     @Test

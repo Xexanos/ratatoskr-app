@@ -40,7 +40,7 @@ class TokenRefreshAuthenticatorTest {
     }
 
     private fun renewed(access: String) =
-        AuthSession(access, "refresh-next", AuthUser("1", "lars"))
+        AuthSession(access, "refresh-next", AuthUser("1", "alex"))
 
     private fun client(
         tokens: FakeTokenAccess,

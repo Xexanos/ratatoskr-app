@@ -67,6 +67,10 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4.accessibility)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
+    // Whole-app UI integration tests (SPEC section 9): drive the real screens against a
+    // MockWebServer over HTTPS, reusing the shared HttpsMockServer + wire fixtures.
+    androidTestImplementation(testFixtures(project(":core-network")))
+    androidTestImplementation(libs.okhttp.mockwebserver)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

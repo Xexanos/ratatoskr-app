@@ -120,7 +120,8 @@ fun RatatoskrNavHost(container: AppContainer, startDestination: Route) {
             SettingsScreen(
                 viewModel = vm,
                 onReTrust = {
-                    // Clear the whole back stack so Back can't return to authenticated screens.
+                    // Re-trust: return to the connect screen with an empty back stack, so Back
+                    // can't reach the now-untrusted authenticated screens.
                     navController.navigate(Route.Connect) {
                         popUpTo(navController.graph.id) { inclusive = true }
                     }

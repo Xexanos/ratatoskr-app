@@ -39,6 +39,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -60,6 +61,7 @@ import io.github.xexanos.ratatoskr.network.domain.LibraryItemSummary
 import io.github.xexanos.ratatoskr.network.domain.PlaybackState
 import io.github.xexanos.ratatoskr.network.domain.RatatoskrError
 import io.github.xexanos.ratatoskr.network.domain.Session
+import io.github.xexanos.ratatoskr.ui.UiTestTags
 import io.github.xexanos.ratatoskr.ui.theme.RatatoskrTheme
 import io.github.xexanos.ratatoskr.ui.toMessage
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -86,6 +88,12 @@ class NowPlayingViewModel(
     private val _uiState = MutableStateFlow(NowPlayingUiState())
     val uiState: StateFlow<NowPlayingUiState> = _uiState.asStateFlow()
 
+    // Monotonic counter of user control actions (pause/resume/seek). Each control bumps it; a
+    // poll snapshots it and drops its own result if a newer control was issued meanwhile - so a
+    // poll already in flight when the user pauses can't flip the control back to "playing". All
+    // access is on the main dispatcher (viewModelScope), so a plain Int needs no synchronisation.
+    private var commandEpoch = 0
+
     /**
      * Fetches the current session once. The screen drives this while it is RESUMED (see
      * [NowPlayingScreen]) instead of a self-running loop, so polling stops when the app is
@@ -94,23 +102,31 @@ class NowPlayingViewModel(
      */
     suspend fun refresh() {
         if (_uiState.value.stopped) return
+        val epoch = commandEpoch
         val client = connectionManager.client() ?: return
         when (val result = client.currentSession()) {
-            is ApiResult.Success -> applySession(result.data)
-            is ApiResult.Failure -> when (result.error) {
-                is RatatoskrError.NoActiveSession ->
-                    _uiState.value = _uiState.value.copy(loading = false, session = null)
-                else ->
-                    _uiState.value = _uiState.value.copy(loading = false, error = result.error.toMessage())
+            is ApiResult.Success -> applySession(result.data, epoch)
+            is ApiResult.Failure -> {
+                // A control action issued while this poll was in flight takes precedence.
+                if (epoch != commandEpoch || _uiState.value.stopped) return
+                when (result.error) {
+                    is RatatoskrError.NoActiveSession ->
+                        _uiState.value = _uiState.value.copy(loading = false, session = null)
+                    else ->
+                        _uiState.value = _uiState.value.copy(loading = false, error = result.error.toMessage())
+                }
             }
         }
     }
 
-    private fun applySession(session: Session) {
+    private fun applySession(session: Session, epoch: Int) {
         // A poll or control response that completes after stop() must not revive the ended
         // session: the `stopped` guard in refresh() only covers the start of the call, not the
         // apply after the network await, and stop() has already navigated away.
         if (_uiState.value.stopped) return
+        // Drop a result the user's latest control action has already superseded (e.g. a poll
+        // that was in flight when the user paused), so it can't revert the just-set state.
+        if (epoch != commandEpoch) return
         // The server owns token rotation while a session is active (SPEC section 5).
         val active = session.state in ACTIVE_STATES
         connectionManager.setSessionActive(active)
@@ -140,15 +156,19 @@ class NowPlayingViewModel(
     }
 
     private fun control(action: suspend (io.github.xexanos.ratatoskr.network.api.RatatoskrClient) -> ApiResult<Session>) {
+        val epoch = ++commandEpoch
         viewModelScope.launch {
             // Clear a stale error when the user starts a new action, so a later successful poll
             // is not what makes the old message disappear.
             _uiState.value = _uiState.value.copy(error = null)
             val client = connectionManager.client() ?: return@launch
             when (val result = action(client)) {
-                is ApiResult.Success -> applySession(result.data)
+                is ApiResult.Success -> applySession(result.data, epoch)
+                // Only surface this action's error if a newer control hasn't superseded it.
                 is ApiResult.Failure ->
-                    _uiState.value = _uiState.value.copy(error = result.error.toMessage())
+                    if (epoch == commandEpoch) {
+                        _uiState.value = _uiState.value.copy(error = result.error.toMessage())
+                    }
             }
         }
     }
@@ -289,7 +309,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.NowPlayingContent(
         },
         valueRange = 0f..duration,
         colors = SliderDefaults.colors(),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().testTag(UiTestTags.NOWPLAYING_SEEK),
     )
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         TimeLabel(sliderPosition.toDouble(), MaterialTheme.colorScheme.onSurface)
