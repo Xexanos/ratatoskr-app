@@ -93,6 +93,9 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.core)
     testImplementation(libs.okhttp.mockwebserver)
+    // testFixturesImplementation's okhttp-tls does not propagate here; the TLS pin unit tests
+    // mint their own certificates with HeldCertificate.Builder and need it directly.
+    testImplementation(libs.okhttp.tls)
     testImplementation(testFixtures(project(":core-network")))
 
     // Instrumented integration tests (SPEC section 9): drive the real client assembly through
