@@ -22,6 +22,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import io.github.xexanos.ratatoskr.di.AppContainer
 import io.github.xexanos.ratatoskr.ui.navigation.RatatoskrNavHost
 import io.github.xexanos.ratatoskr.ui.navigation.Route
@@ -38,7 +40,14 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             RatatoskrTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                Scaffold(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        // Bridges Compose testTags to UiAutomator resource-ids so the
+                        // black-box E2E harness (ratatoskr-e2e, Maestro/UiAutomator) can
+                        // locate the same elements the Compose UI tests find by testTag.
+                        .semantics { testTagsAsResourceId = true },
+                ) { innerPadding ->
                     Surface(modifier = Modifier.padding(innerPadding)) {
                         // Resolve the start route off the main thread (see decideStartDestination),
                         // showing a brief loader instead of blocking onCreate.
