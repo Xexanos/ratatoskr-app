@@ -358,3 +358,32 @@ ratatoskr-app/
   (section 3).
 - Domain models (library item, speaker, session, tokens) live in `core-network`'s wrapper
   layer and are the only types the `app` module sees.
+
+## 14. Planned features (post-v1)
+
+Ideas intentionally deferred beyond v1. These are **not commitments** — they are captured so
+the reasoning is not lost and so the v1 design does not *actively prevent* them (section 2).
+Mirrors the server SPEC's section 16 (Planned features); the app-side counterparts are here.
+
+Most of the section 2 "out of scope for v1" items are the natural first post-v1 candidates and
+are not repeated in full: **chapter-navigation UI**, **bookmarks**, **playback-speed control**,
+**sleep timers**, **podcasts**, **multiple simultaneous sessions**, **Ratatoskr-controlled
+multiroom grouping**, and the platform integrations (**widgets, Android Auto, Wear,
+media-session / notification transport controls**). The following are the additional features on
+the radar:
+
+- **Connect to multiple Ratatoskr servers.** For users with Sonos in more than one location, each
+  behind its own Ratatoskr instance. The app would keep a list of trusted servers and let the user
+  switch between them — a natural generalization of today's single stored server + pinned
+  certificate (sections 5 and 6), which already persist one trusted server; this extends the
+  persist layer and the connect flow to several. Needs each server to be identifiable (a stable,
+  admin-set name) so instances can be labelled in the switcher; tracked on the server side too
+  (server SPEC section 16).
+
+- **Multiple simultaneous sessions (app side).** v1 reflects exactly one active session (section 2).
+  If the server later holds a session per user/speaker (server SPEC section 16), the now-playing
+  experience would show and switch between concurrent sessions rather than assuming a single one —
+  e.g. a session list, or per-speaker now-playing.
+
+- **Cover art.** The library projection carries no cover URL today. Once the server serves cover
+  images (server SPEC section 16), show artwork in the library and now-playing views.
