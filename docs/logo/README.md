@@ -54,6 +54,14 @@ shifts two steps toward its light end - body #CF7B60, tail fade
 #D98C71 -> #F8DCC6 - so the tail keeps fading on dark backgrounds. The mapping
 lives in `DARK_COLORS` in `GenerateLogo.kt`.
 
+Store graphics (`fastlane/metadata/android/en-US/images/`, SPEC section 8):
+`icon.png` (512×512, the framed logo centered on the #FBF1E9 paper background)
+and `featureGraphic.png` (1024×500, framed logo beside the wordmark in frame
+green). Rendered one-off from these SVGs with a headless Chromium/Edge
+screenshot of a small centering HTML page, e.g.
+`msedge --headless=new --window-size=512,512 --screenshot=icon.png icon.html`;
+re-render by hand when the logo changes. The SVGs stay the source of truth.
+
 History note: the generator started as a Python tool (shapely/svgpathtools)
 during the design iteration and was ported to Kotlin + JTS once the design
 froze, so the repository needs no non-JVM toolchain. (JTS is the ancestor of
