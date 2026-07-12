@@ -46,6 +46,9 @@ class KeystoreCrypto(private val keyAlias: String = DEFAULT_ALIAS) {
         val key = existingKey() ?: return null
         return try {
             val combined = Base64.decode(encoded, Base64.NO_WRAP)
+            // Valid Base64 can still be shorter than the IV; slicing would then throw
+            // IndexOutOfBoundsException, which is not a GeneralSecurityException.
+            if (combined.size < IV_LENGTH) return null
             val iv = combined.copyOfRange(0, IV_LENGTH)
             val ciphertext = combined.copyOfRange(IV_LENGTH, combined.size)
             val cipher = Cipher.getInstance(TRANSFORMATION)
