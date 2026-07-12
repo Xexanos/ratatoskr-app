@@ -28,9 +28,11 @@ android {
             // codegen adapters (no reflection kept), the libraries' consumer rules plus
             // src/main/keepRules cover the rest, and the minified build is validated
             // on-device post-merge by the instrumented harness (SPEC section 9).
-            optimization {
-                enable = true
-            }
+            // isShrinkResources also strips the unused material-icons-extended vectors.
+            // (Not the optimization { enable } DSL - that is AGP 9's experimental "gradual
+            // R8" opt-in; isMinifyEnabled is the standard full-shrink path.)
+            isMinifyEnabled = true
+            isShrinkResources = true
         }
         // A shrunk build the instrumented tests can run against: identical R8 configuration
         // to release, but debug-signed and debuggable so instrumentation may attach. R8 in a
@@ -40,9 +42,8 @@ android {
         // -PminifiedTests so the regular per-PR debug test jobs stay untouched.
         create("minified") {
             initWith(getByName("release"))
-            optimization {
-                enable = true
-            }
+            isMinifyEnabled = true
+            isShrinkResources = true
             signingConfig = signingConfigs.getByName("debug")
             isDebuggable = true
             // core-network has no 'minified' build type; use its release variant.
