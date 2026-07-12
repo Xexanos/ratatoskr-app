@@ -88,7 +88,7 @@ class StoreScreenshotsTest {
                     WireFixtures.libraryItemSummaryJson("b4", "Frankenstein", "Mary Shelley", 30_600.0),
                     WireFixtures.libraryItemSummaryJson("b5", "Treasure Island", "Robert Louis Stevenson", 27_000.0),
                     WireFixtures.libraryItemSummaryJson("b6", "The Odyssey", "Homer", 43_200.0),
-                    WireFixtures.libraryItemSummaryJson("b7", "Jane Eyre", "Charlotte Brontë", 68_400.0),
+                    WireFixtures.libraryItemSummaryJson("b7", "Jane Eyre", "Charlotte Bronte", 68_400.0),
                 ),
             ),
             // The first library row (Moby-Dick) is what gets played; keep the session's
