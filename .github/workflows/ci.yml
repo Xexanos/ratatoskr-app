@@ -67,10 +67,13 @@ jobs:
         run: bash scripts/check-ux.sh
 
       - name: Lint, assemble debug and run unit tests
-        # assembleRelease AND assembleMinified both run R8 (SPEC section 8) on the JVM, so a
-        # broken keep rule or shrinker config fails the PR cheaply here. assembleMinified is
-        # what parses the minified-only src/minified/keepRules/tests.keep - assembleRelease
-        # sees src/main/keepRules only - so without it a typo'd test keep rule would slip
-        # through PR CI and only surface post-merge. The on-device validation of the shrunk
-        # build still runs post-merge (release-validation.yml).
-        run: ./gradlew --no-daemon lintDebug testDebugUnitTest assembleDebug :app:assembleRelease :app:assembleMinified
+        run: ./gradlew --no-daemon lintDebug testDebugUnitTest assembleDebug :app:assembleRelease
+
+      - name: Run R8 on the minified app + instrumented-test APKs (JVM, no emulator)
+        # assembleMinifiedAndroidTest runs R8 on BOTH the minified app APK
+        # (minifyMinifiedWithR8) and the instrumented-test APK (minifyMinifiedAndroidTestWithR8).
+        # The latter is the one assembleMinified alone never builds, so a missing-class / keep
+        # rule error in the test APK's R8 (e.g. test-only deps referencing compile-time-only
+        # classes) is caught here per PR instead of only in release-validation.yml post-merge.
+        # -PminifiedTests switches testBuildType to `minified` so the task exists.
+        run: ./gradlew --no-daemon -PminifiedTests :app:assembleMinifiedAndroidTest
