@@ -171,6 +171,14 @@ The app stores, per install: the server URL, the confirmed server-certificate fi
 and the auth tokens (encrypted). It does not store the Audiobookshelf password. A settings
 screen exposes the server URL, a re-trust/forget action for the certificate, and sign-out.
 
+Backups are disabled (`android:allowBackup="false"`, no backup/data-extraction rules).
+Everything the app stores is either per-install by design (the certificate trust decision
+belongs to the device that confirmed it) or useless after a restore anyway: the tokens are
+encrypted with an Android-Keystore key that never leaves the device, so a restored blob
+cannot be decrypted on new hardware and would only force a re-login. Disabling backup makes
+that explicit — a restored or transferred install starts clean at the connect screen — and
+keeps token ciphertext out of cloud backups entirely.
+
 ## 8. Distribution constraints (F-Droid and Play Store)
 
 - License is GPL-3.0-or-later (matches the whole project).
@@ -183,6 +191,39 @@ screen exposes the server URL, a re-trust/forget action for the certificate, and
 - Provide F-Droid metadata under `fastlane/metadata/android/<locale>/` (title, short and
   full description, changelogs, images). The F-Droid build recipe itself lives in F-Droid's
   `fdroiddata` repository, not here.
+  - Images: `en-US/images/icon.png` (512×512) and `en-US/images/featureGraphic.png`
+    (1024×500) are rendered from the SVG sources in `docs/logo/` (see the README there for
+    how); `en-US/images/phoneScreenshots/` is captured on an emulator against mock data,
+    with generic example content only. Images live under `en-US` alone — F-Droid falls back
+    to it for other locales, and duplicating binaries per locale only invites drift.
+  - The feature graphic uses the committed wordmark outlines
+    (`docs/logo/ratatoskr-wordmark.svg`). That raises no `NonFreeAssets` concern: the
+    anti-feature is about assets shipped in the app, and the APK contains only the picture
+    mark; the Norse font file itself is neither in the repository nor in any artifact (its
+    freeware license permits rendered-outline use but forbids redistributing the font
+    file — `docs/logo/README.md`).
+- **Versioning.** `versionName` is semantic versioning, `MAJOR.MINOR.PATCH`, and
+  `versionCode` is derived from it mechanically as `MAJOR * 10000 + MINOR * 100 + PATCH`
+  (`0.1.0` → `100`, `1.2.3` → `10203`): monotonic, gapless in meaning, and reconstructible
+  from the version name alone, so the two can never disagree. Both live only in
+  `app/build.gradle.kts`. Changelog files are named after the version code
+  (`fastlane/.../changelogs/<versionCode>.txt`), as fastlane requires.
+- **Releases are git tags.** A release is an annotated tag `v<versionName>` (e.g.
+  `v0.1.0`) on a `main` commit whose post-merge validation (section 9) has passed. The
+  fdroiddata recipe uses `UpdateCheckMode: Tags` against that pattern. The release
+  process, in order: bump `versionCode`/`versionName` in `app/build.gradle.kts`, add the
+  `changelogs/<versionCode>.txt` files (at least `en-US`), merge to `main`, wait for the
+  release-validation workflow to go green, then tag that commit and push the tag. GitHub
+  releases are optional extras; the tag is what F-Droid consumes.
+- **Signing: F-Droid signs its own builds.** The repository produces an unsigned release
+  APK (the release-validation workflow publishes it per validated commit) and F-Droid's
+  build server builds from the tag and signs the result with the F-Droid key. There is
+  deliberately no developer release keystore: nothing secret to manage, rotate, or leak,
+  and no `Binaries:`/`AllowedAPKSigningKeys` reproducibility contract to keep. Trade-off,
+  recorded: Android signature continuity makes this permanent for this `applicationId` —
+  switching later to developer-signed reproducible builds would force every user to
+  uninstall and reinstall. The "aim for a reproducible build" bullet above stays as build
+  hygiene (deterministic inputs, minimal toolchain), not as a signing strategy.
 - Choose a reasonable `minSdk` that covers the encrypted-storage and TLS requirements; the
   agent proposes the exact value.
 - Release shrinking (R8) is **enabled**, and the conditions that once blocked it are resolved:
