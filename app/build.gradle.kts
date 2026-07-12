@@ -31,12 +31,8 @@ android {
             // isShrinkResources also strips the unused material-icons-extended vectors.
             // (Not the optimization { enable } DSL - that is AGP 9's experimental "gradual
             // R8" opt-in; isMinifyEnabled is the standard full-shrink path.)
-            // TEMP (size measurement, apk-size-report.yml): default true; -Pr8=off builds
-            // unshrunk and -PresShrink=off builds code-shrink-only, to isolate the resource
-            // shrinker's contribution. Revert to plain `= true` after measuring.
-            val r8On = providers.gradleProperty("r8").orNull != "off"
-            isMinifyEnabled = r8On
-            isShrinkResources = r8On && providers.gradleProperty("resShrink").orNull != "off"
+            isMinifyEnabled = true
+            isShrinkResources = true
         }
         // A shrunk build the instrumented tests can run against: identical R8 configuration
         // to release, but debug-signed and debuggable so instrumentation may attach. R8 in a
