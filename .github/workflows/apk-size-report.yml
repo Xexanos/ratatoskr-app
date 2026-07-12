@@ -4,6 +4,11 @@
 name: APK size report (temporary)
 
 on:
+  # Push-triggered on this branch only: a brand-new workflow file cannot be reached via
+  # workflow_dispatch (that needs it on the default branch). Removed with the rest of this
+  # temporary job once the numbers are recorded.
+  push:
+    branches: [claude/spec-review-planning-phsif5]
   workflow_dispatch:
 
 permissions:
