@@ -1,16 +1,35 @@
-# Runs the instrumented suites on every pull request: the core-network integration tests
-# (SPEC section 9 - the real client assembly driven over HTTPS against MockWebServer, on the
-# device's actual TLS/Keystore stack) and the accessibility checks (AccessibilityChecksTest).
+# Runs the instrumented suites on every pull request, across an emulator API-level matrix.
 #
-# Both are instrumented on purpose and share one emulator boot to amortise the ~cold-boot cost.
-# The Accessibility Test Framework needs the real accessibility node tree, which only exists on
-# a device (see the test's kdoc), and contrast is theme-dependent, so that suite runs twice:
-# once in light mode, once in dark mode. The integration tests are theme-independent and run
-# once, first.
+# What runs where:
+#   - core-network component tests (SPEC section 9 - the real client assembly over HTTPS
+#     against MockWebServer, on the device's actual TLS/Keystore stack) run on BOTH API 26
+#     (minSdk) and API 36 (target). This is the layer whose behaviour actually diverges by
+#     API level (Conscrypt/TLS, the Keystore-backed token store), so it is the one worth
+#     verifying at both ends of the supported range.
+#   - the whole-app integration flow (AppFlowTest) and the accessibility checks
+#     (AccessibilityChecksTest, run twice - light + dark, since contrast is theme-dependent)
+#     run on API 36 only. The API-26 hosted emulator cannot reliably bring up the full UI /
+#     accessibility stack: adb goes "offline" and the job hangs to its timeout, and the
+#     accessibility service is often not live (the ATF canary test catches exactly that).
+#     These suites exercise no API-26-specific behaviour, so API 36 is the meaningful target.
 #
-# paths-ignore skips this (expensive, up to an hour of emulator time for both suites) run
-# when a PR changes only docs/metadata that can't affect the build. Denylist, not allowlist:
-# any other path still triggers it, so a code change can never silently skip these suites.
+# Two-stage design:
+#   1. `warm-avd` boots one emulator per API level (on a cache miss only) purely to populate
+#      the AVD snapshot cache, so the stage-2 jobs never pay the ~3-6 min cold-boot cost.
+#   2. One job per suite, each on its own runner in parallel, restoring that cache. Parallel
+#      cache *reads* of one key are safe; parallel *writes* on a cold cache race, which stage
+#      1 avoids by warming each key exactly once before any test job starts.
+#
+# Snapshot loading (emulator-options): API 36 loads the warmed snapshot (-no-snapshot-save:
+# load, don't re-save) and comes up clean in ~3 min. The API-26 component job cold-boots
+# (-no-snapshot: neither load nor save): on API 26 sys.boot_completed fires ~5 s in, before
+# the framework `settings` service is up, so the warm job captures a half-initialised
+# snapshot; restoring it leaves adb permanently "offline" and the job hangs. Cold-booting
+# lets the system fully initialise before the tests attach.
+#
+# paths-ignore skips this (expensive) run when a PR changes only docs/metadata that can't
+# affect the build. Denylist, not allowlist: any other path still triggers it, so a code
+# change can never silently skip these suites.
 
 name: Instrumented tests
 
@@ -29,9 +48,70 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  instrumented-tests:
+  # Stage 1: populate the AVD snapshot cache for each API level. No tests run here - just
+  # enough of an emulator boot to let reactivecircus/android-emulator-runner save a snapshot.
+  # API 26 is warmed too (the component job restores its AVD from this cache, then cold-boots).
+  warm-avd:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 20
+
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [26, 36]
+
+    steps:
+      - name: Check out (with the contract submodule)
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Enable KVM for the emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # Cache the created AVD + its warm snapshot across runs so we skip the ~3–6 min
+      # cold boot. Keyed on the emulator params below - bump the key when any change.
+      - name: Cache the AVD snapshot
+        uses: actions/cache@v4
+        id: avd-cache
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-api${{ matrix.api-level }}-x86_64-default-pixel_6
+
+      # On a cache miss, create the AVD once and let it save a snapshot (no -no-snapshot-save).
+      - name: Warm the AVD snapshot
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          arch: x86_64
+          target: default
+          profile: pixel_6
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: false
+          script: echo "Warmed the AVD snapshot for caching."
+
+  # Stage 2: one job per suite, each on its own runner in parallel, restoring the cache
+  # `warm-avd` populated (force-avd-creation: false, same key) so it boots from the warm
+  # snapshot instead of creating the AVD from scratch.
+
+  # Component tests run on BOTH API levels - this is the API-level-sensitive layer (TLS /
+  # Keystore). API 26 cold-boots (see header); API 36 loads the warmed snapshot.
+  test-component:
+    needs: warm-avd
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [26, 36]
 
     steps:
       - name: Check out (with the contract submodule)
@@ -54,35 +134,18 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      # Cache the created AVD + its warm snapshot across runs so we skip the ~3–6 min
-      # cold boot. Keyed on the emulator params below — bump the key when any change.
-      - name: Cache the AVD snapshot
+      - name: Restore the warmed AVD snapshot
         uses: actions/cache@v4
-        id: avd-cache
         with:
           path: |
             ~/.android/avd/*
             ~/.android/adb*
-          key: avd-api36-x86_64-default-pixel_6
+          key: avd-api${{ matrix.api-level }}-x86_64-default-pixel_6
 
-      # On a cache miss, create the AVD once and let it save a snapshot (no -no-snapshot-save).
-      - name: Warm the AVD snapshot
-        if: steps.avd-cache.outputs.cache-hit != 'true'
+      - name: Run the core-network component suite
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 36
-          arch: x86_64
-          target: default
-          profile: pixel_6
-          force-avd-creation: false
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          disable-animations: false
-          script: echo "Warmed the AVD snapshot for caching."
-
-      - name: Run the integration and accessibility suites
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 36
+          api-level: ${{ matrix.api-level }}
           arch: x86_64
           target: default
           # Pin a 420dpi phone profile: the runner's default AVD is a small low-density
@@ -91,24 +154,247 @@ jobs:
           # against locally.
           profile: pixel_6
           # Restore the cached AVD (don't recreate it) and boot from the snapshot without
-          # rewriting it; params must match the warm step above for the snapshot to load.
+          # rewriting it; params must match the warm-avd job above for the snapshot to load.
           force-avd-creation: false
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          # API 36 loads the warmed snapshot; API 26 cold-boots (ignores it) - see header.
+          emulator-options: ${{ matrix.api-level == 26 && '-no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none' || '-no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none' }}
           disable-animations: true
+          # On API 26 the emulator's own teardown ("emu kill") hangs on orphaned
+          # crashpad_handler crash-reporter processes, running the job to its timeout
+          # even though the tests already passed (android-emulator-runner#385). The
+          # action runs each script line as its own `sh -c` (no shared shell), so a
+          # trap won't work; instead reap crashpad_handler on the trailing lines - they
+          # run after the tests but before the action's blocking teardown, letting the
+          # emulator process tree exit cleanly. `-f` is required: "crashpad_handler" is
+          # 16 chars and pkill matches the 15-char-truncated comm by default (zero
+          # matches), so match the full command line. The `[c]` regex trick keeps the
+          # pattern from matching pkill's own `sh -c` line (which literally contains
+          # "[c]rashpad_handler", so the regex misses it) - without it pkill SIGTERMs its
+          # own parent shell and the step dies. `|| true`: pkill exits 1 on no match.
           script: |
-            # Theme-independent suites first (once), then accessibility in each theme.
             ./gradlew :core-network:connectedDebugAndroidTest
-            ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=io.github.xexanos.ratatoskr.ui.AppFlowTest
-            adb shell cmd uimode night no
-            ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=io.github.xexanos.ratatoskr.ui.AccessibilityChecksTest
-            adb shell cmd uimode night yes
-            ./gradlew :app:connectedDebugAndroidTest --rerun -Pandroid.testInstrumentationRunnerArguments.class=io.github.xexanos.ratatoskr.ui.AccessibilityChecksTest
+            pkill -f -SIGTERM '[c]rashpad_handler' || true
+            sleep 5
+            pkill -f -SIGKILL '[c]rashpad_handler' || true
 
       - name: Upload the test reports on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: instrumented-test-reports
+          name: instrumented-test-reports-component-api${{ matrix.api-level }}
+          path: |
+            app/build/reports/androidTests/connected
+            app/build/outputs/androidTest-results/connected
+            core-network/build/reports/androidTests/connected
+            core-network/build/outputs/androidTest-results/connected
+          retention-days: 14
+
+  # Whole-app UI flow: API 36 only (see header - the API-26 emulator can't reliably drive
+  # the full Compose UI stack).
+  test-integration:
+    needs: warm-avd
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [36]
+
+    steps:
+      - name: Check out (with the contract submodule)
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Enable KVM for the emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Restore the warmed AVD snapshot
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-api${{ matrix.api-level }}-x86_64-default-pixel_6
+
+      - name: Run the whole-app integration flow
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          arch: x86_64
+          target: default
+          profile: pixel_6
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          # See test-component: reap orphaned crashpad_handler on the trailing lines so
+          # the emulator teardown can't hang the job (android-emulator-runner#385).
+          script: |
+            ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=io.github.xexanos.ratatoskr.ui.AppFlowTest
+            pkill -f -SIGTERM '[c]rashpad_handler' || true
+            sleep 5
+            pkill -f -SIGKILL '[c]rashpad_handler' || true
+
+      - name: Upload the test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: instrumented-test-reports-integration-api${{ matrix.api-level }}
+          path: |
+            app/build/reports/androidTests/connected
+            app/build/outputs/androidTest-results/connected
+            core-network/build/reports/androidTests/connected
+            core-network/build/outputs/androidTest-results/connected
+          retention-days: 14
+
+  # Accessibility, light mode: API 36 only (see header).
+  test-a11y-light:
+    needs: warm-avd
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [36]
+
+    steps:
+      - name: Check out (with the contract submodule)
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Enable KVM for the emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Restore the warmed AVD snapshot
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-api${{ matrix.api-level }}-x86_64-default-pixel_6
+
+      - name: Run the accessibility suite in light mode
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          arch: x86_64
+          target: default
+          profile: pixel_6
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          # See test-component: reap orphaned crashpad_handler on the trailing lines so
+          # the emulator teardown can't hang the job (android-emulator-runner#385).
+          script: |
+            adb shell cmd uimode night no
+            ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=io.github.xexanos.ratatoskr.ui.AccessibilityChecksTest
+            pkill -f -SIGTERM '[c]rashpad_handler' || true
+            sleep 5
+            pkill -f -SIGKILL '[c]rashpad_handler' || true
+
+      - name: Upload the test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: instrumented-test-reports-a11y-light-api${{ matrix.api-level }}
+          path: |
+            app/build/reports/androidTests/connected
+            app/build/outputs/androidTest-results/connected
+            core-network/build/reports/androidTests/connected
+            core-network/build/outputs/androidTest-results/connected
+          retention-days: 14
+
+  # Accessibility, dark mode: API 36 only (see header).
+  test-a11y-dark:
+    needs: warm-avd
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [36]
+
+    steps:
+      - name: Check out (with the contract submodule)
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Enable KVM for the emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Restore the warmed AVD snapshot
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-api${{ matrix.api-level }}-x86_64-default-pixel_6
+
+      - name: Run the accessibility suite in dark mode
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          arch: x86_64
+          target: default
+          profile: pixel_6
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          # See test-component: reap orphaned crashpad_handler on the trailing lines so
+          # the emulator teardown can't hang the job (android-emulator-runner#385).
+          script: |
+            adb shell cmd uimode night yes
+            ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=io.github.xexanos.ratatoskr.ui.AccessibilityChecksTest
+            pkill -f -SIGTERM '[c]rashpad_handler' || true
+            sleep 5
+            pkill -f -SIGKILL '[c]rashpad_handler' || true
+
+      - name: Upload the test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: instrumented-test-reports-a11y-dark-api${{ matrix.api-level }}
           path: |
             app/build/reports/androidTests/connected
             app/build/outputs/androidTest-results/connected

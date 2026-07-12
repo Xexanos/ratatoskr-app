@@ -77,5 +77,12 @@ The strategy above is the target. Current state:
   around two separate `AccessibilityChecksTest` runs, the second forced with
   `--rerun` so Gradle can't skip it as up-to-date; `testTagsAsResourceId` set high
   in the hierarchy (`MainActivity`) so the existing `testTag`s are also visible to
-  the black-box E2E harness.
-- **To add:** running the instrumented suite on both API 26 and API 36.
+  the black-box E2E harness. The suites run as parallel per-suite CI jobs; the
+  **component** suite runs on **both API 26 (minSdk) and API 36 (target)** — the
+  layer whose behaviour diverges by API level (Conscrypt/TLS, Keystore) — while
+  the whole-app UI and accessibility suites run on **API 36 only**.
+- **To add:** running the whole-app UI and accessibility suites on API 26 too.
+  The hosted API-26 emulator can't reliably bring up the full UI / accessibility
+  stack (adb goes offline and jobs hang; the a11y service often isn't live), so
+  those suites are API-36-only for now; the component suite already covers the
+  API-26-sensitive layer.
