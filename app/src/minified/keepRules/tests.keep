@@ -9,3 +9,35 @@
 -keep class io.github.xexanos.ratatoskr.di.AppContainer { *; }
 -keep class io.github.xexanos.ratatoskr.network.api.RatatoskrClientFactory { *; }
 -keep class io.github.xexanos.ratatoskr.network.api.RatatoskrClient { *; }
+
+# Shared libraries the instrumented-test APK resolves from the APP APK. AGP filters
+# every dependency that is already on the tested app's runtime classpath out of the
+# androidTest APK, so at runtime the test process loads those classes from the app.
+# The release-shape shrinker only retains what app code reaches; what only the test
+# frameworks need would be gone - the instrumentation then crashes at startup
+# (NoClassDefFoundError: kotlin.LazyKt from androidx.test's OutputDirCalculator; the
+# same pattern follows for espresso's androidx.core view helpers, compose-ui-test's
+# compose internals, mockwebserver's okhttp internals). AGP has no test-aware keep
+# generation (issuetracker.google.com/126429384; Slack's Keeper plugin predates AGP 9),
+# so keep these libraries wholesale - class-granular rules would be whack-a-mole with
+# every test or dependency change.
+#
+# Deliberate trade-off (SPEC section 8): only in this debug-signed validation variant,
+# the release APK keeps its minimal rules. Shrinking of the app's own code, the
+# generated client, and everything NOT listed here (retrofit2, moshi, androidx.navigation,
+# compose material3/foundation/animation and the material-icons vectors) still matches
+# release exactly - the surfaces the validation exists to prove stay proven. Compose is
+# deliberately only ui + runtime (what compose-ui-test itself reaches); widening it to
+# androidx.compose.** would exempt all of compose from validation and balloon the
+# published validation APK with the kept material-icons-extended vectors.
+-keep class kotlin.** { *; }
+-keep class kotlinx.coroutines.** { *; }
+-keep class okhttp3.** { *; }
+-keep class okio.** { *; }
+-keep class androidx.core.** { *; }
+-keep class androidx.compose.ui.** { *; }
+-keep class androidx.compose.runtime.** { *; }
+-keep class androidx.activity.** { *; }
+-keep class androidx.lifecycle.** { *; }
+-keep class androidx.concurrent.futures.** { *; }
+-keep class com.google.common.util.concurrent.** { *; }

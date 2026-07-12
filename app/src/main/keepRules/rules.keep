@@ -24,3 +24,17 @@
     <init>(com.squareup.moshi.Moshi);
     <init>(com.squareup.moshi.Moshi, java.lang.reflect.Type[]);
 }
+
+# The adapters also reach into the models reflectively: when a JSON payload omits a
+# property that has a Kotlin default value, the generated adapter looks up the model's
+# synthetic "defaults" constructor (<init>(..., int mask, DefaultConstructorMarker)) via
+# Class.getDeclaredConstructor (Moshi's Util.lookupDefaultsConstructor). R8 cannot trace
+# that, strips the constructor, and deserialization fails with NoSuchMethodException -
+# caught on-device by MinifiedWireSmokeTest. moshi-kotlin-codegen generates this exact
+# per-model rule too (same META-INF/proguard mechanism as the adapter keeps above), and
+# the on-device failure proved those resource-borne rules really do NOT propagate from
+# core-network into this module's R8 run - so this insurance is load-bearing, not
+# belt-and-braces. Generic member shape mirroring the generated per-model rules.
+-keepclassmembers class io.github.xexanos.ratatoskr.network.generated.model.** {
+    public synthetic <init>(...);
+}

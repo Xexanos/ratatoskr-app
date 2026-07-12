@@ -17,8 +17,11 @@
 # retention window below, so the per-commit releases do not accumulate forever.
 #
 # This runs post-merge rather than per PR (a deliberate cost trade-off; the per-PR gate is
-# assembleRelease + assembleMinified in ci.yml, which catch R8 config / keep-rule errors on
-# the JVM). paths-ignore is the same docs/metadata denylist the other workflows use.
+# assembleRelease + assembleMinifiedAndroidTest in ci.yml for R8 config / keep-rule errors
+# on the JVM, plus the on-device test-minified-smoke job in instrumented-tests.yml for the
+# runtime resolution gaps a JVM build cannot see - only the full AppFlowTest against the
+# shrunk build waits for post-merge). paths-ignore is the same docs/metadata denylist the
+# other workflows use.
 
 name: Release validation
 
