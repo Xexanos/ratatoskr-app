@@ -76,4 +76,7 @@ jobs:
         # rule error in the test APK's R8 (e.g. test-only deps referencing compile-time-only
         # classes) is caught here per PR instead of only in release-validation.yml post-merge.
         # -PminifiedTests switches testBuildType to `minified` so the task exists.
+        # This JVM run only proves the R8 *config* is sound; runtime resolution gaps (classes
+        # the test APK resolves from the shrunk app APK only at runtime) are invisible here
+        # and are covered per PR by test-minified-smoke in instrumented-tests.yml.
         run: ./gradlew --no-daemon -PminifiedTests :app:assembleMinifiedAndroidTest

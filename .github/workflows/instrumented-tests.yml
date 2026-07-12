@@ -12,6 +12,9 @@
 #     accessibility stack: adb goes "offline" and the job hangs to its timeout, and the
 #     accessibility service is often not live (the ATF canary test catches exactly that).
 #     These suites exercise no API-26-specific behaviour, so API 36 is the meaningful target.
+#   - the minified wire smoke (MinifiedWireSmokeTest against the R8-shrunk `minified`
+#     variant) runs on API 36 only, for the same reason. It exists because the JVM R8 gate
+#     in ci.yml cannot see runtime resolution gaps (SPEC section 8) - see its job comment.
 #
 # Two-stage design:
 #   1. `warm-avd` boots one emulator per API level (on a cache miss only) purely to populate
@@ -258,6 +261,86 @@ jobs:
             app/build/outputs/androidTest-results/connected
             core-network/build/reports/androidTests/connected
             core-network/build/outputs/androidTest-results/connected
+          retention-days: 14
+
+  # Minified wire smoke: API 36 only (see header). Runs MinifiedWireSmokeTest against the
+  # R8-shrunk `minified` variant (-PminifiedTests). The JVM gate in ci.yml
+  # (assembleMinifiedAndroidTest) proves the keep rules parse and R8's reference tracing
+  # passes, but only an on-device run catches *runtime* gaps: classes the androidTest APK
+  # expects to resolve from the shrunk app APK (AGP filters app-provided dependencies out
+  # of the test APK), and members reached only reflectively. Both bit main before this job
+  # existed - a kotlin.LazyKt NoClassDefFoundError at instrumentation start, and Moshi's
+  # reflective defaults-constructor lookup (NoSuchMethodException). The full AppFlowTest
+  # against minified stays post-merge in release-validation.yml (SPEC section 8): its
+  # failure modes overlap heavily with this smoke, so per PR the short suite buys almost
+  # all the signal at a fraction of the cost.
+  test-minified-smoke:
+    needs: warm-avd
+    runs-on: ubuntu-latest
+    # The two R8 runs (app + test APK) make the build a few minutes slower than the
+    # debug-variant jobs; the suite itself is seconds.
+    timeout-minutes: 20
+
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [36]
+
+    steps:
+      - name: Check out (with the contract submodule)
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Enable KVM for the emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Restore the warmed AVD snapshot
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-api${{ matrix.api-level }}-x86_64-default-pixel_6
+
+      - name: Run the wire smoke against the minified build
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          arch: x86_64
+          target: default
+          profile: pixel_6
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          # See test-component: reap orphaned crashpad_handler on the trailing lines so
+          # the emulator teardown can't hang the job (android-emulator-runner#385).
+          script: |
+            ./gradlew -PminifiedTests :app:connectedMinifiedAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=io.github.xexanos.ratatoskr.ui.MinifiedWireSmokeTest
+            pkill -f -SIGTERM '[c]rashpad_handler' || true
+            sleep 5
+            pkill -f -SIGKILL '[c]rashpad_handler' || true
+
+      - name: Upload the test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: instrumented-test-reports-minified-smoke-api${{ matrix.api-level }}
+          path: |
+            app/build/reports/androidTests/connected
+            app/build/outputs/androidTest-results/connected
           retention-days: 14
 
   # Accessibility, light mode: API 36 only (see header).
