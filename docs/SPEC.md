@@ -203,10 +203,11 @@ screen exposes the server URL, a re-trust/forget action for the certificate, and
     instrumentation can attach (R8 in a debuggable variant still enforces shrinking and keep
     rules fully; only code optimizations are reduced) — and drives the whole-app integration
     flow plus a wire-level smoke mirror against it. On success the workflow publishes the
-    tested APKs to the rolling `latest-main` pre-release and (once the `ratatoskr-e2e`
-    repository exists) triggers the cross-component E2E suite. The per-PR gate is
-    `assembleRelease` in CI, which catches keep-rule/shrinker config errors cheaply on the
-    JVM without an emulator.
+    tested APKs to a per-commit `testing-<short-sha>` pre-release (pruned by a scheduled
+    cleanup job) and (once the `ratatoskr-e2e` repository exists) triggers the cross-component
+    E2E suite. The per-PR gate is `assembleRelease` **and** `assembleMinified` in CI, which
+    catch keep-rule/shrinker config errors cheaply on the JVM without an emulator —
+    `assembleMinified` is what parses the minified-only keep rules.
 
 ## 9. Testing
 
@@ -286,7 +287,7 @@ follow separately.
 Post-merge, a separate workflow (`release-validation.yml`) validates the **shrunk** build
 (section 8) on every push to `main`: it runs the whole-app integration flow plus
 `MinifiedWireSmokeTest` against the `minified` variant on an API 36 emulator, then publishes
-the tested APKs to the rolling `latest-main` pre-release. `MinifiedWireSmokeTest` lives in
+the tested APKs to a per-commit `testing-<short-sha>` pre-release. `MinifiedWireSmokeTest` lives in
 `app` (not `core-network`) because R8 runs only at the app level, so the component suite can
 never execute against shrunk output; it re-drives just the wire-level behaviours most exposed
 to R8 — the reflectively looked-up Moshi codegen adapters and the unknown-enum fallback —

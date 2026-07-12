@@ -45,8 +45,8 @@ never run against shrunk output from inside `core-network`, since R8 only runs a
 the app level) against the **`minified`** build type: the release R8
 configuration, debug-signed and debuggable so instrumentation can attach. Runs in
 `release-validation.yml` on every push to `main`; on success the tested APKs are
-published to the rolling `latest-main` pre-release (and later: the E2E suite is
-triggered).
+published to a per-commit `testing-<short-sha>` pre-release (and later: the E2E
+suite is triggered).
 
 ## Cross-cutting types
 
@@ -96,7 +96,8 @@ The strategy above is the target. Current state:
   the whole-app UI and accessibility suites run on **API 36 only**; the shrunk
   build (`minified`, SPEC section 8) is validated post-merge on `main` by
   `release-validation.yml` (AppFlowTest + MinifiedWireSmokeTest on API 36), which
-  then publishes the tested APKs to the `latest-main` pre-release.
+  then publishes the tested APKs to a per-commit `testing-<short-sha>` pre-release
+  (pruned by a scheduled cleanup job).
 - **To add:** running the whole-app UI and accessibility suites on API 26 too.
   The hosted API-26 emulator can't reliably bring up the full UI / accessibility
   stack (adb goes offline and jobs hang; the a11y service often isn't live), so
