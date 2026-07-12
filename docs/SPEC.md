@@ -263,11 +263,16 @@ simulator), no mocks. Out of scope for now; a separate later layer.
 
 ### CI
 
-Component and integration suites run instrumented in the emulator CI job (alongside the
-`AccessibilityChecksTest` accessibility suite), not the JVM `testDebugUnitTest` step. The
-shared harness is a reusable `MockWebServer`-over-HTTPS fixture (OkHttp's `okhttp-tls`
-`HeldCertificate`) in `core-network` test fixtures. `ConnectionManager`'s caching is thin and
-orthogonal; a small test for it can follow separately.
+Component and integration suites run instrumented, not the JVM `testDebugUnitTest` step,
+across several parallel emulator CI jobs (alongside the `AccessibilityChecksTest`
+accessibility suite in light and dark themes), after a shared AVD-warming job populates the
+emulator snapshot cache. The component suite runs on both API 26 (minSdk) and API 36
+(target) — the layer whose behaviour diverges by API level (Conscrypt/TLS, Keystore); the
+whole-app UI and accessibility suites run on API 36 only, as the hosted API-26 emulator
+cannot reliably bring up the full UI / accessibility stack. The shared harness is a reusable
+`MockWebServer`-over-HTTPS fixture (OkHttp's `okhttp-tls` `HeldCertificate`) in `core-network`
+test fixtures. `ConnectionManager`'s caching is thin and orthogonal; a small test for it can
+follow separately.
 
 ## 10. Definition of done for v1
 
