@@ -191,9 +191,25 @@ screen exposes the server URL, a re-trust/forget action for the certificate, and
     adapter — and no `kotlin-reflect` — ships at all. Enums keep Moshi's built-in handling,
     so the unknown-`PlaybackState` fallback (section 4) is unaffected.
   - Keep rules are deliberately minimal: the libraries' own consumer rules (Retrofit, OkHttp,
-    Moshi) plus the per-model adapter keeps moshi-kotlin-codegen generates, mirrored
-    explicitly in `app/src/main/keepRules/rules.keep` as insurance in case the library-module
-    resource rules do not propagate.
+    Moshi) plus the rules moshi-kotlin-codegen generates per model — the adapter keeps *and*
+    the models' synthetic defaults constructors, which the adapters look up reflectively when
+    a payload omits a property with a default value. Both are mirrored explicitly in
+    `app/src/main/keepRules/rules.keep`, and that mirror is **load-bearing, not insurance**:
+    the on-device validation proved the codegen's resource-borne rules do not propagate from
+    `core-network` into the app's R8 run (the stripped defaults constructor failed
+    `MinifiedWireSmokeTest` with `NoSuchMethodException` — a real release-APK bug).
+  - The `minified` variant (below) additionally keeps, wholesale, the shared libraries the
+    instrumented-test APK resolves from the app APK (`app/src/minified/keepRules/tests.keep`):
+    AGP filters every dependency the app already ships out of the androidTest APK, so the test
+    frameworks' own needs — kotlin stdlib facades for androidx.test, espresso's androidx.core
+    view helpers, compose-ui-test's compose ui/runtime internals, mockwebserver's okhttp
+    internals — must survive the app-side shrinker or instrumentation crashes at startup
+    (AGP has no test-aware keep generation: issuetracker.google.com/126429384; Slack's Keeper
+    plugin predates AGP 9 and is unmaintained). This is a documented deviation of the
+    validation variant only: the release APK keeps its minimal rules, and everything the
+    validation exists to prove — the app's own code, the generated client, retrofit2/moshi,
+    androidx.navigation, compose material3/foundation and the icon vectors — still shrinks
+    exactly as in release.
   - **No obfuscation** (`-dontobfuscate`): shrinking and optimization stay fully active, but
     names are kept readable. F-Droid users never receive a mapping file, so crash reports
     must stay legible; unobfuscated output is also easier to verify for the reproducible
@@ -205,9 +221,15 @@ screen exposes the server URL, a re-trust/forget action for the certificate, and
     flow plus a wire-level smoke mirror against it. On success the workflow publishes the
     tested APKs to a per-commit `testing-<short-sha>` pre-release (pruned by a scheduled
     cleanup job) and (once the `ratatoskr-e2e` repository exists) triggers the cross-component
-    E2E suite. The per-PR gate is `assembleRelease` **and** `assembleMinified` in CI, which
-    catch keep-rule/shrinker config errors cheaply on the JVM without an emulator —
-    `assembleMinified` is what parses the minified-only keep rules.
+    E2E suite. The per-PR gate is layered: `assembleRelease` and
+    `assembleMinifiedAndroidTest` in CI catch keep-rule/shrinker *config* errors cheaply on
+    the JVM without an emulator (the latter runs R8 on both the minified app APK and the
+    instrumented-test APK), and `MinifiedWireSmokeTest` runs on-device against the minified
+    variant in the instrumented-tests workflow, because a JVM build cannot see *runtime*
+    resolution gaps — a keep-rule set that builds cleanly can still leave the test process
+    unable to start (both post-merge failures that preceded this gate were of that class).
+    The full integration flow against the shrunk build stays post-merge: a deliberate cost
+    split, since its failure modes overlap heavily with the wire smoke.
   - Measured impact (unsigned release APK, CI): **13.3 MB** unshrunk → **2.2 MB** with code
     shrinking → **1.8 MB** with code + resource shrinking. Code shrinking accounts for the bulk
     (it strips `kotlin-reflect` and the unused `material-icons-extended` vectors, which are
@@ -299,7 +321,9 @@ the tested APKs to a per-commit `testing-<short-sha>` pre-release. `MinifiedWire
 never execute against shrunk output; it re-drives just the wire-level behaviours most exposed
 to R8 — the reflectively looked-up Moshi codegen adapters and the unknown-enum fallback —
 through the real factory. This is the same deliberate, thin overlap policy as above, extended
-to the minified context.
+to the minified context. `MinifiedWireSmokeTest` also runs per PR against the minified
+variant on an API 36 emulator (instrumented-tests workflow), so runtime R8 breakage — which
+the JVM assembly gate cannot see — is caught before merge, not only post-merge (section 8).
 
 ## 10. Definition of done for v1
 
