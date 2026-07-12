@@ -24,17 +24,32 @@ android {
 
     buildTypes {
         release {
-            // R8/shrinking is intentionally off for v1. The generated API client uses
-            // reflective Moshi adapters (@JsonClass(generateAdapter = false)), so enabling
-            // shrinking needs Moshi/Retrofit keep rules validated against a real minified,
-            // on-device run - or, better, switching the generator to Moshi codegen adapters so
-            // no reflection is kept at all. Until that is done and verified, ship unshrunk
-            // rather than risk a release that only breaks at runtime. Tracked as a follow-up.
+            // R8 shrinking is on (SPEC section 8): the generated API client uses Moshi
+            // codegen adapters (no reflection kept), the libraries' consumer rules plus
+            // src/main/keepRules cover the rest, and the minified build is validated
+            // on-device post-merge by the instrumented harness (SPEC section 9).
             optimization {
-                enable = false
+                enable = true
             }
         }
+        // A shrunk build the instrumented tests can run against: identical R8 configuration
+        // to release, but debug-signed and debuggable so instrumentation may attach. R8 in a
+        // debuggable variant still enforces shrinking and keep rules fully (only code
+        // optimizations are reduced), which is exactly the failure class the on-device
+        // validation exists to catch (SPEC sections 8 and 9). Selected via
+        // -PminifiedTests so the regular per-PR debug test jobs stay untouched.
+        create("minified") {
+            initWith(getByName("release"))
+            optimization {
+                enable = true
+            }
+            signingConfig = signingConfigs.getByName("debug")
+            isDebuggable = true
+            // core-network has no 'minified' build type; use its release variant.
+            matchingFallbacks += "release"
+        }
     }
+    testBuildType = if (providers.gradleProperty("minifiedTests").isPresent) "minified" else "debug"
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11

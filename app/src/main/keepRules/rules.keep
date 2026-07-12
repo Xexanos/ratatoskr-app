@@ -1,12 +1,22 @@
-# Add project specific R8 rules here.
-# AGP will combine all keep rule files in src/main/keepRules to pass to R8
+# Project R8 rules. AGP combines all keep rule files in src/main/keepRules with
+# the libraries' consumer rules (Retrofit, OkHttp, Moshi) and the per-model
+# adapter keeps moshi-kotlin-codegen generates in core-network.
 #
 # For more details, see
 #   https://d.android.com/r/tools/r8/keep-rules
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Shrink and optimize, but do not obfuscate (SPEC section 8): F-Droid users never
+# get a mapping file, so crash reports must stay readable; unobfuscated output is
+# also easier to verify for the reproducible build and keeps the minified
+# instrumented run free of test-APK mapping fragility. Costs a modest part of the
+# size win - the bulk comes from shrinking, which stays fully active.
+-dontobfuscate
+
+# Moshi codegen adapters are looked up reflectively (Class.forName(model + "JsonAdapter")),
+# which the shrinker cannot trace. moshi-kotlin-codegen generates equivalent per-model rules
+# inside core-network (META-INF/proguard); these two are deliberate insurance in case those
+# resource-borne rules do not propagate from the library module into this module's R8 run.
+-keepnames @com.squareup.moshi.JsonClass class io.github.xexanos.ratatoskr.network.generated.model.**
+-keep class io.github.xexanos.ratatoskr.network.generated.model.*JsonAdapter {
+    <init>(com.squareup.moshi.Moshi);
+}
