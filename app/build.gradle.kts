@@ -16,8 +16,10 @@ android {
         applicationId = "io.github.xexanos.ratatoskr"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        // versionCode = MAJOR * 10000 + MINOR * 100 + PATCH, derived from versionName;
+        // releases are v<versionName> git tags (SPEC section 8).
+        versionCode = 100
+        versionName = "0.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // R8 rules for the instrumented-test APK. Only take effect when the androidTest APK is

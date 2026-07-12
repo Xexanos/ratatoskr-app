@@ -25,6 +25,9 @@ class RatatoskrDispatcher(
     private val login: () -> MockResponse = { jsonResponse(WireFixtures.authTokensJson()) },
     private val speakers: String = WireFixtures.speakerListJson(),
     private val libraryPage: String = WireFixtures.libraryPageJson(),
+    private val sessionDurationSeconds: Double = 600.0,
+    /** Optional embedded `LibraryItemSummary` JSON for the session's `item` member. */
+    private val sessionItemJson: String? = null,
 ) : Dispatcher() {
 
     @Volatile private var state = "playing"
@@ -72,7 +75,12 @@ class RatatoskrDispatcher(
     }
 
     private fun session() =
-        WireFixtures.sessionJson(state = state, positionSeconds = position, durationSeconds = 600.0)
+        WireFixtures.sessionJson(
+            state = state,
+            positionSeconds = position,
+            durationSeconds = sessionDurationSeconds,
+            extraJson = sessionItemJson?.let { """"item":$it""" } ?: "",
+        )
 
     private companion object {
         val POSITION = Regex(""""positionSeconds"\s*:\s*([0-9.]+)""")
