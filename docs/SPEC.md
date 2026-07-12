@@ -208,6 +208,13 @@ screen exposes the server URL, a re-trust/forget action for the certificate, and
     E2E suite. The per-PR gate is `assembleRelease` **and** `assembleMinified` in CI, which
     catch keep-rule/shrinker config errors cheaply on the JVM without an emulator —
     `assembleMinified` is what parses the minified-only keep rules.
+  - Measured impact (unsigned release APK, CI): **13.3 MB** unshrunk → **2.2 MB** with code
+    shrinking → **1.8 MB** with code + resource shrinking. Code shrinking accounts for the bulk
+    (it strips `kotlin-reflect` and the unused `material-icons-extended` vectors, which are
+    Compose `ImageVector` *code*, not `res/` drawables). Resource shrinking (`isShrinkResources`)
+    adds ~385 KB (~18 %) on top; F-Droid's reproducible-build guidance cautions against the
+    resource shrinker "unless it decreases the APK file size significantly", and ~18 % clears
+    that bar, so it stays on. Re-measure if that margin shrinks.
 
 ## 9. Testing
 
