@@ -5,15 +5,20 @@
 #      (AppFlowTest) plus the wire-level smoke mirror (MinifiedWireSmokeTest) against it on
 #      an API 36 emulator. This is the on-device proof that shrinking kept everything the
 #      app needs (Moshi codegen adapters, Retrofit interfaces, Compose navigation).
-#   2. On success, publish the tested APKs to the rolling `latest-main` pre-release: the
-#      debug-signed minified APK (installable - what the black-box E2E harness drives) and
-#      the unsigned release APK (what F-Droid signs).
+#   2. On success, publish the tested APKs to a per-commit `testing-<short-sha>` pre-release:
+#      the debug-signed minified APK (installable - what the black-box E2E harness drives)
+#      and the unsigned release APK (what F-Droid signs). Each validated commit gets its own
+#      pre-release so a given build stays retrievable by its commit; the `testing-` prefix and
+#      prerelease flag make clear these are throwaway, not stable releases.
 #   3. Then trigger the cross-component E2E suite - placeholder until the ratatoskr-e2e
 #      repository's workflow exists.
 #
+# A separate scheduled job prunes `testing-*` pre-releases (and their tags) older than the
+# retention window below, so the per-commit releases do not accumulate forever.
+#
 # This runs post-merge rather than per PR (a deliberate cost trade-off; the per-PR gate is
-# assembleRelease in ci.yml, which catches R8 config errors on the JVM). paths-ignore is the
-# same docs/metadata denylist the other workflows use.
+# assembleRelease + assembleMinified in ci.yml, which catch R8 config / keep-rule errors on
+# the JVM). paths-ignore is the same docs/metadata denylist the other workflows use.
 
 name: Release validation
 
@@ -26,22 +31,34 @@ on:
       - 'fastlane/**'
       - '.gitignore'
       - 'LICENSE'
+  # Daily prune of stale testing-* pre-releases (see the cleanup job).
+  schedule:
+    - cron: '17 4 * * *'
   workflow_dispatch:
 
 permissions:
-  # Needed to create/update the rolling `latest-main` pre-release and its tag.
+  # Needed to create the per-commit testing-* pre-releases and their tags, and to delete
+  # stale ones in the scheduled cleanup job.
   contents: write
 
 concurrency:
-  # A newer main push supersedes an in-flight validation of an older commit.
-  group: release-validation-${{ github.ref_name }}
+  # Scope by event so the scheduled cleanup and a push validation never cancel each other.
+  # Within pushes, a newer main push still supersedes an in-flight validation of an older
+  # commit. Each successful run publishes to its own testing-<sha> release, so a cancellation
+  # can at worst leave one commit's release half-populated - never a mix across commits.
+  group: release-validation-${{ github.event_name }}-${{ github.ref_name }}
   cancel-in-progress: true
 
 jobs:
   validate-and-publish:
     name: Validate the shrunk build & publish the pre-release
+    # The scheduled trigger is only for the cleanup job below; skip the heavy validation then.
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # On main this is permanently the cold path: nothing warms the AVD snapshot in-scope
+    # (the restore below is best-effort), so every run pays AVD creation + cold boot on top
+    # of two R8 builds (minified + release) and two instrumented suites. 45m leaves headroom.
+    timeout-minutes: 45
 
     steps:
       - name: Check out (with the contract submodule)
@@ -64,11 +81,16 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      # Same key as instrumented-tests.yml. PR-branch caches are not visible to main, so
-      # this hits only once a warm run has happened on main; on a miss the runner creates
-      # the AVD itself (slower, acceptable post-merge).
-      - name: Restore the warmed AVD snapshot
-        uses: actions/cache@v4
+      # Restore-only (NOT actions/cache@v4): this job must never SAVE under the shared key.
+      # instrumented-tests.yml runs on pull_request, so its warm snapshots live in PR-scoped
+      # cache entries that main cannot read - this restore therefore always misses on main,
+      # and the emulator boots snapshot-less (-no-snapshot-save). A full actions/cache here
+      # would then save that cold, snapshot-less AVD under the default-branch-scoped key that
+      # every PR's warm-avd job reads, giving those jobs a cross-scope exact-key hit that
+      # skips warming forever (keys are immutable). Restore-only closes that off; the runner
+      # just creates the AVD itself here (slower, acceptable post-merge).
+      - name: Restore the warmed AVD snapshot (best-effort)
+        uses: actions/cache/restore@v4
         with:
           path: |
             ~/.android/avd/*
@@ -113,16 +135,27 @@ jobs:
           cp app/build/outputs/apk/minified/app-minified.apk publish/ratatoskr-minified.apk
           cp app/build/outputs/apk/release/app-release-unsigned.apk publish/ratatoskr-release-unsigned.apk
 
-      # Rolling pre-release: the tag and release body always point at the latest validated
-      # main commit; assets are replaced on every run.
-      - name: Publish the validated APKs to the latest-main pre-release
+      - name: Derive the per-commit release tag
+        id: tag
+        run: echo "name=testing-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      # Per-commit pre-release: each validated main commit gets its own testing-<short-sha>
+      # release and fresh tag at that commit. Because the tag is new every run, it always
+      # resolves to the commit it names (no stale-tag problem), and assets are never shared
+      # across commits (no mixed-generation payload). The scheduled cleanup job prunes these.
+      # Guarded to main so a workflow_dispatch from a branch cannot publish branch-built APKs
+      # (its own concurrency group would otherwise let it escape superseding entirely).
+      - name: Publish the validated APKs to a per-commit testing pre-release
+        if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: latest-main
-          name: Latest validated main build
+          tag_name: ${{ steps.tag.outputs.name }}
+          target_commitish: ${{ github.sha }}
+          name: Testing build ${{ steps.tag.outputs.name }}
           prerelease: true
           body: |
-            Automatically published by the release-validation workflow.
+            Automatically published by the release-validation workflow. This is a throwaway
+            testing build, not a stable release; it is pruned by the scheduled cleanup job.
 
             Commit: ${{ github.sha }}
 
@@ -136,15 +169,52 @@ jobs:
             publish/ratatoskr-release-unsigned.apk
 
       # Placeholder until the ratatoskr-e2e repository's workflow exists: it will be driven
-      # by a repository_dispatch carrying the pre-release tag, e.g.
+      # by a repository_dispatch carrying this run's per-commit pre-release tag, e.g.
       #
       #   - name: Trigger the cross-component E2E suite
+      #     if: github.ref == 'refs/heads/main'
       #     run: |
       #       gh api repos/Xexanos/ratatoskr-e2e/dispatches \
       #         -f event_type=app-validated \
-      #         -F 'client_payload[release_tag]=latest-main' \
+      #         -F 'client_payload[release_tag]=${{ steps.tag.outputs.name }}' \
       #         -F 'client_payload[commit]=${{ github.sha }}'
       #     env:
       #       GH_TOKEN: ${{ secrets.E2E_DISPATCH_TOKEN }}  # PAT with access to ratatoskr-e2e
       - name: Trigger the E2E suite (placeholder)
+        if: github.ref == 'refs/heads/main'
         run: echo "ratatoskr-e2e does not exist yet - see the commented dispatch step above."
+
+  # Prune the per-commit testing-* pre-releases so they do not accumulate forever. Runs only
+  # on the daily schedule (or a manual dispatch); deletes any testing-* pre-release older than
+  # the retention window, together with its tag. A safety floor keeps the most recent few so
+  # there is always something for the E2E harness to fetch even during a quiet spell.
+  cleanup-testing-releases:
+    name: Prune stale testing pre-releases
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Delete testing-* pre-releases older than the retention window
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RETENTION_DAYS: '14'
+          KEEP_MOST_RECENT: '3'
+        run: |
+          set -euo pipefail
+          cutoff=$(date -u -d "${RETENTION_DAYS} days ago" +%s)
+          # Newest first; skip the KEEP_MOST_RECENT safety floor, then delete the rest older
+          # than the cutoff. --cleanup-tag removes the git tag along with the release.
+          gh release list --repo "$GITHUB_REPOSITORY" --limit 200 \
+            --json tagName,createdAt,isPrerelease \
+            --jq "[.[] | select(.isPrerelease and (.tagName | startswith(\"testing-\")))]
+                  | sort_by(.createdAt) | reverse | .[${KEEP_MOST_RECENT}:] | .[]
+                  | [.tagName, .createdAt] | @tsv" \
+            | while IFS=$'\t' read -r tag created; do
+                created_epoch=$(date -u -d "$created" +%s)
+                if [ "$created_epoch" -lt "$cutoff" ]; then
+                  echo "Deleting stale pre-release $tag (created $created)"
+                  gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
+                else
+                  echo "Keeping $tag (created $created, within retention window)"
+                fi
+              done

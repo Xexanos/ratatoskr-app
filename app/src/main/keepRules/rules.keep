@@ -13,10 +13,14 @@
 -dontobfuscate
 
 # Moshi codegen adapters are looked up reflectively (Class.forName(model + "JsonAdapter")),
-# which the shrinker cannot trace. moshi-kotlin-codegen generates equivalent per-model rules
-# inside core-network (META-INF/proguard); these two are deliberate insurance in case those
+# which the shrinker cannot trace. moshi-kotlin-codegen generates an equivalent per-model rule
+# inside core-network (META-INF/proguard); this is deliberate insurance in case those
 # resource-borne rules do not propagate from the library module into this module's R8 run.
--keepnames @com.squareup.moshi.JsonClass class io.github.xexanos.ratatoskr.network.generated.model.**
+# (The model classes themselves need no rule: each is a return/parameter type on a kept
+# Retrofit interface, so R8 reaches them by reference - and the adapter kept below references
+# them too.) Non-generic models take <init>(Moshi); a future parameterized model gets
+# <init>(Moshi, Type[]) instead, so keep both so the insurance holds regardless.
 -keep class io.github.xexanos.ratatoskr.network.generated.model.*JsonAdapter {
     <init>(com.squareup.moshi.Moshi);
+    <init>(com.squareup.moshi.Moshi, java.lang.reflect.Type[]);
 }

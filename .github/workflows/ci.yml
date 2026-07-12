@@ -67,7 +67,10 @@ jobs:
         run: bash scripts/check-ux.sh
 
       - name: Lint, assemble debug and run unit tests
-        # assembleRelease runs R8 (SPEC section 8) on the JVM, so a broken keep rule or
-        # shrinker config fails the PR cheaply here; the on-device validation of the shrunk
-        # build runs post-merge (release-validation.yml).
-        run: ./gradlew --no-daemon lintDebug testDebugUnitTest assembleDebug :app:assembleRelease
+        # assembleRelease AND assembleMinified both run R8 (SPEC section 8) on the JVM, so a
+        # broken keep rule or shrinker config fails the PR cheaply here. assembleMinified is
+        # what parses the minified-only src/minified/keepRules/tests.keep - assembleRelease
+        # sees src/main/keepRules only - so without it a typo'd test keep rule would slip
+        # through PR CI and only surface post-merge. The on-device validation of the shrunk
+        # build still runs post-merge (release-validation.yml).
+        run: ./gradlew --no-daemon lintDebug testDebugUnitTest assembleDebug :app:assembleRelease :app:assembleMinified
