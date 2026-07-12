@@ -185,19 +185,28 @@ screen exposes the server URL, a re-trust/forget action for the certificate, and
   `fdroiddata` repository, not here.
 - Choose a reasonable `minSdk` that covers the encrypted-storage and TLS requirements; the
   agent proposes the exact value.
-- Release shrinking (R8) is near-term build hardening, not a post-v1 nice-to-have: take it
-  up soon — after the integration-test layer below (section 9) — so the debt of shipping
-  unshrunk stops growing. It is currently disabled because the generated API client uses
-  reflective Moshi adapters (`@JsonClass(generateAdapter = false)`); enabling shrinking first
-  needs validated Moshi/Retrofit keep rules, or (better) switching the generator to Moshi
-  codegen adapters so no reflection is kept at all. Sequencing it right after the integration
-  tests is deliberate: that harness drives real responses through the factory's own Moshi over
-  `MockWebServer`, which is exactly what verifies a minified build still deserializes correctly.
-  While it stays off, unused code and resources accumulate unshrunk (e.g. the vectors pulled in
-  with `material-icons-extended`), inflating the F-Droid build size — the longer it waits, the
-  more debt it carries. Until the keep rules are validated against a real minified, on-device
-  run, the release ships unshrunk rather than risk a runtime-only break; the `build.gradle.kts`
-  release block carries the same rationale where it is off.
+- Release shrinking (R8) is **enabled**, and the conditions that once blocked it are resolved:
+  - The generated API client uses Moshi **codegen** adapters (`moshiCodeGen=true` in the
+    generator config, processed by KSP/`moshi-kotlin-codegen`), so no reflective Kotlin
+    adapter — and no `kotlin-reflect` — ships at all. Enums keep Moshi's built-in handling,
+    so the unknown-`PlaybackState` fallback (section 4) is unaffected.
+  - Keep rules are deliberately minimal: the libraries' own consumer rules (Retrofit, OkHttp,
+    Moshi) plus the per-model adapter keeps moshi-kotlin-codegen generates, mirrored
+    explicitly in `app/src/main/keepRules/rules.keep` as insurance in case the library-module
+    resource rules do not propagate.
+  - **No obfuscation** (`-dontobfuscate`): shrinking and optimization stay fully active, but
+    names are kept readable. F-Droid users never receive a mapping file, so crash reports
+    must stay legible; unobfuscated output is also easier to verify for the reproducible
+    build and keeps the minified instrumented run free of test-APK mapping fragility.
+  - Validation is on-device and post-merge (section 9): every push to `main` builds the
+    `minified` variant — the release R8 configuration, debug-signed and debuggable so
+    instrumentation can attach (R8 in a debuggable variant still enforces shrinking and keep
+    rules fully; only code optimizations are reduced) — and drives the whole-app integration
+    flow plus a wire-level smoke mirror against it. On success the workflow publishes the
+    tested APKs to the rolling `latest-main` pre-release and (once the `ratatoskr-e2e`
+    repository exists) triggers the cross-component E2E suite. The per-PR gate is
+    `assembleRelease` in CI, which catches keep-rule/shrinker config errors cheaply on the
+    JVM without an emulator.
 
 ## 9. Testing
 
@@ -273,6 +282,16 @@ cannot reliably bring up the full UI / accessibility stack. The shared harness i
 `MockWebServer`-over-HTTPS fixture (OkHttp's `okhttp-tls` `HeldCertificate`) in `core-network`
 test fixtures. `ConnectionManager`'s caching is thin and orthogonal; a small test for it can
 follow separately.
+
+Post-merge, a separate workflow (`release-validation.yml`) validates the **shrunk** build
+(section 8) on every push to `main`: it runs the whole-app integration flow plus
+`MinifiedWireSmokeTest` against the `minified` variant on an API 36 emulator, then publishes
+the tested APKs to the rolling `latest-main` pre-release. `MinifiedWireSmokeTest` lives in
+`app` (not `core-network`) because R8 runs only at the app level, so the component suite can
+never execute against shrunk output; it re-drives just the wire-level behaviours most exposed
+to R8 — the reflectively looked-up Moshi codegen adapters and the unknown-enum fallback —
+through the real factory. This is the same deliberate, thin overlap policy as above, extended
+to the minified context.
 
 ## 10. Definition of done for v1
 
