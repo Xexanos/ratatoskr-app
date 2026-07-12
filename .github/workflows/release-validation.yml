@@ -1,0 +1,150 @@
+# Post-merge validation of the shrunk build (SPEC sections 8 and 9), on every push to main:
+#
+#   1. Build the `minified` variant - the release R8 configuration, but debug-signed and
+#      debuggable so instrumentation can attach - and run the whole-app integration flow
+#      (AppFlowTest) plus the wire-level smoke mirror (MinifiedWireSmokeTest) against it on
+#      an API 36 emulator. This is the on-device proof that shrinking kept everything the
+#      app needs (Moshi codegen adapters, Retrofit interfaces, Compose navigation).
+#   2. On success, publish the tested APKs to the rolling `latest-main` pre-release: the
+#      debug-signed minified APK (installable - what the black-box E2E harness drives) and
+#      the unsigned release APK (what F-Droid signs).
+#   3. Then trigger the cross-component E2E suite - placeholder until the ratatoskr-e2e
+#      repository's workflow exists.
+#
+# This runs post-merge rather than per PR (a deliberate cost trade-off; the per-PR gate is
+# assembleRelease in ci.yml, which catches R8 config errors on the JVM). paths-ignore is the
+# same docs/metadata denylist the other workflows use.
+
+name: Release validation
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'fastlane/**'
+      - '.gitignore'
+      - 'LICENSE'
+  workflow_dispatch:
+
+permissions:
+  # Needed to create/update the rolling `latest-main` pre-release and its tag.
+  contents: write
+
+concurrency:
+  # A newer main push supersedes an in-flight validation of an older commit.
+  group: release-validation-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  validate-and-publish:
+    name: Validate the shrunk build & publish the pre-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out (with the contract submodule)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Enable KVM for the emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # Same key as instrumented-tests.yml. PR-branch caches are not visible to main, so
+      # this hits only once a warm run has happened on main; on a miss the runner creates
+      # the AVD itself (slower, acceptable post-merge).
+      - name: Restore the warmed AVD snapshot
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-api36-x86_64-default-pixel_6
+
+      - name: Run the integration flow against the minified build
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          arch: x86_64
+          target: default
+          profile: pixel_6
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          # -PminifiedTests switches the instrumented target to the `minified` build type
+          # (see app/build.gradle.kts). The crashpad reaping mirrors instrumented-tests.yml
+          # (android-emulator-runner#385).
+          script: |
+            ./gradlew -PminifiedTests :app:connectedMinifiedAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=io.github.xexanos.ratatoskr.ui.AppFlowTest,io.github.xexanos.ratatoskr.ui.MinifiedWireSmokeTest
+            pkill -f -SIGTERM '[c]rashpad_handler' || true
+            sleep 5
+            pkill -f -SIGKILL '[c]rashpad_handler' || true
+
+      - name: Upload the test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-validation-test-reports
+          path: |
+            app/build/reports/androidTests/connected
+            app/build/outputs/androidTest-results/connected
+          retention-days: 14
+
+      - name: Build the unsigned release APK
+        run: ./gradlew --no-daemon :app:assembleRelease
+
+      - name: Collect the APKs under stable names
+        run: |
+          mkdir -p publish
+          cp app/build/outputs/apk/minified/app-minified.apk publish/ratatoskr-minified.apk
+          cp app/build/outputs/apk/release/app-release-unsigned.apk publish/ratatoskr-release-unsigned.apk
+
+      # Rolling pre-release: the tag and release body always point at the latest validated
+      # main commit; assets are replaced on every run.
+      - name: Publish the validated APKs to the latest-main pre-release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest-main
+          name: Latest validated main build
+          prerelease: true
+          body: |
+            Automatically published by the release-validation workflow.
+
+            Commit: ${{ github.sha }}
+
+            - `ratatoskr-minified.apk` - R8-shrunk, debug-signed, installable; validated
+              on-device by the instrumented integration suite. This is the artifact the
+              black-box E2E harness drives.
+            - `ratatoskr-release-unsigned.apk` - the unsigned release build (F-Droid signs
+              its own).
+          files: |
+            publish/ratatoskr-minified.apk
+            publish/ratatoskr-release-unsigned.apk
+
+      # Placeholder until the ratatoskr-e2e repository's workflow exists: it will be driven
+      # by a repository_dispatch carrying the pre-release tag, e.g.
+      #
+      #   - name: Trigger the cross-component E2E suite
+      #     run: |
+      #       gh api repos/Xexanos/ratatoskr-e2e/dispatches \
+      #         -f event_type=app-validated \
+      #         -F 'client_payload[release_tag]=latest-main' \
+      #         -F 'client_payload[commit]=${{ github.sha }}'
+      #     env:
+      #       GH_TOKEN: ${{ secrets.E2E_DISPATCH_TOKEN }}  # PAT with access to ratatoskr-e2e
+      - name: Trigger the E2E suite (placeholder)
+        run: echo "ratatoskr-e2e does not exist yet - see the commented dispatch step above."

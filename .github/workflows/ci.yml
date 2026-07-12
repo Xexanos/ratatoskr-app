@@ -67,4 +67,7 @@ jobs:
         run: bash scripts/check-ux.sh
 
       - name: Lint, assemble debug and run unit tests
-        run: ./gradlew --no-daemon lintDebug testDebugUnitTest assembleDebug
+        # assembleRelease runs R8 (SPEC section 8) on the JVM, so a broken keep rule or
+        # shrinker config fails the PR cheaply here; the on-device validation of the shrunk
+        # build runs post-merge (release-validation.yml).
+        run: ./gradlew --no-daemon lintDebug testDebugUnitTest assembleDebug :app:assembleRelease
