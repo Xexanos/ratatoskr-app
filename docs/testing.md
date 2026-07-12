@@ -38,6 +38,16 @@ Drive `MainActivity` through the real Compose screens against a MockWebServer
 backend (no real server): the full flow connect → login → browse → now-playing.
 Tools: **Compose UI Test** + Espresso.
 
+### Minified validation — instrumented, shrunk build (post-merge)
+The same integration flow plus `MinifiedWireSmokeTest` (the wire-level mirror of
+the component layer — Moshi codegen adapters, unknown-enum fallback — which can
+never run against shrunk output from inside `core-network`, since R8 only runs at
+the app level) against the **`minified`** build type: the release R8
+configuration, debug-signed and debuggable so instrumentation can attach. Runs in
+`release-validation.yml` on every push to `main`; on success the tested APKs are
+published to a per-commit `testing-<short-sha>` pre-release (and later: the E2E
+suite is triggered).
+
 ## Cross-cutting types
 
 - **Accessibility:** per-screen checks with the Accessibility Test Framework, run
@@ -60,6 +70,9 @@ black-box. See the central concept's open points.
 ./gradlew testDebugUnitTest         # unit (JVM), all modules
 ./gradlew connectedDebugAndroidTest # component + integration + a11y on an emulator;
                                     # run from the root, it covers :core-network and :app
+./gradlew -PminifiedTests :app:connectedMinifiedAndroidTest \
+                                    # integration + wire smoke against the R8-shrunk build
+                                    # (the property switches the instrumented build type)
 ```
 
 ## Status / alignment
@@ -80,7 +93,11 @@ The strategy above is the target. Current state:
   the black-box E2E harness. The suites run as parallel per-suite CI jobs; the
   **component** suite runs on **both API 26 (minSdk) and API 36 (target)** — the
   layer whose behaviour diverges by API level (Conscrypt/TLS, Keystore) — while
-  the whole-app UI and accessibility suites run on **API 36 only**.
+  the whole-app UI and accessibility suites run on **API 36 only**; the shrunk
+  build (`minified`, SPEC section 8) is validated post-merge on `main` by
+  `release-validation.yml` (AppFlowTest + MinifiedWireSmokeTest on API 36), which
+  then publishes the tested APKs to a per-commit `testing-<short-sha>` pre-release
+  (pruned by a scheduled cleanup job).
 - **To add:** running the whole-app UI and accessibility suites on API 26 too.
   The hosted API-26 emulator can't reliably bring up the full UI / accessibility
   stack (adb goes offline and jobs hang; the a11y service often isn't live), so

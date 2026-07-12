@@ -12,7 +12,10 @@ composeBom = "2026.02.01"
 openapiGenerator = "7.23.0"
 retrofit = "2.11.0"
 okhttp = "4.12.0"
-moshi = "1.15.1"
+# 1.15.2 is the first release whose codegen supports (and requires) KSP2, which is the only
+# KSP mode AGP 9 runs. Keep moshi and ksp in lockstep with the kotlin version.
+moshi = "1.15.2"
+ksp = "2.2.10-2.0.2"
 coroutines = "1.10.2"
 datastore = "1.1.1"
 navigationCompose = "2.8.5"
@@ -49,8 +52,9 @@ okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhtt
 okhttp-logging-interceptor = { group = "com.squareup.okhttp3", name = "logging-interceptor", version.ref = "okhttp" }
 okhttp-mockwebserver = { group = "com.squareup.okhttp3", name = "mockwebserver", version.ref = "okhttp" }
 okhttp-tls = { group = "com.squareup.okhttp3", name = "okhttp-tls", version.ref = "okhttp" }
-moshi-kotlin = { group = "com.squareup.moshi", name = "moshi-kotlin", version.ref = "moshi" }
+moshi = { group = "com.squareup.moshi", name = "moshi", version.ref = "moshi" }
 moshi-adapters = { group = "com.squareup.moshi", name = "moshi-adapters", version.ref = "moshi" }
+moshi-kotlin-codegen = { group = "com.squareup.moshi", name = "moshi-kotlin-codegen", version.ref = "moshi" }
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
 kotlinx-serialization-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-core", version.ref = "kotlinxSerialization" }
@@ -62,4 +66,5 @@ android-library = { id = "com.android.library", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 openapi-generator = { id = "org.openapi.generator", version.ref = "openapiGenerator" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 

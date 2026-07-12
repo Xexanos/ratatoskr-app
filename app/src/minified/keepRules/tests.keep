@@ -1,0 +1,11 @@
+# Keep rules for the 'minified' build type only: entry points the instrumented
+# tests call on the app under test that no app code reaches, so R8's shrinker
+# would otherwise strip them (obfuscation is off globally, shrinking is not).
+#
+# - ClearAppStateRule resets all persisted state through AppContainer.reset().
+# - MinifiedWireSmokeTest drives RatatoskrClientFactory.create(...) directly to
+#   exercise the shrunk wire stack (SPEC section 9).
+-keep class io.github.xexanos.ratatoskr.RatatoskrApp { *; }
+-keep class io.github.xexanos.ratatoskr.di.AppContainer { *; }
+-keep class io.github.xexanos.ratatoskr.network.api.RatatoskrClientFactory { *; }
+-keep class io.github.xexanos.ratatoskr.network.api.RatatoskrClient { *; }
