@@ -12,8 +12,10 @@ import io.github.xexanos.ratatoskr.network.generated.model.PlaybackState as GenP
 import io.github.xexanos.ratatoskr.network.generated.model.Progress as GenProgress
 import io.github.xexanos.ratatoskr.network.generated.model.Session as GenSession
 import io.github.xexanos.ratatoskr.network.generated.model.Speaker as GenSpeaker
+import com.squareup.moshi.JsonDataException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertThrows
 import org.junit.Test
 import java.time.OffsetDateTime
 
@@ -87,5 +89,25 @@ class MappersTest {
         assertEquals(PlaybackState.PLAYING, session.state.toDomain())
         assertEquals(OffsetDateTime.parse("2026-07-05T12:00:00Z"), session.updatedAt)
         assertEquals("T", session.item!!.title)
+    }
+
+    @Test
+    fun `session json missing a required field is rejected`() {
+        // The strict counterpart to unknown-field tolerance: a payload that lacks a required
+        // field must fail deserialization, not produce a half-initialized object. Pins the
+        // behaviour across Moshi adapter strategies (reflective vs codegen).
+        val json = """
+            {
+              "itemId": "i1",
+              "speakerId": "s1",
+              "positionSeconds": 12.5,
+              "durationSeconds": 100.0,
+              "updatedAt": "2026-07-05T12:00:00Z"
+            }
+        """.trimIndent()
+
+        assertThrows(JsonDataException::class.java) {
+            Serializer.moshi.adapter(GenSession::class.java).fromJson(json)
+        }
     }
 }
