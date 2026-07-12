@@ -20,6 +20,12 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // R8 rules for the instrumented-test APK. Only take effect when the androidTest APK is
+        // minified (the `minified` build type, -PminifiedTests); the default debug test APK is
+        // not shrunk. They -dontwarn the compile-time-only classes that test-only deps
+        // (okhttp-tls, mockwebserver, espresso-accessibility) reference but that are absent at
+        // runtime, which R8 would otherwise reject in minifyMinifiedAndroidTestWithR8.
+        testProguardFiles("proguard-test-rules.pro")
     }
 
     buildTypes {
