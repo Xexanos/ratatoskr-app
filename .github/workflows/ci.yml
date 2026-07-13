@@ -56,7 +56,7 @@ jobs:
       - name: Set up Gradle
         # Caches Gradle and validates the wrapper jar against known-good checksums,
         # complementing the pinned distributionSha256Sum in gradle-wrapper.properties.
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Set up the Android SDK
         # Provides cmdline-tools and accepts the SDK licences so AGP can provision the

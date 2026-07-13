@@ -82,7 +82,7 @@ jobs:
           java-version: 21
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       # Restore-only (NOT actions/cache@v4): this job must never SAVE under the shared key.
       # instrumented-tests.yml runs on pull_request, so its warm snapshots live in PR-scoped
