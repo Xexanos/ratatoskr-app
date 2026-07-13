@@ -17,7 +17,9 @@
 # frameworks need would be gone - the instrumentation then crashes at startup
 # (NoClassDefFoundError: kotlin.LazyKt from androidx.test's OutputDirCalculator; the
 # same pattern follows for espresso's androidx.core view helpers, compose-ui-test's
-# compose internals, mockwebserver's okhttp internals). AGP has no test-aware keep
+# compose internals, mockwebserver's okhttp internals, and compose-ui-test's use of
+# androidx.collection - e.g. IntSetKt.intSetOf(vararg), which no app code reaches so R8
+# strips it from the app APK, giving NoSuchMethodError in the test process). AGP has no test-aware keep
 # generation (issuetracker.google.com/126429384; Slack's Keeper plugin predates AGP 9),
 # so keep these libraries wholesale - class-granular rules would be whack-a-mole with
 # every test or dependency change.
@@ -35,6 +37,7 @@
 -keep class okhttp3.** { *; }
 -keep class okio.** { *; }
 -keep class androidx.core.** { *; }
+-keep class androidx.collection.** { *; }
 -keep class androidx.compose.ui.** { *; }
 -keep class androidx.compose.runtime.** { *; }
 -keep class androidx.activity.** { *; }
