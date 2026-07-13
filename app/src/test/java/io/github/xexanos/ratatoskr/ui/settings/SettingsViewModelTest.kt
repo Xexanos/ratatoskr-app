@@ -11,8 +11,10 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import io.github.xexanos.ratatoskr.data.ConnectionManager
+import io.github.xexanos.ratatoskr.network.FakeConnectionStore
 import io.github.xexanos.ratatoskr.network.FakeTokenAccess
 import io.github.xexanos.ratatoskr.network.persist.ConnectionStore
+import io.github.xexanos.ratatoskr.network.persist.DataStoreConnectionStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -32,11 +34,13 @@ class SettingsViewModelTest {
 
     @get:Rule val tempFolder = TemporaryFolder()
 
-    // Unconfined, not Standard: these tests care about the end state after a suspend chain
+    // Unconfined: these tests care about the end state after a VM action's suspend chain
     // (store write -> connectionManager.invalidate() -> state update) completes, not about
-    // controlling interleaving, so eager execution avoids a manual advanceUntilIdle() per test.
-    // LibraryViewModel's debounce test (which DOES need to control virtual time) uses
-    // StandardTestDispatcher instead - see LibraryViewModelTest.
+    // controlling interleaving. The ViewModel is driven against an in-memory FakeConnectionStore
+    // whose reads and writes complete in-place, so eager execution settles each action
+    // synchronously - no advanceUntilIdle() per test. (A real DataStore would not: since
+    // datastore 1.2 its writes land on an IO dispatcher, and its file rename is flaky on Windows;
+    // the round-trip test below covers the real store directly instead.)
     private val dispatcher = UnconfinedTestDispatcher()
 
     @Before fun setUp() = Dispatchers.setMain(dispatcher)
@@ -44,11 +48,11 @@ class SettingsViewModelTest {
 
     // Step 2 smoke test (see task brief / docs/testing.md): a real Jetpack DataStore-Preferences
     // instance, pointed at a temp file, with no Context and no Robolectric. If this stops working
-    // on a future dependency bump every other test in this class silently loses its
-    // connectionStore coverage, so the round-trip is asserted directly here.
+    // on a future dependency bump the ViewModel tests still pass against the fake, so the real
+    // store's round-trip is asserted directly here.
     @Test
     fun `ConnectionStore round-trips a trusted server through a real DataStore on the JVM`() = runTest(dispatcher) {
-        val store = connectionStore()
+        val store = realConnectionStore()
 
         store.saveTrustedServer("https://ratatoskr.home:8080", "ab:cd:ef")
 
@@ -65,8 +69,7 @@ class SettingsViewModelTest {
 
     @Test
     fun `initial state reports the trusted server's URL`() = runTest(dispatcher) {
-        val store = connectionStore()
-        store.saveTrustedServer("https://ratatoskr.home:8080", "ab:cd:ef")
+        val store = FakeConnectionStore(baseUrl = "https://ratatoskr.home:8080", fingerprint = "ab:cd:ef")
 
         val viewModel = SettingsViewModel(connectionManager(store))
 
@@ -75,8 +78,7 @@ class SettingsViewModelTest {
 
     @Test
     fun `forgetCertificate drops the fingerprint and flips certForgotten`() = runTest(dispatcher) {
-        val store = connectionStore()
-        store.saveTrustedServer("https://ratatoskr.home:8080", "ab:cd:ef")
+        val store = FakeConnectionStore(baseUrl = "https://ratatoskr.home:8080", fingerprint = "ab:cd:ef")
         val viewModel = SettingsViewModel(connectionManager(store))
 
         viewModel.forgetCertificate()
@@ -98,15 +100,15 @@ class SettingsViewModelTest {
         assertNull(tokens.currentAccessTokenBlocking())
     }
 
-    private fun connectionStore(): ConnectionStore {
+    private fun realConnectionStore(): ConnectionStore {
         val file = tempFolder.root.resolve("connection_${System.nanoTime()}.preferences_pb")
         val dataStore: DataStore<Preferences> =
             PreferenceDataStoreFactory.create(scope = CoroutineScope(dispatcher)) { file }
-        return ConnectionStore(dataStore)
+        return DataStoreConnectionStore(dataStore)
     }
 
     private fun connectionManager(
-        connectionStore: ConnectionStore = connectionStore(),
+        connectionStore: ConnectionStore = FakeConnectionStore(),
         tokenStore: FakeTokenAccess = FakeTokenAccess(),
     ) = ConnectionManager(connectionStore, tokenStore)
 }
