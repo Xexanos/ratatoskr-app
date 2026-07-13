@@ -149,6 +149,12 @@ certificate cannot be pinned at build time.
   fingerprint against the stored pin. Matching neither is a hard failure with a loud
   "certificate changed" warning and an explicit re-trust flow (settings → forget
   certificate).
+- Hostname verification is pin-aware: when the served leaf matches the confirmed
+  fingerprint, the hostname is not checked - the user confirmed that exact certificate, so
+  it is trustworthy at any address (typically a LAN IP that appears in no certificate SAN).
+  In every other case - the platform-trusted path, or no confirmed fingerprint - the
+  standard hostname verification applies unchanged; on the platform path it is the only
+  host binding, since the pin is consulted only after platform validation fails.
 - Scope of the change guarantee (deliberate trade-off): the "warn loudly if it changes"
   guarantee applies to the self-signed / local-CA deployment, which is the primary one and
   where the platform chain fails so the stored pin is always the deciding factor. When the

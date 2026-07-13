@@ -27,9 +27,11 @@ import org.junit.rules.ExternalResource
  * to connect; [wrongFingerprint] to simulate a changed certificate.
  *
  * The served certificate's SAN deliberately does NOT match the host MockWebServer serves on:
- * the factory disables hostname verification on the pinned client (exact-cert pinning
- * supersedes it - SPEC sections 6 and 14), so the pin alone carries the connection. A green
- * handshake here therefore also proves the client ignores the certificate hostname.
+ * when the confirmed pin carries the connection, the client's pin-aware hostname verifier
+ * (`PinnedHostnameVerifier`) ignores the hostname. A green handshake here therefore proves
+ * hostname-independence of the PIN path only - the path this fixture reaches. The
+ * platform-trusted path stays host-bound and is out of this fixture's reach entirely (no
+ * system-trusted certificate); its host binding is covered by the verifier's JVM unit test.
  *
  * Use as a JUnit rule: it owns the whole per-test lifecycle - the server starts before each
  * test, and afterwards every client registered via [track] is closed and the server shut
@@ -96,10 +98,10 @@ class HttpsMockServer : ExternalResource() {
     fun takeRequest(): RecordedRequest = server.takeRequest()
 
     private companion object {
-        // A SAN that never matches the loopback host MockWebServer serves on. The pinned client
-        // disables hostname verification (exact-cert pinning decides), so the served cert needs
-        // no matching SAN - and using a foreign one makes the whole HTTPS suite prove that
-        // independence: re-enabling the default hostname verifier would fail every test here.
+        // A SAN that never matches the loopback host MockWebServer serves on. On the pin path
+        // the client's pin-aware hostname verifier ignores the hostname, so the served cert
+        // needs no matching SAN - and using a foreign one makes the whole HTTPS suite prove
+        // that pin-path independence: a hostname-bound pin path would fail every test here.
         private const val FOREIGN_SAN = "ratatoskr-e2e.invalid"
 
         // Minted once per class load, not per fixture instance: JUnit4 constructs a fresh test

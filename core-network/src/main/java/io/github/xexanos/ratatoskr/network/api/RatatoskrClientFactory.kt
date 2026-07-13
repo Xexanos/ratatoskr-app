@@ -13,6 +13,7 @@ import io.github.xexanos.ratatoskr.network.generated.infrastructure.Serializer
 import io.github.xexanos.ratatoskr.network.generated.model.PlaybackState
 import io.github.xexanos.ratatoskr.network.generated.model.RefreshRequest
 import io.github.xexanos.ratatoskr.network.persist.TokenAccess
+import io.github.xexanos.ratatoskr.network.tls.PinnedHostnameVerifier
 import io.github.xexanos.ratatoskr.network.tls.PinnedTrustManager
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.adapters.EnumJsonAdapter
@@ -67,12 +68,13 @@ object RatatoskrClientFactory {
 
         val baseBuilder = OkHttpClient.Builder()
             .sslSocketFactory(sslSocketFactory, trustManager)
-            // Exact-certificate trust-on-first-use pinning ([PinnedTrustManager]) already
-            // guarantees the server presents the one certificate the user confirmed by
-            // fingerprint, so hostname verification is redundant here - and enforcing it would
-            // break connecting to a server at an address not in its cert (a LAN IP, etc.). Let
-            // the pin alone decide (SPEC sections 6 and 14); mirrors CertificateInspector.
-            .hostnameVerifier { _, _ -> true }
+            // Pin-aware hostname verification (SPEC section 6): when the user-confirmed
+            // fingerprint matches the served leaf, the hostname is ignored - the confirmed
+            // certificate is trustworthy at any address (a LAN IP, the E2E emulator's
+            // 10.0.2.2). On the platform-trusted path (reverse proxy, public CA) the standard
+            // verifier still applies; there it is the only host binding, because
+            // PinnedTrustManager consults the pin only after platform validation fails.
+            .hostnameVerifier(PinnedHostnameVerifier(fingerprint))
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .addInterceptor(logging)
