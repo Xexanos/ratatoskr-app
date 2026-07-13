@@ -14,7 +14,6 @@ import okhttp3.mockwebserver.RecordedRequest
 import okhttp3.tls.HandshakeCertificates
 import okhttp3.tls.HeldCertificate
 import org.junit.rules.ExternalResource
-import java.net.InetAddress
 
 /**
  * A [MockWebServer] served over HTTPS with a self-signed certificate, for the instrumented
@@ -54,8 +53,16 @@ class HttpsMockServer : ExternalResource() {
         "00:11:22:33:44:55:66:77:88:99:aa:bb:cc:dd:ee:ff:" +
             "00:11:22:33:44:55:66:77:88:99:aa:bb:cc:dd:ee:ff"
 
-    /** Base URL WITHOUT the `/v1/` suffix - the factory appends it. Valid once the rule ran. */
-    val baseUrl: String get() = server.url("/").toString().trimEnd('/')
+    /**
+     * Base URL WITHOUT the `/v1/` suffix - the factory appends it. Valid once the rule ran.
+     *
+     * The host is forced to [SERVER_HOST] (a DNS name) rather than taken verbatim from
+     * [MockWebServer.url], which on the emulator resolves the loopback to an IP literal. A
+     * DNS host is what makes the client send a TLS SNI extension; without it okhttp 5's
+     * mockwebserver3 crashes reading server-side SNI (see [SERVER_HOST]).
+     */
+    val baseUrl: String get() =
+        server.url("/").newBuilder().host(SERVER_HOST).build().toString().trimEnd('/')
 
     /** Registers a client to be closed when the test ends, and returns it. */
     fun track(client: RatatoskrClient): RatatoskrClient {
@@ -95,14 +102,19 @@ class HttpsMockServer : ExternalResource() {
     fun takeRequest(): RecordedRequest = server.takeRequest()
 
     private companion object {
-        // canonicalHostName is what MockWebServer.url() reports for the loopback address; using
-        // it as the certificate SAN keeps the served cert valid for the URL the tests call.
-        private val loopbackHost: String = InetAddress.getByName("localhost").canonicalHostName
+        // The DNS name the tests connect to AND the certificate's SAN, so hostname verification
+        // passes. It must be a DNS name (not an IP literal): okhttp only emits a TLS SNI
+        // extension for non-IP hosts, and okhttp 5's mockwebserver3 records the server-side SNI
+        // for every request (RecordedRequest.handshakeServerNames). On Android, reading that from
+        // a session with no requested names throws ("getRequestedServerNames(...) must not be
+        // null"), which crashes the whole instrumentation process. "localhost" resolves to the
+        // loopback MockWebServer binds to, so it both reaches the server and triggers SNI.
+        private const val SERVER_HOST = "localhost"
 
         // Minted once per class load, not per fixture instance: JUnit4 constructs a fresh test
         // instance (and with it this fixture) for every @Test method, and the certificate
         // depends on no instance state - regenerating it per test is pure repeat keygen work.
         private val served: HeldCertificate =
-            HeldCertificate.Builder().addSubjectAlternativeName(loopbackHost).build()
+            HeldCertificate.Builder().addSubjectAlternativeName(SERVER_HOST).build()
     }
 }
