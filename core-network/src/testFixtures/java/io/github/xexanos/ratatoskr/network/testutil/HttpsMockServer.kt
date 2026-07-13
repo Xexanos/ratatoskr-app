@@ -5,6 +5,7 @@
  */
 package io.github.xexanos.ratatoskr.network.testutil
 
+import android.annotation.SuppressLint
 import io.github.xexanos.ratatoskr.network.api.RatatoskrClient
 import io.github.xexanos.ratatoskr.network.tls.Fingerprints
 import okhttp3.mockwebserver.Dispatcher
@@ -193,9 +194,15 @@ private class PlainSessionSslSocket(
 
     // SSLSocket's base implementations of these throw UnsupportedOperationException; okhttp's
     // JVM platform reads the negotiated ALPN protocol through them, so they must be delegated
-    // or every HTTPS request fails. (Only reached on the JVM / API 29+; okhttp's Android
-    // platform uses reflection on API 26, so these are never called there.)
+    // or every HTTPS request fails. getApplicationProtocol/getHandshakeApplicationProtocol are
+    // API 29 (minSdk is 26), but this fixture only ever reaches them on the JVM or on API 29+:
+    // okhttp's Android platform reads ALPN via reflection below API 29 and never calls these,
+    // and mockwebserver3 does not touch them either (it ran past this point on the API-26
+    // emulator before the wrapper existed). Hence the NewApi suppression is safe.
+    @SuppressLint("NewApi")
     override fun getApplicationProtocol(): String? = delegate.applicationProtocol
+
+    @SuppressLint("NewApi")
     override fun getHandshakeApplicationProtocol(): String? = delegate.handshakeApplicationProtocol
 
     // --- pure delegation below (explicit getX/setX calls to avoid Kotlin property-name
