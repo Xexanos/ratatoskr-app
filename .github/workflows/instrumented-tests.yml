@@ -78,7 +78,7 @@ jobs:
       # Cache the created AVD + its warm snapshot across runs so we skip the ~3–6 min
       # cold boot. Keyed on the emulator params below - bump the key when any change.
       - name: Cache the AVD snapshot
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         id: avd-cache
         with:
           path: |
@@ -138,7 +138,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
 
       - name: Restore the warmed AVD snapshot
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.android/avd/*
@@ -226,7 +226,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
 
       - name: Restore the warmed AVD snapshot
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.android/avd/*
@@ -308,7 +308,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
 
       - name: Restore the warmed AVD snapshot
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.android/avd/*
@@ -376,7 +376,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
 
       - name: Restore the warmed AVD snapshot
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.android/avd/*
@@ -447,7 +447,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
 
       - name: Restore the warmed AVD snapshot
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.android/avd/*
