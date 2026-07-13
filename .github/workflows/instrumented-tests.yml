@@ -182,7 +182,7 @@ jobs:
 
       - name: Upload the test reports on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: instrumented-test-reports-component-api${{ matrix.api-level }}
           path: |
@@ -253,7 +253,7 @@ jobs:
 
       - name: Upload the test reports on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: instrumented-test-reports-integration-api${{ matrix.api-level }}
           path: |
@@ -335,7 +335,7 @@ jobs:
 
       - name: Upload the test reports on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: instrumented-test-reports-minified-smoke-api${{ matrix.api-level }}
           path: |
@@ -404,7 +404,7 @@ jobs:
 
       - name: Upload the test reports on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: instrumented-test-reports-a11y-light-api${{ matrix.api-level }}
           path: |
@@ -475,7 +475,7 @@ jobs:
 
       - name: Upload the test reports on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: instrumented-test-reports-a11y-dark-api${{ matrix.api-level }}
           path: |
