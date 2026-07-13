@@ -41,7 +41,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out (with the contract submodule)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # The Kotlin client is generated at build time from the pinned contract
           # submodule (SPEC section 4), so the build needs it checked out.
