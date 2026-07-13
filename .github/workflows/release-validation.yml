@@ -93,7 +93,7 @@ jobs:
       # skips warming forever (keys are immutable). Restore-only closes that off; the runner
       # just creates the AVD itself here (slower, acceptable post-merge).
       - name: Restore the warmed AVD snapshot (best-effort)
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: |
             ~/.android/avd/*
