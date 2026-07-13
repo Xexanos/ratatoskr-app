@@ -13,6 +13,7 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import io.github.xexanos.ratatoskr.data.ConnectionManager
 import io.github.xexanos.ratatoskr.network.FakeTokenAccess
 import io.github.xexanos.ratatoskr.network.persist.ConnectionStore
+import io.github.xexanos.ratatoskr.network.persist.DataStoreConnectionStore
 import io.github.xexanos.ratatoskr.network.testutil.HttpsMockServer
 import io.github.xexanos.ratatoskr.network.tls.CertificateInspector
 import kotlinx.coroutines.CoroutineScope
@@ -44,7 +45,7 @@ class ConnectViewModelTest {
         val file = tempFolder.root.resolve("connection_${System.nanoTime()}.preferences_pb")
         val dataStore: DataStore<Preferences> =
             PreferenceDataStoreFactory.create(scope = CoroutineScope(dispatcher)) { file }
-        return ConnectionStore(dataStore)
+        return DataStoreConnectionStore(dataStore)
     }
 
     private fun viewModel(store: ConnectionStore = connectionStore()) = ConnectViewModel(

@@ -11,7 +11,7 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStoreFile
 import io.github.xexanos.ratatoskr.data.ConnectionManager
-import io.github.xexanos.ratatoskr.network.persist.ConnectionStore
+import io.github.xexanos.ratatoskr.network.persist.DataStoreConnectionStore
 import io.github.xexanos.ratatoskr.network.persist.KeystoreCrypto
 import io.github.xexanos.ratatoskr.network.persist.TokenStore
 import io.github.xexanos.ratatoskr.network.tls.CertificateInspector
@@ -31,7 +31,7 @@ class AppContainer(context: Context) {
     private val tokenDataStore: DataStore<Preferences> =
         PreferenceDataStoreFactory.create { appContext.preferencesDataStoreFile("tokens") }
 
-    val connectionStore = ConnectionStore(connectionDataStore)
+    val connectionStore = DataStoreConnectionStore(connectionDataStore)
     val tokenStore = TokenStore(tokenDataStore, KeystoreCrypto())
     val certificateInspector = CertificateInspector()
     val connectionManager = ConnectionManager(connectionStore, tokenStore)

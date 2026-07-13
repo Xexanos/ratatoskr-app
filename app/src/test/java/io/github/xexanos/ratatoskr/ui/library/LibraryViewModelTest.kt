@@ -13,7 +13,7 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import io.github.xexanos.ratatoskr.data.ConnectionManager
 import io.github.xexanos.ratatoskr.network.FakeTokenAccess
 import io.github.xexanos.ratatoskr.network.WireFixtures
-import io.github.xexanos.ratatoskr.network.persist.ConnectionStore
+import io.github.xexanos.ratatoskr.network.persist.DataStoreConnectionStore
 import io.github.xexanos.ratatoskr.network.testutil.HttpsMockServer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -67,7 +67,7 @@ class LibraryViewModelTest {
         // scheduler here would deadlock (nothing would ever advance it to service the write).
         val dataStore: DataStore<Preferences> =
             PreferenceDataStoreFactory.create(scope = CoroutineScope(Dispatchers.IO)) { file }
-        val store = ConnectionStore(dataStore)
+        val store = DataStoreConnectionStore(dataStore)
         runBlocking { store.saveTrustedServer(server.baseUrl, server.fingerprint) }
         return ConnectionManager(store, FakeTokenAccess())
     }
@@ -135,7 +135,7 @@ class LibraryViewModelTest {
 
     @Test
     fun `no configured server surfaces a specific error`() = runTest(dispatcher) {
-        val store = ConnectionStore(
+        val store = DataStoreConnectionStore(
             PreferenceDataStoreFactory.create(scope = CoroutineScope(dispatcher)) {
                 tempFolder.root.resolve("unconfigured_${System.nanoTime()}.preferences_pb")
             },
