@@ -11,7 +11,7 @@ kotlin = "2.4.0"
 composeBom = "2026.06.01"
 openapiGenerator = "7.23.0"
 retrofit = "3.0.0"
-okhttp = "4.12.0"
+okhttp = "5.4.0"
 # 1.15.2 is the first release whose codegen supports (and requires) KSP2, which is the only
 # KSP mode AGP 9 runs. Keep moshi and ksp in lockstep with the kotlin version.
 moshi = "1.15.2"
