@@ -14,7 +14,6 @@ import okhttp3.mockwebserver.RecordedRequest
 import okhttp3.tls.HandshakeCertificates
 import okhttp3.tls.HeldCertificate
 import org.junit.rules.ExternalResource
-import java.net.InetAddress
 
 /**
  * A [MockWebServer] served over HTTPS with a self-signed certificate, for the instrumented
@@ -27,8 +26,10 @@ import java.net.InetAddress
  * self-signed / local-CA deployment (SPEC section 6). Pass [fingerprint] as the factory's pin
  * to connect; [wrongFingerprint] to simulate a changed certificate.
  *
- * The certificate's SAN is the loopback host name MockWebServer reports, so the production
- * hostname verifier (which the factory does not disable) is satisfied.
+ * The served certificate's SAN deliberately does NOT match the host MockWebServer serves on:
+ * the factory disables hostname verification on the pinned client (exact-cert pinning
+ * supersedes it - SPEC sections 6 and 14), so the pin alone carries the connection. A green
+ * handshake here therefore also proves the client ignores the certificate hostname.
  *
  * Use as a JUnit rule: it owns the whole per-test lifecycle - the server starts before each
  * test, and afterwards every client registered via [track] is closed and the server shut
@@ -95,14 +96,16 @@ class HttpsMockServer : ExternalResource() {
     fun takeRequest(): RecordedRequest = server.takeRequest()
 
     private companion object {
-        // canonicalHostName is what MockWebServer.url() reports for the loopback address; using
-        // it as the certificate SAN keeps the served cert valid for the URL the tests call.
-        private val loopbackHost: String = InetAddress.getByName("localhost").canonicalHostName
+        // A SAN that never matches the loopback host MockWebServer serves on. The pinned client
+        // disables hostname verification (exact-cert pinning decides), so the served cert needs
+        // no matching SAN - and using a foreign one makes the whole HTTPS suite prove that
+        // independence: re-enabling the default hostname verifier would fail every test here.
+        private const val FOREIGN_SAN = "ratatoskr-e2e.invalid"
 
         // Minted once per class load, not per fixture instance: JUnit4 constructs a fresh test
         // instance (and with it this fixture) for every @Test method, and the certificate
         // depends on no instance state - regenerating it per test is pure repeat keygen work.
         private val served: HeldCertificate =
-            HeldCertificate.Builder().addSubjectAlternativeName(loopbackHost).build()
+            HeldCertificate.Builder().addSubjectAlternativeName(FOREIGN_SAN).build()
     }
 }

@@ -67,6 +67,12 @@ object RatatoskrClientFactory {
 
         val baseBuilder = OkHttpClient.Builder()
             .sslSocketFactory(sslSocketFactory, trustManager)
+            // Exact-certificate trust-on-first-use pinning ([PinnedTrustManager]) already
+            // guarantees the server presents the one certificate the user confirmed by
+            // fingerprint, so hostname verification is redundant here - and enforcing it would
+            // break connecting to a server at an address not in its cert (a LAN IP, etc.). Let
+            // the pin alone decide (SPEC sections 6 and 14); mirrors CertificateInspector.
+            .hostnameVerifier { _, _ -> true }
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .addInterceptor(logging)

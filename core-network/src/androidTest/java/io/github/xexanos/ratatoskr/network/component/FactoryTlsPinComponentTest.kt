@@ -28,6 +28,9 @@ import org.junit.runner.RunWith
  * skipped) is deliberately NOT covered here: the trust manager consults only the system trust
  * store, which a test-minted CA is not in, so a self-signed MockWebServer cannot reach that path.
  * It stays a documented gap (SPEC section 9).
+ *
+ * The fixture's certificate SAN deliberately does not match the host it serves on, so these
+ * tests also prove the pinned client ignores the certificate hostname (SPEC sections 6 and 14).
  */
 @RunWith(AndroidJUnit4::class)
 class FactoryTlsPinComponentTest {
@@ -45,6 +48,20 @@ class FactoryTlsPinComponentTest {
 
         assertTrue("expected Success, was $result", result is ApiResult.Success)
         assertTrue((result as ApiResult.Success).data.isEmpty())
+    }
+
+    @Test
+    fun aPinnedConnectionIgnoresTheCertificateHostname() = runBlocking {
+        // HttpsMockServer serves a certificate whose SAN never matches the loopback host it runs
+        // on, yet the connection succeeds: exact-cert pinning supersedes hostname verification,
+        // which the factory disables (SPEC sections 6 and 14). Guards against re-enabling the
+        // default hostname verifier on the pinned client - which would break connecting to a
+        // server by a LAN IP (and the E2E emulator's 10.0.2.2).
+        https.enqueueJson("[]")
+
+        val result = client(https.fingerprint).listSpeakers()
+
+        assertTrue("expected Success despite a non-matching cert SAN, was $result", result is ApiResult.Success)
     }
 
     @Test
