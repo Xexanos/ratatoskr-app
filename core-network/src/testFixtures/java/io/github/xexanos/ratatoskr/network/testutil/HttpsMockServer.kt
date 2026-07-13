@@ -191,6 +191,13 @@ private class PlainSessionSslSocket(
 
     override fun getHandshakeSession(): SSLSession? = strip(delegate.handshakeSession)
 
+    // SSLSocket's base implementations of these throw UnsupportedOperationException; okhttp's
+    // JVM platform reads the negotiated ALPN protocol through them, so they must be delegated
+    // or every HTTPS request fails. (Only reached on the JVM / API 29+; okhttp's Android
+    // platform uses reflection on API 26, so these are never called there.)
+    override fun getApplicationProtocol(): String? = delegate.applicationProtocol
+    override fun getHandshakeApplicationProtocol(): String? = delegate.handshakeApplicationProtocol
+
     // --- pure delegation below (explicit getX/setX calls to avoid Kotlin property-name
     //     ambiguity for acronyms like SSL/OOB) --------------------------------------------
 
