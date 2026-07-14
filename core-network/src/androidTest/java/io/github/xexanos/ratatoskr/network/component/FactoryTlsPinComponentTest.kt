@@ -28,6 +28,11 @@ import org.junit.runner.RunWith
  * skipped) is deliberately NOT covered here: the trust manager consults only the system trust
  * store, which a test-minted CA is not in, so a self-signed MockWebServer cannot reach that path.
  * It stays a documented gap (SPEC section 9).
+ *
+ * The fixture's certificate SAN deliberately does not match the host it serves on, so these
+ * tests also prove the PIN path ignores the certificate hostname (SPEC section 6). The
+ * platform-trusted path stays host-bound through the pin-aware verifier; being unreachable
+ * here (same reason as above), that binding is covered by PinnedHostnameVerifierTest on the JVM.
  */
 @RunWith(AndroidJUnit4::class)
 class FactoryTlsPinComponentTest {
@@ -45,6 +50,21 @@ class FactoryTlsPinComponentTest {
 
         assertTrue("expected Success, was $result", result is ApiResult.Success)
         assertTrue((result as ApiResult.Success).data.isEmpty())
+    }
+
+    @Test
+    fun aPinnedConnectionIgnoresTheCertificateHostname() = runBlocking {
+        // HttpsMockServer serves a certificate whose SAN never matches the loopback host it runs
+        // on, yet the connection succeeds: the confirmed pin carries the connection, so the
+        // pin-aware hostname verifier ignores the hostname (SPEC section 6). Guards against
+        // losing that - a hostname-bound pin path would break connecting to a server by a LAN IP
+        // (and the E2E emulator's 10.0.2.2). Also proves, through the real Conscrypt stack, that
+        // the verifier can read the peer certificates it needs for the pin comparison.
+        https.enqueueJson("[]")
+
+        val result = client(https.fingerprint).listSpeakers()
+
+        assertTrue("expected Success despite a non-matching cert SAN, was $result", result is ApiResult.Success)
     }
 
     @Test
