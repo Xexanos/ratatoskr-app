@@ -208,15 +208,36 @@ keeps token ciphertext out of cloud backups entirely.
   from the version name alone, so the two can never disagree. Both live only in
   `app/build.gradle.kts`. Changelog files are named after the version code
   (`fastlane/.../changelogs/<versionCode>.txt`), as fastlane requires.
-- **Releases are git tags.** A release is an annotated tag `v<versionName>` (e.g.
-  `v0.1.0`) on a `main` commit whose post-merge validation (section 9) has passed. The
-  fdroiddata recipe uses `UpdateCheckMode: Tags` against that pattern. The release
-  process, in order: bump `versionCode`/`versionName` in `app/build.gradle.kts`, add the
-  `changelogs/<versionCode>.txt` files (at least `en-US`), merge to `main`, wait for the
-  release-validation workflow to go green, then tag that commit and push the tag. GitHub
-  releases are optional extras; the tag is what F-Droid consumes.
+- **Releases are git tags, cut automatically once E2E is green.** A release is an
+  annotated tag `v<versionName>` (e.g. `v0.1.0`) on a `main` commit whose full validation
+  has passed. The fdroiddata recipe uses `UpdateCheckMode: Tags` against that pattern. The
+  version itself is never computed by CI — `versionName` in `app/build.gradle.kts` is the
+  single source of truth and a human bumps it; CI only automates the *wait-for-green,
+  then-tag* half. The release process, in order: bump `versionCode`/`versionName`, add the
+  `changelogs/<versionCode>.txt` files (at least `en-US`), and merge to `main`. From there
+  CI takes over: `release-validation.yml` validates the shrunk build post-merge, publishes
+  it to a per-commit `testing-<sha>` pre-release, and dispatches the cross-component E2E
+  suite (`Xexanos/ratatoskr-e2e`, run as server@release-`:latest` × app@this-build); on a
+  green run E2E dispatches `app-e2e-passed` back, and `promote.yml` cuts the `v<versionName>`
+  tag at the validated commit and creates a GitHub release carrying the E2E-validated
+  unsigned APK (copied from the pre-release, not rebuilt). The tag is cut only when that
+  `versionName` is not already tagged: the gate is idempotent, so landing further commits at
+  an unchanged version cuts nothing new, and the tag lands on the first E2E-green commit that
+  carries a not-yet-released version (normally the bump commit). A red E2E run cuts no
+  release — the tag can only ever point at a commit that passed. GitHub releases are optional
+  extras; the tag is what F-Droid consumes. Manual promotion of a known-good `testing-<sha>`
+  pre-release stays available via `promote.yml`'s `workflow_dispatch`. This mirrors the
+  server's `container.yml` → E2E → `promote.yml` flow, one direction per component.
+- **Why the version must be set before the build.** Unlike an OCI image — whose version is
+  a registry tag pointing at already-built, digest-addressed bytes, applied (and changed)
+  after the fact without a rebuild — an APK's `versionName`/`versionCode` are compiled into
+  `AndroidManifest.xml` and covered by the APK signature, so they are part of the artifact
+  bytes. There is therefore no "build once, choose the version later by re-tagging" for the
+  app: the version lives in source, and F-Droid rebuilds from the tag regardless. The git
+  tag, not a re-tag of a built artifact, is what carries the version.
 - **Signing: F-Droid signs its own builds.** The repository produces an unsigned release
-  APK (the release-validation workflow publishes it per validated commit) and F-Droid's
+  APK (the release-validation workflow publishes it per validated commit, and `promote.yml`
+  attaches that same validated APK to the `v<versionName>` GitHub release) and F-Droid's
   build server builds from the tag and signs the result with the F-Droid key. There is
   deliberately no developer release keystore: nothing secret to manage, rotate, or leak,
   and no `Binaries:`/`AllowedAPKSigningKeys` reproducibility contract to keep. Trade-off,
