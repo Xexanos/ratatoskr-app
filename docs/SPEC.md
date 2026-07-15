@@ -207,7 +207,14 @@ keeps token ciphertext out of cloud backups entirely.
   (`0.1.0` → `100`, `1.2.3` → `10203`): monotonic, gapless in meaning, and reconstructible
   from the version name alone, so the two can never disagree. Both live only in
   `app/build.gradle.kts`. Changelog files are named after the version code
-  (`fastlane/.../changelogs/<versionCode>.txt`), as fastlane requires.
+  (`fastlane/.../changelogs/<versionCode>.txt`), as fastlane requires. CI enforces the bump
+  so it is never forgotten: `pr-release-guards.yml` fails any PR whose commits are
+  release-worthy (feat/fix/perf/breaking, per Conventional Commits — themselves linted by a
+  commitlint job mirrored from the server) unless it raises `versionName`/`versionCode` by at
+  least the implied semver level, keeps `versionCode` consistent with the formula above, and
+  adds the matching `en-US` changelog. Non-release commits (docs/chore/ci/deps/…) require no
+  bump. This is the continuous-versioning half of the flow: because every release-worthy merge
+  bumps, every such green `main` commit is a fresh version the tag gate below can cut.
 - **Releases are git tags, cut automatically once E2E is green.** A release is an
   annotated tag `v<versionName>` (e.g. `v0.1.0`) on a `main` commit whose full validation
   has passed. The fdroiddata recipe uses `UpdateCheckMode: Tags` against that pattern. The
