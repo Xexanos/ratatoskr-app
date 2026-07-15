@@ -13,8 +13,6 @@ package io.github.xexanos.ratatoskr.ui
  * existing text/contentDescription instead - see the integration suite.
  */
 object UiTestTags {
-    /** Connect screen's server-URL field: prefilled ("https://") with only a floating label,
-     *  so it has no reliable text handle for black-box driving (the central E2E harness). */
     const val CONNECT_SERVER_URL = "connect_server_url"
     const val LIBRARY_SEARCH = "library_search"
     const val LIBRARY_ROW = "library_row"
