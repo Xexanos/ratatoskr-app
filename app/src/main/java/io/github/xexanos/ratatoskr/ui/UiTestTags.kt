@@ -13,6 +13,7 @@ package io.github.xexanos.ratatoskr.ui
  * existing text/contentDescription instead - see the integration suite.
  */
 object UiTestTags {
+    const val CONNECT_SERVER_URL = "connect_server_url"
     const val LIBRARY_SEARCH = "library_search"
     const val LIBRARY_ROW = "library_row"
     const val SPEAKER_ROW = "speaker_row"
