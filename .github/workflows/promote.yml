@@ -97,8 +97,9 @@ jobs:
             echo "::error::Promote commit ${commit} is not in this repository."; exit 1
           fi
           # Releases come from main history only, mirroring the server's promote.yml. A manually
-          # dispatched feature-branch build is not tag-worthy.
-          if ! git merge-base --is-ancestor "$commit" origin/main; then
+          # dispatched feature-branch build is not tag-worthy. HEAD is main here: checkout defaults
+          # to the repository's default branch for both repository_dispatch and workflow_dispatch.
+          if ! git merge-base --is-ancestor "$commit" HEAD; then
             echo "::error::Commit ${commit} is not on main; refusing to cut a release tag."; exit 1
           fi
 
