@@ -113,7 +113,21 @@ jobs:
 
           # Idempotent gate: cut the tag only if this version has not been released yet.
           if git rev-parse -q --verify "refs/tags/v${version}" >/dev/null; then
-            echo "::notice::v${version} already exists - nothing to release (build promoted for an already-released version)."
+            # Distinguish the benign case (a non-release commit - docs/chore/ci - promoted past an
+            # already-released version) from the one that means a bump was MISSED: release-worthy
+            # commits between v${version} and this commit. The PR guard (pr-release-guards.yml)
+            # should stop the latter at merge time, so reaching it here signals the guard was
+            # bypassed or two PRs collided on the same version - warn loudly rather than no-op
+            # silently (the whole point of the guard is that forgetting a bump is never quiet).
+            subjects="$(git log --format='%s' "v${version}..${commit}")"
+            bodies="$(git log --format='%b' "v${version}..${commit}")"
+            if grep -qE '^[a-z]+(\([^)]*\))?!:' <<< "$subjects" \
+               || grep -qE '^BREAKING[ -]CHANGE:' <<< "$bodies" \
+               || grep -qE '^(feat|fix|perf)(\([^)]*\))?:' <<< "$subjects"; then
+              echo "::warning::v${version} is already tagged, yet release-worthy commits landed since it (commit ${commit}). A version bump was likely missed (guard bypassed, or two PRs collided on ${version}) - NO release was cut. Bump the version on main to ship these changes."
+            else
+              echo "::notice::v${version} already exists - nothing to release (non-release commit promoted past an already-released version)."
+            fi
             echo "release=false" >> "$GITHUB_OUTPUT"
           else
             echo "Cutting v${version} at ${commit} (from ${TAG})."
