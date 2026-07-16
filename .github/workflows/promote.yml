@@ -190,7 +190,9 @@ jobs:
           "$bt/apksigner" sign \
             --ks "$keystore" --ks-key-alias ratatoskr-release --ks-pass env:KEYSTORE_PASS \
             --out "publish/ratatoskr-v${VERSION}.apk" "$RUNNER_TEMP/aligned.apk"
-          "$bt/apksigner" verify --print-certs "publish/ratatoskr-v${VERSION}.apk"
+          "$bt/apksigner" verify --print-certs "publish/ratatoskr-v${VERSION}.apk" \
+            | grep -Fq 'certificate SHA-256 digest: 1b4d89b7b6cf207022a23825e5651bf56b4fcfcaecbb35109772304266f011b1' \
+            || { echo "::error::Signing certificate does not match the pinned fingerprint - wrong or rotated RELEASE_KEYSTORE secret."; exit 1; }
           rm -f "$keystore"
 
       - name: Push the version tag and create the GitHub release
