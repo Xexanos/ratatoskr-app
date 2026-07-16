@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Ratatoskr</string>
+    <string name="app_name" translatable="false">Ratatoskr</string>
 
     <!-- Connect -->
     <string name="connect_welcome_title">Welcome to Ratatoskr</string>
@@ -58,7 +58,7 @@
     <string name="nowplaying_state_buffering">Buffering</string>
     <string name="nowplaying_state_finished">Finished</string>
     <string name="nowplaying_state_stopped">Stopped</string>
-    <string name="nowplaying_state_unknown">-</string>
+    <string name="nowplaying_state_unknown" translatable="false">-</string>
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>

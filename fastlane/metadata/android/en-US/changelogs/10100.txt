@@ -1,0 +1,1 @@
+Add a German translation and register the app languages for Android 13+ per-app language settings.

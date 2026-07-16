@@ -1,0 +1,71 @@
+<resources>
+    <!-- Connect -->
+    <string name="connect_welcome_title">Willkommen bei Ratatoskr</string>
+    <string name="connect_welcome_subtitle">Verbinde dich mit deinem Ratatoskr-Server, um Hörbücher auf deinen Sonos-Lautsprechern abzuspielen.</string>
+    <string name="connect_server_url_label">Server-URL</string>
+    <string name="connect_url_locked_desc">URL gesperrt, während das Zertifikat bestätigt wird</string>
+    <string name="connect_action_connect">Verbinden</string>
+    <string name="connect_inspecting">Serverzertifikat wird gelesen...</string>
+    <string name="connect_action_retry">Erneut versuchen</string>
+    <string name="connect_confirm_title">Erste Verbindung: Zertifikat bestätigen</string>
+    <string name="connect_cert_subject_label">Inhaber</string>
+    <string name="connect_cert_issuer_label">Aussteller</string>
+    <string name="connect_cert_valid_until_label">Gültig bis</string>
+    <string name="connect_cert_fingerprint_label">SHA-256-Fingerabdruck</string>
+    <string name="connect_cert_compare_hint">Vergleiche diesen Fingerabdruck mit dem, den dein Server anzeigt, bevor du ihm vertraust.</string>
+    <string name="connect_action_trust">Vertrauen und fortfahren</string>
+    <string name="connect_action_cancel">Abbrechen</string>
+
+    <!-- Sign in -->
+    <string name="signin_title">Bei Audiobookshelf anmelden</string>
+    <string name="signin_subtitle">Verwende deinen vorhandenen Benutzernamen und dein Passwort.</string>
+    <string name="signin_username_label">Benutzername</string>
+    <string name="signin_password_label">Passwort</string>
+    <string name="signin_action">Anmelden</string>
+
+    <!-- Library -->
+    <string name="library_title">Bibliothek</string>
+    <string name="library_now_playing">Aktuelle Wiedergabe</string>
+    <string name="library_settings">Einstellungen</string>
+    <string name="library_search_placeholder">Hörbücher durchsuchen</string>
+    <string name="library_empty_title">Deine Bibliothek ist leer</string>
+    <string name="library_no_results_title">Keine Treffer</string>
+    <string name="library_empty_body">Hörbücher von deinem Audiobookshelf-Server erscheinen hier.</string>
+    <string name="library_no_results_body">Keine Hörbücher passen zu %1$s. Versuche es mit einer kürzeren Suche.</string>
+    <string name="library_finished">Abgeschlossen</string>
+    <string name="library_percent">%1$d&#160;%%</string>
+
+    <!-- Speakers -->
+    <string name="speakers_title">Lautsprecher auswählen</string>
+    <string name="speakers_subtitle">Die Wiedergabe startet auf dem ausgewählten Lautsprecher.</string>
+    <string name="speakers_starting">Wiedergabe wird gestartet...</string>
+    <string name="speakers_empty_title">Keine Lautsprecher gefunden</string>
+    <string name="speakers_empty_hint">Stelle sicher, dass deine Sonos-Lautsprecher eingeschaltet und vom Server aus erreichbar sind.</string>
+    <string name="speakers_group">Gruppe</string>
+    <string name="speakers_group_members">Gruppe: %1$s</string>
+    <string name="speakers_kind_speaker">Lautsprecher</string>
+
+    <!-- Now playing -->
+    <string name="nowplaying_header">AKTUELLE WIEDERGABE</string>
+    <string name="nowplaying_nothing_playing">Gerade wird nichts wiedergegeben.</string>
+    <string name="nowplaying_action_play">Wiedergeben</string>
+    <string name="nowplaying_action_pause">Pausieren</string>
+    <string name="nowplaying_action_stop">Stoppen</string>
+    <string name="nowplaying_state_playing">Wird wiedergegeben</string>
+    <string name="nowplaying_state_paused">Pausiert</string>
+    <string name="nowplaying_state_buffering">Wird gepuffert</string>
+    <string name="nowplaying_state_finished">Abgeschlossen</string>
+    <string name="nowplaying_state_stopped">Gestoppt</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Einstellungen</string>
+    <string name="settings_section_server">Server</string>
+    <string name="settings_section_security">Sicherheit</string>
+    <string name="settings_section_account">Konto</string>
+    <string name="settings_not_configured">Nicht konfiguriert</string>
+    <string name="settings_connected">Über HTTPS verbunden</string>
+    <string name="settings_not_connected">Über den Startbildschirm verbinden</string>
+    <string name="settings_forget_cert">Zertifikat vergessen und neu vertrauen</string>
+    <string name="settings_forget_cert_hint">Entfernt das gepinnte Zertifikat. Bei der nächsten Verbindung bestätigst du den Fingerabdruck des Servers erneut.</string>
+    <string name="settings_sign_out">Abmelden</string>
+</resources>
