@@ -72,7 +72,7 @@ jobs:
           echo "commit=${commit}" >> "$GITHUB_OUTPUT"
 
       - name: Check out (full history + tags)
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           # Need the tag list (to test whether v<versionName> already exists) and the ability to
           # push a new tag at an arbitrary commit; the contract submodule is not needed here (we
