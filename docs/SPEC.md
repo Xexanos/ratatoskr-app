@@ -525,3 +525,10 @@ the radar:
 
 - **Cover art.** The library projection carries no cover URL today. Once the server serves cover
   images (server SPEC section 16), show artwork in the library and now-playing views.
+
+- **Server auto-discovery on the LAN (mDNS/Zeroconf).** Mirrors the server-side feature (server
+  SPEC section 16): instead of the user typing the server's URL by hand on first connect
+  (sections 5 and 6), the app would browse for Ratatoskr instances advertised via mDNS/Bonjour and
+  offer them as selectable candidates. The existing trust-on-first-use certificate-fingerprint
+  confirmation stays mandatory regardless of how the address was obtained, so discovery only
+  removes the typing, not the trust step.
