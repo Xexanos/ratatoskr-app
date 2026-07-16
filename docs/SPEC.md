@@ -240,7 +240,8 @@ keeps token ciphertext out of cloud backups entirely.
   suite (`Xexanos/ratatoskr-e2e`, run as server@release-`:latest` × app@this-build); on a
   green run E2E dispatches `app-e2e-passed` back, and `promote.yml` cuts the `v<versionName>`
   tag at the validated commit and creates a GitHub release carrying the E2E-validated
-  unsigned APK (copied from the pre-release, not rebuilt). The tag is cut only when that
+  APK bytes (copied from the pre-release, not rebuilt): the unsigned APK plus a
+  developer-signed copy for sideloading (see the signing bullet below). The tag is cut only when that
   `versionName` is not already tagged: the gate is idempotent, so landing further commits at
   an unchanged version cuts nothing new, and the tag lands on the first E2E-green commit that
   carries a not-yet-released version (normally the bump commit). A red E2E run cuts no
@@ -255,16 +256,27 @@ keeps token ciphertext out of cloud backups entirely.
   bytes. There is therefore no "build once, choose the version later by re-tagging" for the
   app: the version lives in source, and F-Droid rebuilds from the tag regardless. The git
   tag, not a re-tag of a built artifact, is what carries the version.
-- **Signing: F-Droid signs its own builds.** The repository produces an unsigned release
-  APK (the release-validation workflow publishes it per validated commit, and `promote.yml`
-  attaches that same validated APK to the `v<versionName>` GitHub release) and F-Droid's
-  build server builds from the tag and signs the result with the F-Droid key. There is
-  deliberately no developer release keystore: nothing secret to manage, rotate, or leak,
-  and no `Binaries:`/`AllowedAPKSigningKeys` reproducibility contract to keep. Trade-off,
-  recorded: Android signature continuity makes this permanent for this `applicationId` —
-  switching later to developer-signed reproducible builds would force every user to
-  uninstall and reinstall. The "aim for a reproducible build" bullet above stays as build
-  hygiene (deterministic inputs, minimal toolchain), not as a signing strategy.
+- **Signing: two install channels, two keys.** F-Droid remains the primary channel: its
+  build server builds from the `v<versionName>` tag and signs the result with the F-Droid
+  key — it consumes nothing but the tag. In addition, the GitHub release explicitly offers
+  sideloading as an alternative: `promote.yml` signs the E2E-validated unsigned APK (the
+  exact bytes that passed, never a rebuild) with a developer release key and attaches it
+  as `ratatoskr-v<versionName>.apk`, alongside the `ratatoskr-release-unsigned.apk` it is
+  derived from (kept as the provenance artifact — an unsigned APK is not installable). The
+  key is a PKCS12 keystore held in GitHub Actions secrets (`RELEASE_KEYSTORE`,
+  base64-encoded, and `RELEASE_KEYSTORE_PASSWORD`; alias `ratatoskr-release`), with an
+  offline backup outside CI. The signing certificate's SHA-256 fingerprint, for
+  `apksigner verify --print-certs` checks, is
+  `D9:91:F4:BC:63:BB:23:F5:87:F0:58:57:10:65:AC:B2:00:3E:61:BC:A7:DD:12:95:BB:C2:21:7D:62:87:AD:DF`.
+  Trade-offs, recorded: (a) Android signature continuity makes the two channels mutually
+  exclusive per install — a device cannot move between an F-Droid install and a sideload
+  install without uninstall + reinstall (and the data loss that implies); release notes
+  must say so. (b) There is now a secret to manage: the keystore must stay backed up, and
+  losing it orphans every sideload install (F-Droid installs are unaffected). There is
+  still no `Binaries:`/`AllowedAPKSigningKeys` reproducibility contract to keep — the
+  sideload APK is a parallel channel, not an F-Droid input. The "aim for a reproducible
+  build" bullet above stays as build hygiene (deterministic inputs, minimal toolchain),
+  not as a signing strategy.
 - Choose a reasonable `minSdk` that covers the encrypted-storage and TLS requirements; the
   agent proposes the exact value.
 - Release shrinking (R8) is **enabled**, and the conditions that once blocked it are resolved:
