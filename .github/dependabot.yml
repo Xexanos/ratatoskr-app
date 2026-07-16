@@ -8,6 +8,11 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    # 7-day cooldown before proposing a new release: compromised releases are typically
+    # discovered and pulled within days — don't be the early adopter. Same policy as the
+    # server repo.
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 10
     # Keep PR noise low: bundle non-major bumps into a single PR, majors stay separate.
     groups:
@@ -21,6 +26,8 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
     groups:
       github-actions:
         update-types:

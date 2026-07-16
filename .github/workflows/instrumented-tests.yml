@@ -65,7 +65,7 @@ jobs:
 
     steps:
       - name: Check out (with the contract submodule)
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           submodules: true
 
@@ -78,7 +78,7 @@ jobs:
       # Cache the created AVD + its warm snapshot across runs so we skip the ~3–6 min
       # cold boot. Keyed on the emulator params below - bump the key when any change.
       - name: Cache the AVD snapshot
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: avd-cache
         with:
           path: |
@@ -89,7 +89,7 @@ jobs:
       # On a cache miss, create the AVD once and let it save a snapshot (no -no-snapshot-save).
       - name: Warm the AVD snapshot
         if: steps.avd-cache.outputs.cache-hit != 'true'
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: ${{ matrix.api-level }}
           arch: x86_64
@@ -118,7 +118,7 @@ jobs:
 
     steps:
       - name: Check out (with the contract submodule)
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           submodules: true
 
@@ -129,16 +129,16 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4.8.0
         with:
           distribution: temurin
           java-version: 21
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
 
       - name: Restore the warmed AVD snapshot
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.android/avd/*
@@ -146,7 +146,7 @@ jobs:
           key: avd-api${{ matrix.api-level }}-x86_64-default-pixel_6
 
       - name: Run the core-network component suite
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: ${{ matrix.api-level }}
           arch: x86_64
@@ -182,7 +182,7 @@ jobs:
 
       - name: Upload the test reports on failure
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: instrumented-test-reports-component-api${{ matrix.api-level }}
           path: |
@@ -206,7 +206,7 @@ jobs:
 
     steps:
       - name: Check out (with the contract submodule)
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           submodules: true
 
@@ -217,16 +217,16 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4.8.0
         with:
           distribution: temurin
           java-version: 21
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
 
       - name: Restore the warmed AVD snapshot
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.android/avd/*
@@ -234,7 +234,7 @@ jobs:
           key: avd-api${{ matrix.api-level }}-x86_64-default-pixel_6
 
       - name: Run the whole-app integration flow
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: ${{ matrix.api-level }}
           arch: x86_64
@@ -253,7 +253,7 @@ jobs:
 
       - name: Upload the test reports on failure
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: instrumented-test-reports-integration-api${{ matrix.api-level }}
           path: |
@@ -288,7 +288,7 @@ jobs:
 
     steps:
       - name: Check out (with the contract submodule)
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           submodules: true
 
@@ -299,16 +299,16 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4.8.0
         with:
           distribution: temurin
           java-version: 21
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
 
       - name: Restore the warmed AVD snapshot
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.android/avd/*
@@ -316,7 +316,7 @@ jobs:
           key: avd-api${{ matrix.api-level }}-x86_64-default-pixel_6
 
       - name: Run the wire smoke against the minified build
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: ${{ matrix.api-level }}
           arch: x86_64
@@ -335,7 +335,7 @@ jobs:
 
       - name: Upload the test reports on failure
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: instrumented-test-reports-minified-smoke-api${{ matrix.api-level }}
           path: |
@@ -356,7 +356,7 @@ jobs:
 
     steps:
       - name: Check out (with the contract submodule)
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           submodules: true
 
@@ -367,16 +367,16 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4.8.0
         with:
           distribution: temurin
           java-version: 21
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
 
       - name: Restore the warmed AVD snapshot
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.android/avd/*
@@ -384,7 +384,7 @@ jobs:
           key: avd-api${{ matrix.api-level }}-x86_64-default-pixel_6
 
       - name: Run the accessibility suite in light mode
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: ${{ matrix.api-level }}
           arch: x86_64
@@ -404,7 +404,7 @@ jobs:
 
       - name: Upload the test reports on failure
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: instrumented-test-reports-a11y-light-api${{ matrix.api-level }}
           path: |
@@ -427,7 +427,7 @@ jobs:
 
     steps:
       - name: Check out (with the contract submodule)
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           submodules: true
 
@@ -438,16 +438,16 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4.8.0
         with:
           distribution: temurin
           java-version: 21
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
 
       - name: Restore the warmed AVD snapshot
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.android/avd/*
@@ -455,7 +455,7 @@ jobs:
           key: avd-api${{ matrix.api-level }}-x86_64-default-pixel_6
 
       - name: Run the accessibility suite in dark mode
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: ${{ matrix.api-level }}
           arch: x86_64
@@ -475,7 +475,7 @@ jobs:
 
       - name: Upload the test reports on failure
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: instrumented-test-reports-a11y-dark-api${{ matrix.api-level }}
           path: |
