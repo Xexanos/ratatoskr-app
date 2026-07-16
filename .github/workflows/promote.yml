@@ -16,7 +16,7 @@
 # E2E-green commit that carries a not-yet-released version (normally the version-bump commit).
 #
 # Triggers:
-#   - repository_dispatch (app-e2e-passed): ratatoskr-e2e fires this on a green app-validated run,
+#   - repository_dispatch (app-e2e-passed): ratatoskr-e2e fires this on a green app-candidate run,
 #     carrying the release_tag (the testing-<sha> pre-release it tested) and the commit. This is
 #     the automatic path: release-validation.yml -> E2E -> (on pass) promote.yml.
 #   - workflow_dispatch: manual promotion of a known-good testing-<sha> pre-release.
