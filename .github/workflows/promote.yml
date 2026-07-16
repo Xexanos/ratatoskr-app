@@ -5,8 +5,14 @@
 # what passed. This mirrors the server's promote.yml (which re-tags the tested image by digest);
 # an APK cannot be "re-tagged" the way a container image can (versionName/versionCode are compiled
 # into the APK bytes and covered by the signature), so the tag is what carries the version, and
-# F-Droid rebuilds from that tag and signs with its own key (SPEC section 8). The attached APK is
-# a convenience for sideloaders, not what F-Droid consumes.
+# F-Droid rebuilds from that tag and signs with its own key (SPEC section 8).
+#
+# The release carries two APKs (SPEC section 8): the unsigned validated bytes (provenance — not
+# installable, and not what F-Droid consumes either), and a developer-signed copy of those same
+# bytes (ratatoskr-v<versionName>.apk) as the explicit sideload alternative to F-Droid. Signing
+# adds a signature to the validated APK; it never rebuilds. The two channels use different keys,
+# so a device cannot switch between an F-Droid install and a sideload install without
+# uninstalling first — the release notes say so.
 #
 # The version is NOT computed here (unlike the server, which derives semver from conventional
 # commits): versionName lives in app/build.gradle.kts and a human bumps it (SPEC section 8). This
@@ -159,6 +165,36 @@ jobs:
             --pattern 'ratatoskr-release-unsigned.apk' --dir publish
           test -s publish/ratatoskr-release-unsigned.apk
 
+      # Sign the validated bytes for the sideload channel (SPEC section 8): the exact APK the
+      # E2E suite validated, plus a developer signature — never a rebuild. Runs BEFORE tagging
+      # for the same reason the download does: a missing secret or a bad keystore fails the run
+      # before any tag is pushed.
+      - name: Sign the sideload APK
+        if: steps.version.outputs.release == 'true'
+        env:
+          KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE }}
+          KEYSTORE_PASS: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          if [ -z "$KEYSTORE_B64" ] || [ -z "$KEYSTORE_PASS" ]; then
+            echo "::error::RELEASE_KEYSTORE / RELEASE_KEYSTORE_PASSWORD secrets are not set — cannot sign the sideload APK."; exit 1
+          fi
+          keystore="$RUNNER_TEMP/release.p12"
+          printf '%s' "$KEYSTORE_B64" | base64 -d > "$keystore"
+          bt="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -n1)"
+          # zipalign before signing (v2+ signatures cover the whole file). AGP's unsigned APK
+          # is already aligned; -f makes this idempotent rather than a failure.
+          "$bt/zipalign" -f 4 publish/ratatoskr-release-unsigned.apk "$RUNNER_TEMP/aligned.apk"
+          # --ks-pass env: keeps the password out of argv and logs (never log secrets).
+          "$bt/apksigner" sign \
+            --ks "$keystore" --ks-key-alias ratatoskr-release --ks-pass env:KEYSTORE_PASS \
+            --out "publish/ratatoskr-v${VERSION}.apk" "$RUNNER_TEMP/aligned.apk"
+          "$bt/apksigner" verify --print-certs "publish/ratatoskr-v${VERSION}.apk" \
+            | grep -Fq 'certificate SHA-256 digest: 1b4d89b7b6cf207022a23825e5651bf56b4fcfcaecbb35109772304266f011b1' \
+            || { echo "::error::Signing certificate does not match the pinned fingerprint - wrong or rotated RELEASE_KEYSTORE secret."; exit 1; }
+          rm -f "$keystore"
+
       - name: Push the version tag and create the GitHub release
         if: steps.version.outputs.release == 'true'
         env:
@@ -173,10 +209,18 @@ jobs:
           # Tags pushed with GITHUB_TOKEN do not trigger other workflows - no dispatch loop.
           git tag -a "v${VERSION}" -m "Release v${VERSION}" "${COMMIT}"
           git push origin "v${VERSION}"
+          # The generated notes (commit log) are appended after this install guidance by gh.
           gh release create "v${VERSION}" \
             --repo "$GITHUB_REPOSITORY" \
             --target "${COMMIT}" \
             --title "v${VERSION}" \
+            --notes "## Install
+
+          - **F-Droid** (primary): builds and signs this release itself from the \`v${VERSION}\` tag.
+          - **Sideload**: download \`ratatoskr-v${VERSION}.apk\` (developer-signed; certificate SHA-256 \`1B:4D:89:B7:B6:CF:20:70:22:A2:38:25:E5:65:1B:F5:6B:4F:CF:CA:EC:BB:35:10:97:72:30:42:66:F0:11:B1\`).
+
+          The two channels are signed with different keys: a device cannot switch between an F-Droid install and a sideloaded install without uninstalling first. \`ratatoskr-release-unsigned.apk\` is the unsigned build the E2E suite validated (provenance artifact, not installable)." \
             --generate-notes \
             --verify-tag \
+            "publish/ratatoskr-v${VERSION}.apk" \
             publish/ratatoskr-release-unsigned.apk
