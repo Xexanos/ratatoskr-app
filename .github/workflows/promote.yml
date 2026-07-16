@@ -1,0 +1,182 @@
+# Promote a *tested* build to a release — the second half of the flow that starts in
+# release-validation.yml. It does NOT rebuild: it cuts an annotated v<versionName> git tag at
+# the validated commit and creates a GitHub release carrying the exact unsigned release APK that
+# E2E validated (copied from that commit's testing-<sha> pre-release), so what ships is provably
+# what passed. This mirrors the server's promote.yml (which re-tags the tested image by digest);
+# an APK cannot be "re-tagged" the way a container image can (versionName/versionCode are compiled
+# into the APK bytes and covered by the signature), so the tag is what carries the version, and
+# F-Droid rebuilds from that tag and signs with its own key (SPEC section 8). The attached APK is
+# a convenience for sideloaders, not what F-Droid consumes.
+#
+# The version is NOT computed here (unlike the server, which derives semver from conventional
+# commits): versionName lives in app/build.gradle.kts and a human bumps it (SPEC section 8). This
+# gate automates the "wait for green, then tag" half — it cuts the tag for the version declared at
+# the validated commit, but ONLY if that version has not already been released. So landing more
+# commits at an unchanged versionName cuts nothing new; the tag is cut once, at the first
+# E2E-green commit that carries a not-yet-released version (normally the version-bump commit).
+#
+# Triggers:
+#   - repository_dispatch (app-e2e-passed): ratatoskr-e2e fires this on a green app-validated run,
+#     carrying the release_tag (the testing-<sha> pre-release it tested) and the commit. This is
+#     the automatic path: release-validation.yml -> E2E -> (on pass) promote.yml.
+#   - workflow_dispatch: manual promotion of a known-good testing-<sha> pre-release.
+
+name: Promote (release)
+
+on:
+  repository_dispatch:
+    types: [app-e2e-passed]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Tested pre-release tag to promote (e.g. testing-abc1234)
+        required: true
+
+permissions:
+  # Push the v<versionName> git tag, create the GitHub release, and read/download the
+  # testing-<sha> pre-release's assets — all in this repo, so the per-run GITHUB_TOKEN suffices.
+  contents: write
+
+concurrency:
+  # Serialize promotions: two concurrent runs could both read "v0.1.0 does not exist yet" and race
+  # to push the same tag. Queue instead, and never cancel one in flight (a half-cut release is
+  # worse than a delayed one).
+  group: app-promote
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Resolve the source pre-release tag and commit
+        id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          DISPATCH_TAG: ${{ github.event.client_payload.release_tag }}
+          DISPATCH_COMMIT: ${{ github.event.client_payload.commit }}
+          INPUT_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = "repository_dispatch" ]; then
+            tag="$DISPATCH_TAG"
+            commit="$DISPATCH_COMMIT"
+          else
+            tag="$INPUT_TAG"
+            commit=""   # resolved from the release below when dispatched manually
+          fi
+          if [ -z "$tag" ]; then
+            echo "::error::No release_tag to promote."; exit 1
+          fi
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "commit=${commit}" >> "$GITHUB_OUTPUT"
+
+      - name: Check out (full history + tags)
+        uses: actions/checkout@v7
+        with:
+          # Need the tag list (to test whether v<versionName> already exists) and the ability to
+          # push a new tag at an arbitrary commit; the contract submodule is not needed here (we
+          # neither build nor generate the client).
+          fetch-depth: 0
+
+      - name: Resolve the commit, read versionName, decide whether to release
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.plan.outputs.tag }}
+          COMMIT: ${{ steps.plan.outputs.commit }}
+        run: |
+          set -euo pipefail
+
+          # A manual dispatch carries no commit; take the one the pre-release was cut at.
+          commit="$COMMIT"
+          if [ -z "$commit" ]; then
+            commit="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json targetCommitish --jq .targetCommitish)"
+          fi
+          if ! git cat-file -e "${commit}^{commit}" 2>/dev/null; then
+            echo "::error::Promote commit ${commit} is not in this repository."; exit 1
+          fi
+          # Releases come from main history only, mirroring the server's promote.yml. A manually
+          # dispatched feature-branch build is not tag-worthy. HEAD is main here: checkout defaults
+          # to the repository's default branch for both repository_dispatch and workflow_dispatch.
+          if ! git merge-base --is-ancestor "$commit" HEAD; then
+            echo "::error::Commit ${commit} is not on main; refusing to cut a release tag."; exit 1
+          fi
+
+          # versionName is the single source of truth for the version (SPEC section 8). Read it at
+          # the validated commit, not at HEAD, so a later bump on main cannot mislabel this release.
+          line="$(git show "${commit}:app/build.gradle.kts" | grep -E '^\s*versionName\s*=' | head -n1)"
+          version="$(printf '%s' "$line" | grep -oP 'versionName\s*=\s*"\K[^"]+')"
+          if [ -z "$version" ]; then
+            echo "::error::Could not read versionName from app/build.gradle.kts at ${commit}."; exit 1
+          fi
+
+          # Idempotent gate: cut the tag only if this version has not been released yet.
+          if git rev-parse -q --verify "refs/tags/v${version}" >/dev/null; then
+            # Distinguish the benign case (a non-release commit - docs/chore/ci - promoted past an
+            # already-released version) from the one that means a bump was MISSED: release-worthy
+            # commits between v${version} and this commit. The PR guard (pr-release-guards.yml)
+            # should stop the latter at merge time, so reaching it here signals the guard was
+            # bypassed or two PRs collided on the same version - warn loudly rather than no-op
+            # silently (the whole point of the guard is that forgetting a bump is never quiet).
+            #
+            # This classification reads MAIN's commit subjects, so it assumes merges preserve the
+            # branch's Conventional Commits (merge-commit or rebase). Under SQUASH merges the main
+            # subject defaults to the (unlinted) PR title, so a release-worthy squash titled e.g.
+            # `ci: ...` would be misread as benign here and reported as ::notice:: instead of
+            # ::warning::. This only degrades THIS diagnostic - the actual bump enforcement runs on
+            # the PR's own base..head commits in pr-release-guards.yml, which are linted regardless
+            # of merge strategy. SPEC section 8 records the no-squash requirement for main.
+            subjects="$(git log --format='%s' "v${version}..${commit}")"
+            bodies="$(git log --format='%b' "v${version}..${commit}")"
+            if grep -qE '^[a-z]+(\([^)]*\))?!:' <<< "$subjects" \
+               || grep -qE '^BREAKING[ -]CHANGE:' <<< "$bodies" \
+               || grep -qE '^(feat|fix|perf)(\([^)]*\))?:' <<< "$subjects"; then
+              echo "::warning::v${version} is already tagged, yet release-worthy commits landed since it (commit ${commit}). A version bump was likely missed (guard bypassed, or two PRs collided on ${version}) - NO release was cut. Bump the version on main to ship these changes."
+            else
+              echo "::notice::v${version} already exists - nothing to release (non-release commit promoted past an already-released version)."
+            fi
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Cutting v${version} at ${commit} (from ${TAG})."
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "commit=${commit}" >> "$GITHUB_OUTPUT"
+
+      # Fetch the E2E-validated bytes BEFORE tagging, so a missing/pruned asset fails the run
+      # before any tag is pushed (never a tag with no release behind it - the server orders its
+      # publish-before-tag for the same reason).
+      - name: Download the validated unsigned release APK
+        if: steps.version.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.plan.outputs.tag }}
+        run: |
+          set -euo pipefail
+          mkdir -p publish
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern 'ratatoskr-release-unsigned.apk' --dir publish
+          test -s publish/ratatoskr-release-unsigned.apk
+
+      - name: Push the version tag and create the GitHub release
+        if: steps.version.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          COMMIT: ${{ steps.version.outputs.commit }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Annotated tag matching the fdroiddata UpdateCheckMode: Tags pattern (v<versionName>).
+          # Tags pushed with GITHUB_TOKEN do not trigger other workflows - no dispatch loop.
+          git tag -a "v${VERSION}" -m "Release v${VERSION}" "${COMMIT}"
+          git push origin "v${VERSION}"
+          gh release create "v${VERSION}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "${COMMIT}" \
+            --title "v${VERSION}" \
+            --generate-notes \
+            --verify-tag \
+            publish/ratatoskr-release-unsigned.apk

@@ -10,8 +10,10 @@
 #      and the unsigned release APK (what F-Droid signs). Each validated commit gets its own
 #      pre-release so a given build stays retrievable by its commit; the `testing-` prefix and
 #      prerelease flag make clear these are throwaway, not stable releases.
-#   3. Then trigger the cross-component E2E suite - placeholder until the ratatoskr-e2e
-#      repository's workflow exists.
+#   3. Then dispatch the cross-component E2E suite (Xexanos/ratatoskr-e2e) with this build's
+#      pre-release tag. On a green E2E run it dispatches `app-e2e-passed` back, which drives
+#      promote.yml - the git-tag release gate (a v<versionName> tag is cut only for a version
+#      not yet released). Mirrors the server's container.yml -> E2E -> promote.yml flow.
 #
 # A separate scheduled job prunes `testing-*` pre-releases (and their tags) older than the
 # retention window below, so the per-commit releases do not accumulate forever.
@@ -171,21 +173,33 @@ jobs:
             publish/ratatoskr-minified.apk
             publish/ratatoskr-release-unsigned.apk
 
-      # Placeholder until the ratatoskr-e2e repository's workflow exists: it will be driven
-      # by a repository_dispatch carrying this run's per-commit pre-release tag, e.g.
-      #
-      #   - name: Trigger the cross-component E2E suite
-      #     if: github.ref == 'refs/heads/main'
-      #     run: |
-      #       gh api repos/Xexanos/ratatoskr-e2e/dispatches \
-      #         -f event_type=app-validated \
-      #         -F 'client_payload[release_tag]=${{ steps.tag.outputs.name }}' \
-      #         -F 'client_payload[commit]=${{ github.sha }}'
-      #     env:
-      #       GH_TOKEN: ${{ secrets.E2E_DISPATCH_TOKEN }}  # PAT with access to ratatoskr-e2e
-      - name: Trigger the E2E suite (placeholder)
+      # Hand this validated build to the cross-component E2E suite (Xexanos/ratatoskr-e2e).
+      # The dispatch carries the per-commit pre-release tag (the APK it just published, which the
+      # E2E harness pulls) and the commit. E2E runs server@release-:latest x app@THIS build; on a
+      # green run it dispatches `app-e2e-passed` back here, which drives promote.yml (the git-tag
+      # release gate). Mirrors the server's container.yml -> E2E -> promote.yml flow, one direction
+      # per component. Cross-repo dispatch needs a PAT with access to ratatoskr-e2e (the per-run
+      # GITHUB_TOKEN is scoped to THIS repo only), stored as E2E_DISPATCH_TOKEN. If that secret is
+      # missing the step FAILS: the testing APKs are published but their E2E gate silently not
+      # running would be worse than a red pipeline (same stance as the server's trigger-e2e).
+      - name: Trigger the cross-component E2E suite
         if: github.ref == 'refs/heads/main'
-        run: echo "ratatoskr-e2e does not exist yet - see the commented dispatch step above."
+        env:
+          E2E_DISPATCH_TOKEN: ${{ secrets.E2E_DISPATCH_TOKEN }}
+          RELEASE_TAG: ${{ steps.tag.outputs.name }}
+          SHA: ${{ github.sha }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          if [ -z "$E2E_DISPATCH_TOKEN" ]; then
+            echo "::error title=E2E dispatch failed::E2E_DISPATCH_TOKEN is not set - cannot trigger the E2E suite for ${RELEASE_TAG}. Add the secret (a PAT with access to ratatoskr-e2e)." >&2
+            exit 1
+          fi
+          echo "Dispatching app-validated E2E for ${RELEASE_TAG} (${SHA})"
+          GH_TOKEN="$E2E_DISPATCH_TOKEN" gh api \
+            "repos/${OWNER}/ratatoskr-e2e/dispatches" \
+            -f event_type=app-validated \
+            -F "client_payload[release_tag]=${RELEASE_TAG}" \
+            -F "client_payload[commit]=${SHA}"
 
   # Prune the per-commit testing-* pre-releases so they do not accumulate forever. Runs only
   # on the daily schedule (or a manual dispatch); deletes any testing-* pre-release older than
