@@ -1,0 +1,1 @@
+Fix a stale error message that could linger on the Now Playing screen after playback ended.

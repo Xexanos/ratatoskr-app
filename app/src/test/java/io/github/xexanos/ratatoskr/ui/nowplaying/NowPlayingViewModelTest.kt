@@ -26,6 +26,7 @@ import kotlinx.coroutines.test.setMain
 import okhttp3.mockwebserver.MockResponse
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -107,6 +108,38 @@ class NowPlayingViewModelTest {
         assertNull(state.session)
         assertEquals(false, state.loading)
         assertNull(state.error)
+    }
+
+    @Test
+    fun `a relinquished session clears the card, the stale error, and the active flag`() = runBlocking {
+        // The E2E-09 recovery path: playing -> the speaker drops out (502 banner, session kept) ->
+        // the server relinquishes the session (404). The now-empty screen must show neither a stale
+        // "Sonos is unavailable" banner nor keep sessionActive=true - the latter would suppress the
+        // client's own token refresh while it polls 404s (SPEC section 5: the server owns rotation
+        // only while a session is active, and there is none anymore).
+        val calls = AtomicInteger(0)
+        server.dispatch {
+            when (calls.getAndIncrement()) {
+                0 -> jsonResponse(WireFixtures.sessionJson(state = "playing"))
+                1 -> jsonResponse("""{"code":"upstream_error","message":"Sonos is unavailable"}""", code = 502)
+                else -> jsonResponse("""{"code":"no_active_session","message":"Nothing playing"}""", code = 404)
+            }
+        }
+        val connectionManager = trustedConnectionManager()
+        val viewModel = NowPlayingViewModel(connectionManager)
+
+        viewModel.refresh() // playing -> session active
+        assertTrue(connectionManager.isSessionActive())
+
+        viewModel.refresh() // 502 -> banner; session and active flag retained
+        assertEquals("Sonos is unavailable", viewModel.uiState.value.error)
+        assertTrue(connectionManager.isSessionActive())
+
+        viewModel.refresh() // 404 -> relinquished: card gone, banner cleared, refresh un-suppressed
+        val state = viewModel.uiState.value
+        assertNull(state.session)
+        assertNull(state.error)
+        assertFalse(connectionManager.isSessionActive())
     }
 
     @Test
