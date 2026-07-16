@@ -30,12 +30,14 @@ export default {
         'comment', // comment-only corrections
       ],
     ],
-    // Style rules relaxed for dependabot, which capitalizes subjects ("deps: Bump ...")
-    // and writes long changelog URLs into bodies. The gate exists so the TYPE parses -
-    // subject cosmetics are not what the release pipeline reads.
+    // These three style checks are disabled for ALL commits, not just Dependabot's - only the
+    // commit TYPE is load-bearing (the guard and the release pipeline read nothing else), so
+    // subject/header/body cosmetics are deliberately unenforced. Dependabot is what forces the
+    // issue (it capitalizes subjects like "deps: Bump ..." and writes long changelog URLs and
+    // scoped-package headers well past 100 chars), but the relaxation is global: a 120-char
+    // header on a hand-written commit passes too. Kept off on purpose; revisit if noisy.
     'subject-case': [0],
     'body-max-line-length': [0],
-    // Dependabot subjects (scoped package + path) routinely exceed the 100-char default.
     'header-max-length': [0],
   },
 }

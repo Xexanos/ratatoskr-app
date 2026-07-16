@@ -68,6 +68,9 @@ jobs:
           set -euo pipefail
 
           # --- classify the PR's commits (identical rules to the server's promote.yml) ----------
+          # Only feat/fix/perf/breaking force a bump. `revert` is deliberately release-neutral here
+          # (matching the server's classifier), so reverting a shipped feat/fix does not by itself
+          # require a bump - rare, and kept consistent across the two pipelines on purpose.
           subjects="$(git log --format='%s' "${BASE_SHA}..${HEAD_SHA}")"
           bodies="$(git log --format='%b' "${BASE_SHA}..${HEAD_SHA}")"
           bump="none"
@@ -85,13 +88,18 @@ jobs:
             exit 0
           fi
 
+          fail() { echo "::error::$*"; exit 1; }
+
           # --- read versionName/versionCode at base and head ------------------------------------
-          read_vn() { git show "$1:app/build.gradle.kts" | grep -E '^\s*versionName\s*=' | head -n1 | grep -oP 'versionName\s*=\s*"\K[^"]+'; }
-          read_vc() { git show "$1:app/build.gradle.kts" | grep -E '^\s*versionCode\s*='  | head -n1 | grep -oP 'versionCode\s*=\s*\K[0-9]+'; }
+          # The trailing grep exits 1 when nothing matches; the `|| true` keeps that from aborting
+          # the whole script inside the command substitution (set -euo pipefail) BEFORE the
+          # empty-checks below can turn it into a clear message.
+          read_vn() { git show "$1:app/build.gradle.kts" 2>/dev/null | grep -E '^\s*versionName\s*=' | head -n1 | grep -oP 'versionName\s*=\s*"\K[^"]+' || true; }
+          read_vc() { git show "$1:app/build.gradle.kts" 2>/dev/null | grep -E '^\s*versionCode\s*='  | head -n1 | grep -oP 'versionCode\s*=\s*\K[0-9]+' || true; }
           base_vn="$(read_vn "$BASE_SHA")"; base_vc="$(read_vc "$BASE_SHA")"
           head_vn="$(read_vn "$HEAD_SHA")"; head_vc="$(read_vc "$HEAD_SHA")"
-
-          fail() { echo "::error::$*"; exit 1; }
+          [ -n "$head_vn" ] && [ -n "$head_vc" ] || fail "Could not read versionName/versionCode from app/build.gradle.kts at head (${HEAD_SHA})."
+          [ -n "$base_vn" ] && [ -n "$base_vc" ] || fail "Could not read versionName/versionCode from app/build.gradle.kts at base (${BASE_SHA})."
 
           case "$head_vn" in
             [0-9]*.[0-9]*.[0-9]*) : ;;

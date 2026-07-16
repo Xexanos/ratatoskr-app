@@ -119,6 +119,14 @@ jobs:
             # should stop the latter at merge time, so reaching it here signals the guard was
             # bypassed or two PRs collided on the same version - warn loudly rather than no-op
             # silently (the whole point of the guard is that forgetting a bump is never quiet).
+            #
+            # This classification reads MAIN's commit subjects, so it assumes merges preserve the
+            # branch's Conventional Commits (merge-commit or rebase). Under SQUASH merges the main
+            # subject defaults to the (unlinted) PR title, so a release-worthy squash titled e.g.
+            # `ci: ...` would be misread as benign here and reported as ::notice:: instead of
+            # ::warning::. This only degrades THIS diagnostic - the actual bump enforcement runs on
+            # the PR's own base..head commits in pr-release-guards.yml, which are linted regardless
+            # of merge strategy. SPEC section 8 records the no-squash requirement for main.
             subjects="$(git log --format='%s' "v${version}..${commit}")"
             bodies="$(git log --format='%b' "v${version}..${commit}")"
             if grep -qE '^[a-z]+(\([^)]*\))?!:' <<< "$subjects" \

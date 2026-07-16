@@ -188,6 +188,7 @@ jobs:
           E2E_DISPATCH_TOKEN: ${{ secrets.E2E_DISPATCH_TOKEN }}
           RELEASE_TAG: ${{ steps.tag.outputs.name }}
           SHA: ${{ github.sha }}
+          OWNER: ${{ github.repository_owner }}
         run: |
           if [ -z "$E2E_DISPATCH_TOKEN" ]; then
             echo "::error title=E2E dispatch failed::E2E_DISPATCH_TOKEN is not set - cannot trigger the E2E suite for ${RELEASE_TAG}. Add the secret (a PAT with access to ratatoskr-e2e)." >&2
@@ -195,7 +196,7 @@ jobs:
           fi
           echo "Dispatching app-validated E2E for ${RELEASE_TAG} (${SHA})"
           GH_TOKEN="$E2E_DISPATCH_TOKEN" gh api \
-            repos/${{ github.repository_owner }}/ratatoskr-e2e/dispatches \
+            "repos/${OWNER}/ratatoskr-e2e/dispatches" \
             -f event_type=app-validated \
             -F "client_payload[release_tag]=${RELEASE_TAG}" \
             -F "client_payload[commit]=${SHA}"

@@ -215,6 +215,13 @@ keeps token ciphertext out of cloud backups entirely.
   adds the matching `en-US` changelog. Non-release commits (docs/chore/ci/deps/…) require no
   bump. This is the continuous-versioning half of the flow: because every release-worthy merge
   bumps, every such green `main` commit is a fresh version the tag gate below can cut.
+  - **Merges to `main` must preserve the branch's Conventional Commits** — use merge-commit or
+    rebase, **not squash** (disable squash merges in the repository settings). The per-PR guard
+    reads the branch's own `base..head` commits and so is robust to the strategy, but the
+    tag gate's post-hoc "missed a bump?" diagnostic (`promote.yml`) classifies `main`'s history,
+    where a squash would substitute the unlinted PR title for the real commit subjects and could
+    mislabel a missed release-worthy change as benign. Keeping commits intact on `main` also
+    mirrors how the server derives its version.
 - **Releases are git tags, cut automatically once E2E is green.** A release is an
   annotated tag `v<versionName>` (e.g. `v0.1.0`) on a `main` commit whose full validation
   has passed. The fdroiddata recipe uses `UpdateCheckMode: Tags` against that pattern. The
