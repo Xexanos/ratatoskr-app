@@ -114,7 +114,7 @@ class NowPlayingViewModelTest {
     fun `a relinquished session clears the card, the stale error, and the active flag`() = runBlocking {
         // The E2E-09 recovery path: playing -> the speaker drops out (502 banner, session kept) ->
         // the server relinquishes the session (404). The now-empty screen must show neither a stale
-        // "Sonos is unavailable" banner nor keep sessionActive=true — the latter would suppress the
+        // "Sonos is unavailable" banner nor keep sessionActive=true - the latter would suppress the
         // client's own token refresh while it polls 404s (SPEC section 5: the server owns rotation
         // only while a session is active, and there is none anymore).
         val calls = AtomicInteger(0)

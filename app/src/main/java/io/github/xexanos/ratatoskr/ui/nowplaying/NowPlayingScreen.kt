@@ -112,8 +112,9 @@ class NowPlayingViewModel(
                 when (result.error) {
                     is RatatoskrError.NoActiveSession -> {
                         // The session ended (server relinquished it, or it was stopped elsewhere).
-                        // The server owns token rotation only WHILE a session is active (SPEC §5),
-                        // so release that flag now — otherwise the client keeps suppressing its own
+                        // The server owns token rotation only WHILE a session is active (SPEC
+                        // section 5), so release that flag now - otherwise the client keeps
+                        // suppressing its own
                         // refresh while it sits here polling 404s, and its access token would
                         // eventually lapse with no way to renew (mirrors applySession()/stop()).
                         connectionManager.setSessionActive(false)
