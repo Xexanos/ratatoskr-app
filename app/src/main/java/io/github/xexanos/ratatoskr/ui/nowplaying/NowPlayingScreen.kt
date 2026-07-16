@@ -110,12 +110,18 @@ class NowPlayingViewModel(
                 // A control action issued while this poll was in flight takes precedence.
                 if (epoch != commandEpoch || _uiState.value.stopped) return
                 when (result.error) {
-                    is RatatoskrError.NoActiveSession ->
-                        // Session ended (server relinquished / stopped): drop the card AND clear any
-                        // error, so a banner from a just-prior failure (e.g. a 502 while the speaker
-                        // was dropping out) doesn't stick on the now-empty screen. Mirrors the
-                        // stale-error clear in applySession().
+                    is RatatoskrError.NoActiveSession -> {
+                        // The session ended (server relinquished it, or it was stopped elsewhere).
+                        // The server owns token rotation only WHILE a session is active (SPEC §5),
+                        // so release that flag now — otherwise the client keeps suppressing its own
+                        // refresh while it sits here polling 404s, and its access token would
+                        // eventually lapse with no way to renew (mirrors applySession()/stop()).
+                        connectionManager.setSessionActive(false)
+                        // Drop the card AND clear any error, so a banner from a just-prior failure
+                        // (e.g. a 502 while the speaker was dropping out) doesn't stick on the
+                        // now-empty screen. Mirrors the stale-error clear in applySession().
                         _uiState.value = _uiState.value.copy(loading = false, session = null, error = null)
+                    }
                     else ->
                         _uiState.value = _uiState.value.copy(loading = false, error = result.error.toMessage())
                 }

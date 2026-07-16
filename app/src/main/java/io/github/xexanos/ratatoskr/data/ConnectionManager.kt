@@ -44,6 +44,9 @@ class ConnectionManager(
 
     fun setSessionActive(active: Boolean) = sessionActive.set(active)
 
+    /** Whether a playback session is currently active — gates client-side token refresh (SPEC §5). */
+    fun isSessionActive(): Boolean = sessionActive.get()
+
     /** The client for the currently trusted server, or null if none is configured yet. */
     suspend fun client(): RatatoskrClient? {
         val config = connectionStore.currentServerConfig() ?: return null
