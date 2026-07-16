@@ -267,7 +267,7 @@ keeps token ciphertext out of cloud backups entirely.
   base64-encoded, and `RELEASE_KEYSTORE_PASSWORD`; alias `ratatoskr-release`), with an
   offline backup outside CI. The signing certificate's SHA-256 fingerprint, for
   `apksigner verify --print-certs` checks, is
-  `D9:91:F4:BC:63:BB:23:F5:87:F0:58:57:10:65:AC:B2:00:3E:61:BC:A7:DD:12:95:BB:C2:21:7D:62:87:AD:DF`.
+  `1B:4D:89:B7:B6:CF:20:70:22:A2:38:25:E5:65:1B:F5:6B:4F:CF:CA:EC:BB:35:10:97:72:30:42:66:F0:11:B1`.
   Trade-offs, recorded: (a) Android signature continuity makes the two channels mutually
   exclusive per install — a device cannot move between an F-Droid install and a sideload
   install without uninstall + reinstall (and the data loss that implies); release notes

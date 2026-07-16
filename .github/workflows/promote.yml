@@ -215,7 +215,7 @@ jobs:
             --notes "## Install
 
           - **F-Droid** (primary): builds and signs this release itself from the \`v${VERSION}\` tag.
-          - **Sideload**: download \`ratatoskr-v${VERSION}.apk\` (developer-signed; certificate SHA-256 \`D9:91:F4:BC:63:BB:23:F5:87:F0:58:57:10:65:AC:B2:00:3E:61:BC:A7:DD:12:95:BB:C2:21:7D:62:87:AD:DF\`).
+          - **Sideload**: download \`ratatoskr-v${VERSION}.apk\` (developer-signed; certificate SHA-256 \`1B:4D:89:B7:B6:CF:20:70:22:A2:38:25:E5:65:1B:F5:6B:4F:CF:CA:EC:BB:35:10:97:72:30:42:66:F0:11:B1\`).
 
           The two channels are signed with different keys: a device cannot switch between an F-Droid install and a sideloaded install without uninstalling first. \`ratatoskr-release-unsigned.apk\` is the unsigned build the E2E suite validated (provenance artifact, not installable)." \
             --generate-notes \
