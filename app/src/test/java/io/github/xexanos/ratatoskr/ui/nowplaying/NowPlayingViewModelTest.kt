@@ -110,6 +110,28 @@ class NowPlayingViewModelTest {
     }
 
     @Test
+    fun `refresh clears a stale error once the session has ended`() = runBlocking {
+        // A dead speaker surfaces a 502 banner while the session is still active; the server then
+        // relinquishes the session and the poll gets a 404. The banner must not stick on the empty
+        // screen (regression: E2E-09 recovery saw "Sonos is unavailable" instead of nothing playing).
+        val calls = AtomicInteger(0)
+        server.dispatch {
+            if (calls.getAndIncrement() == 0)
+                jsonResponse("""{"code":"upstream_error","message":"Sonos is unavailable"}""", code = 502)
+            else jsonResponse("""{"code":"no_active_session","message":"Nothing playing"}""", code = 404)
+        }
+        val viewModel = NowPlayingViewModel(trustedConnectionManager())
+
+        viewModel.refresh() // 502 -> error banner
+        assertEquals("Sonos is unavailable", viewModel.uiState.value.error)
+
+        viewModel.refresh() // 404 -> session ended; the stale banner must clear
+        val state = viewModel.uiState.value
+        assertNull(state.session)
+        assertNull(state.error)
+    }
+
+    @Test
     fun `refresh failure surfaces the mapped error`() = runBlocking {
         server.dispatch {
             jsonResponse("""{"code":"abs_unreachable","message":"Audiobookshelf down"}""", code = 502)

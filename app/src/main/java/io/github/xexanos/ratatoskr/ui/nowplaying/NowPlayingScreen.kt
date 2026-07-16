@@ -111,7 +111,11 @@ class NowPlayingViewModel(
                 if (epoch != commandEpoch || _uiState.value.stopped) return
                 when (result.error) {
                     is RatatoskrError.NoActiveSession ->
-                        _uiState.value = _uiState.value.copy(loading = false, session = null)
+                        // Session ended (server relinquished / stopped): drop the card AND clear any
+                        // error, so a banner from a just-prior failure (e.g. a 502 while the speaker
+                        // was dropping out) doesn't stick on the now-empty screen. Mirrors the
+                        // stale-error clear in applySession().
+                        _uiState.value = _uiState.value.copy(loading = false, session = null, error = null)
                     else ->
                         _uiState.value = _uiState.value.copy(loading = false, error = result.error.toMessage())
                 }
