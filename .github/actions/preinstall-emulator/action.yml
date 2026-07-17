@@ -1,0 +1,40 @@
+# Pre-installs the Android Emulator SDK package, retrying the flaky download, before a job
+# hands off to reactivecircus/android-emulator-runner.
+#
+# Why: sdkmanager's emulator-package download intermittently arrives as a corrupted zip
+# ("Error on ZipFile unknown archive"), which the runner action treats as fatal - PR #43
+# lost a full run to exactly this. Installing it ourselves first, with retries, means the
+# action's own install (the same `sdkmanager --install emulator` command) just finds the
+# package already there and no-ops. Used by every emulator job in instrumented-tests.yml
+# and by release-validation.yml (a flake there reads as a main regression, not a PR
+# failure).
+#
+# Local composite action (referenced as ./.github/actions/preinstall-emulator): lives in
+# the same commit as its callers, so - unlike the third-party actions this repo pins by SHA
+# - it is not (and cannot be) SHA-pinned. Requires the repo to be checked out first, which
+# every calling job already does.
+name: Pre-install the Android Emulator SDK package
+description: Retry sdkmanager's flaky emulator-package download before android-emulator-runner hits it.
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        # Not on PATH yet at this point in the job - the emulator-runner action's own
+        # JS wrapper is what adds it. Resolve the binary directly under $ANDROID_HOME.
+        sdkmanager="$(find "$ANDROID_HOME/cmdline-tools" -maxdepth 2 -name sdkmanager -type f | head -n1)"
+        if [ -z "$sdkmanager" ]; then
+          echo "::warning::sdkmanager not found under \$ANDROID_HOME/cmdline-tools; skipping the pre-install."
+          exit 0
+        fi
+        yes | "$sdkmanager" --licenses > /dev/null
+        ok=false
+        for attempt in 1 2 3; do
+          if "$sdkmanager" --install emulator --channel=0 > /dev/null; then
+            ok=true
+            break
+          fi
+          echo "::warning::sdkmanager emulator install failed (attempt ${attempt}/3), retrying in 10s..."
+          sleep 10
+        done
+        [ "$ok" = true ] || echo "::warning::All 3 attempts failed; the emulator-runner action gets one more try."
