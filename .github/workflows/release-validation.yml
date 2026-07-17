@@ -102,6 +102,26 @@ jobs:
             ~/.android/adb*
           key: avd-api36-x86_64-default-pixel_6
 
+      # sdkmanager's emulator-package download intermittently arrives as a corrupted zip
+      # ("Error on ZipFile unknown archive"), which the runner action treats as fatal - see
+      # the same step in instrumented-tests.yml (PR #43). Installing it ourselves first,
+      # with retries, means the action's own install (same command) just finds it already
+      # there and no-ops. Worth the same fix here: a flake on this job reads as a main
+      # regression, not a PR failure.
+      - name: Pre-install the Android Emulator SDK package (retry the flaky download)
+        run: |
+          yes | sdkmanager --licenses > /dev/null
+          ok=false
+          for attempt in 1 2 3; do
+            if sdkmanager --install emulator --channel=0 > /dev/null; then
+              ok=true
+              break
+            fi
+            echo "::warning::sdkmanager emulator install failed (attempt ${attempt}/3), retrying in 10s..."
+            sleep 10
+          done
+          [ "$ok" = true ] || echo "::warning::All 3 attempts failed; the emulator-runner action gets one more try."
+
       - name: Run the integration flow against the minified build
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
