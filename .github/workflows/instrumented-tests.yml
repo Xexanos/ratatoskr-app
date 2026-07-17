@@ -94,10 +94,17 @@ jobs:
       - name: Pre-install the Android Emulator SDK package (retry the flaky download)
         if: steps.avd-cache.outputs.cache-hit != 'true'
         run: |
-          yes | sdkmanager --licenses > /dev/null
+          # Not on PATH yet at this point in the job - the emulator-runner action's own
+          # JS wrapper is what adds it. Resolve the binary directly under $ANDROID_HOME.
+          sdkmanager="$(find "$ANDROID_HOME/cmdline-tools" -maxdepth 2 -name sdkmanager -type f | head -n1)"
+          if [ -z "$sdkmanager" ]; then
+            echo "::warning::sdkmanager not found under \$ANDROID_HOME/cmdline-tools; skipping the pre-install."
+            exit 0
+          fi
+          yes | "$sdkmanager" --licenses > /dev/null
           ok=false
           for attempt in 1 2 3; do
-            if sdkmanager --install emulator --channel=0 > /dev/null; then
+            if "$sdkmanager" --install emulator --channel=0 > /dev/null; then
               ok=true
               break
             fi
@@ -169,10 +176,17 @@ jobs:
       # before the action's own install hits it.
       - name: Pre-install the Android Emulator SDK package (retry the flaky download)
         run: |
-          yes | sdkmanager --licenses > /dev/null
+          # Not on PATH yet at this point in the job - the emulator-runner action's own
+          # JS wrapper is what adds it. Resolve the binary directly under $ANDROID_HOME.
+          sdkmanager="$(find "$ANDROID_HOME/cmdline-tools" -maxdepth 2 -name sdkmanager -type f | head -n1)"
+          if [ -z "$sdkmanager" ]; then
+            echo "::warning::sdkmanager not found under \$ANDROID_HOME/cmdline-tools; skipping the pre-install."
+            exit 0
+          fi
+          yes | "$sdkmanager" --licenses > /dev/null
           ok=false
           for attempt in 1 2 3; do
-            if sdkmanager --install emulator --channel=0 > /dev/null; then
+            if "$sdkmanager" --install emulator --channel=0 > /dev/null; then
               ok=true
               break
             fi
@@ -273,10 +287,17 @@ jobs:
       # before the action's own install hits it.
       - name: Pre-install the Android Emulator SDK package (retry the flaky download)
         run: |
-          yes | sdkmanager --licenses > /dev/null
+          # Not on PATH yet at this point in the job - the emulator-runner action's own
+          # JS wrapper is what adds it. Resolve the binary directly under $ANDROID_HOME.
+          sdkmanager="$(find "$ANDROID_HOME/cmdline-tools" -maxdepth 2 -name sdkmanager -type f | head -n1)"
+          if [ -z "$sdkmanager" ]; then
+            echo "::warning::sdkmanager not found under \$ANDROID_HOME/cmdline-tools; skipping the pre-install."
+            exit 0
+          fi
+          yes | "$sdkmanager" --licenses > /dev/null
           ok=false
           for attempt in 1 2 3; do
-            if sdkmanager --install emulator --channel=0 > /dev/null; then
+            if "$sdkmanager" --install emulator --channel=0 > /dev/null; then
               ok=true
               break
             fi
@@ -371,10 +392,17 @@ jobs:
       # before the action's own install hits it.
       - name: Pre-install the Android Emulator SDK package (retry the flaky download)
         run: |
-          yes | sdkmanager --licenses > /dev/null
+          # Not on PATH yet at this point in the job - the emulator-runner action's own
+          # JS wrapper is what adds it. Resolve the binary directly under $ANDROID_HOME.
+          sdkmanager="$(find "$ANDROID_HOME/cmdline-tools" -maxdepth 2 -name sdkmanager -type f | head -n1)"
+          if [ -z "$sdkmanager" ]; then
+            echo "::warning::sdkmanager not found under \$ANDROID_HOME/cmdline-tools; skipping the pre-install."
+            exit 0
+          fi
+          yes | "$sdkmanager" --licenses > /dev/null
           ok=false
           for attempt in 1 2 3; do
-            if sdkmanager --install emulator --channel=0 > /dev/null; then
+            if "$sdkmanager" --install emulator --channel=0 > /dev/null; then
               ok=true
               break
             fi
@@ -455,10 +483,17 @@ jobs:
       # before the action's own install hits it.
       - name: Pre-install the Android Emulator SDK package (retry the flaky download)
         run: |
-          yes | sdkmanager --licenses > /dev/null
+          # Not on PATH yet at this point in the job - the emulator-runner action's own
+          # JS wrapper is what adds it. Resolve the binary directly under $ANDROID_HOME.
+          sdkmanager="$(find "$ANDROID_HOME/cmdline-tools" -maxdepth 2 -name sdkmanager -type f | head -n1)"
+          if [ -z "$sdkmanager" ]; then
+            echo "::warning::sdkmanager not found under \$ANDROID_HOME/cmdline-tools; skipping the pre-install."
+            exit 0
+          fi
+          yes | "$sdkmanager" --licenses > /dev/null
           ok=false
           for attempt in 1 2 3; do
-            if sdkmanager --install emulator --channel=0 > /dev/null; then
+            if "$sdkmanager" --install emulator --channel=0 > /dev/null; then
               ok=true
               break
             fi
@@ -542,10 +577,17 @@ jobs:
       # before the action's own install hits it.
       - name: Pre-install the Android Emulator SDK package (retry the flaky download)
         run: |
-          yes | sdkmanager --licenses > /dev/null
+          # Not on PATH yet at this point in the job - the emulator-runner action's own
+          # JS wrapper is what adds it. Resolve the binary directly under $ANDROID_HOME.
+          sdkmanager="$(find "$ANDROID_HOME/cmdline-tools" -maxdepth 2 -name sdkmanager -type f | head -n1)"
+          if [ -z "$sdkmanager" ]; then
+            echo "::warning::sdkmanager not found under \$ANDROID_HOME/cmdline-tools; skipping the pre-install."
+            exit 0
+          fi
+          yes | "$sdkmanager" --licenses > /dev/null
           ok=false
           for attempt in 1 2 3; do
-            if sdkmanager --install emulator --channel=0 > /dev/null; then
+            if "$sdkmanager" --install emulator --channel=0 > /dev/null; then
               ok=true
               break
             fi
