@@ -149,11 +149,21 @@ class LibraryViewModel(
         val client = connectionManager.client() ?: return
         _uiState.value = _uiState.value.copy(loadingMore = true, loadMoreError = false)
         _uiState.value = when (val result = client.listLibraryItems(query = query, cursor = cursor)) {
-            is ApiResult.Success -> _uiState.value.copy(
-                items = _uiState.value.items + result.data.items,
-                nextCursor = result.data.nextCursor,
-                loadingMore = false,
-            )
+            is ApiResult.Success -> {
+                // Drop ids already loaded before appending: a duplicate id (cursor drift from a
+                // concurrent ABS-side mutation, or a server pagination bug) would otherwise crash
+                // the LazyColumn, whose item key must be unique. If the page brings nothing new,
+                // stop paginating - a server that keeps returning a non-null cursor with no
+                // forward progress would make the near-end trigger re-fire without end.
+                // The list grows unbounded by design for now (no windowing); see issue #65.
+                val seen = _uiState.value.items.mapTo(HashSet(_uiState.value.items.size)) { it.id }
+                val fresh = result.data.items.filter { seen.add(it.id) }
+                _uiState.value.copy(
+                    items = _uiState.value.items + fresh,
+                    nextCursor = if (fresh.isEmpty()) null else result.data.nextCursor,
+                    loadingMore = false,
+                )
+            }
             // Keep the loaded items and the cursor: the footer flips to a tap-to-retry row
             // instead of replacing a working list with the full-screen error state. Scrolling
             // back into the trigger zone retries too.

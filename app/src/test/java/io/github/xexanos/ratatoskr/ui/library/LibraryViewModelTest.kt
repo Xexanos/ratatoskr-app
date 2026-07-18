@@ -31,6 +31,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.util.Collections
+import java.util.concurrent.CountDownLatch
 
 class LibraryViewModelTest {
 
@@ -239,6 +240,58 @@ class LibraryViewModelTest {
 
         // The cat load starts over: one page, requested without a cursor (id "cat-null").
         assertEquals("cat-null", viewModel.uiState.value.items.single().id)
+    }
+
+    @Test
+    fun `a query change cancels an in-flight page load so its stale page never appends`() = runTest(dispatcher) {
+        // The next-page response is held until the test releases it, so the query changes while
+        // loadNextPage is genuinely suspended on the server - the actual race the collectLatest
+        // structure protects against (unlike the test above, which changes query only after the
+        // page has fully landed).
+        val pageBlocked = CountDownLatch(1)
+        server.dispatch { request ->
+            val cursor = request.requestUrl?.queryParameter("cursor")
+            val q = request.requestUrl?.queryParameter("q")
+            receivedQueries += q
+            when {
+                cursor != null -> {
+                    pageBlocked.await()
+                    MockResponse().setResponseCode(200)
+                        .setHeader("Content-Type", "application/json")
+                        .setBody(
+                            WireFixtures.libraryPageJson(
+                                items = listOf(WireFixtures.libraryItemSummaryJson(id = "stale", title = "stale page")),
+                            ),
+                        )
+                }
+                else -> MockResponse().setResponseCode(200)
+                    .setHeader("Content-Type", "application/json")
+                    .setBody(
+                        WireFixtures.libraryPageJson(
+                            items = listOf(WireFixtures.libraryItemSummaryJson(id = "${q}-first", title = q ?: "all")),
+                            nextCursor = if (q == null) "c2" else null,
+                        ),
+                    )
+            }
+        }
+        val viewModel = LibraryViewModel(trustedConnectionManager())
+        settleState { viewModel.uiState.value.nextCursor == "c2" }
+
+        // Kick off the next page and wait until it is actually in flight (request received,
+        // now parked on the latch), then change the query while it hangs.
+        viewModel.loadMore()
+        settleState { viewModel.uiState.value.loadingMore }
+        viewModel.search("cat")
+        dispatcher.scheduler.advanceTimeBy(301) // clear the 300ms search debounce
+        settleState { viewModel.uiState.value.items.singleOrNull()?.title == "cat" }
+
+        // Release the held page and give it a chance to (wrongly) append.
+        pageBlocked.countDown()
+        repeat(5) { dispatcher.scheduler.advanceUntilIdle(); Thread.sleep(20) }
+
+        // collectLatest cancelled the null-query page load, so its "stale" item never landed.
+        assertEquals(listOf("cat-first"), viewModel.uiState.value.items.map { it.id })
+        assertTrue(viewModel.uiState.value.items.none { it.id == "stale" })
     }
 
     @Test
