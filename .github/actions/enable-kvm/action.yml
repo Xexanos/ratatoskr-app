@@ -1,0 +1,17 @@
+# Enables KVM on the GitHub-hosted runner so the Android emulator can use hardware
+# acceleration. Every job that boots an emulator needs this; kept in one place so the udev
+# rule stays identical across all of them.
+#
+# Local composite action (referenced as ./.github/actions/enable-kvm): lives in the same
+# commit as its callers, so - unlike the SHA-pinned third-party actions - it is not pinned.
+# Requires the repo to be checked out first, which every calling job already does.
+name: Enable KVM for the emulator
+description: Install the udev rule that gives the runner user access to /dev/kvm.
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+        sudo udevadm control --reload-rules
+        sudo udevadm trigger --name-match=kvm
