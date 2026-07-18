@@ -34,6 +34,8 @@
     <string name="library_no_results_body">Keine Hörbücher passen zu %1$s. Versuche es mit einer kürzeren Suche.</string>
     <string name="library_finished">Abgeschlossen</string>
     <string name="library_percent">%1$d&#160;%%</string>
+    <string name="library_loading_more">Weitere Hörbücher werden geladen</string>
+    <string name="library_load_more_failed">Weitere Hörbücher konnten nicht geladen werden. Zum Wiederholen tippen.</string>
 
     <!-- Speakers -->
     <string name="speakers_title">Lautsprecher auswählen</string>

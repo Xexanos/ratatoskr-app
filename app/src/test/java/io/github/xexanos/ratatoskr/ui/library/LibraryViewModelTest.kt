@@ -31,6 +31,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.util.Collections
+import java.util.concurrent.CountDownLatch
 
 class LibraryViewModelTest {
 
@@ -131,6 +132,166 @@ class LibraryViewModelTest {
         // A blank query debounces at 0ms, same as the initial load - it is not throttled like a
         // real keystroke because there is nothing left to type past.
         assertEquals(listOf(null, "cat", null), receivedQueries)
+    }
+
+    @Test
+    fun `loadMore follows the cursor and appends the next page`() = runTest(dispatcher) {
+        val receivedCursors = Collections.synchronizedList(mutableListOf<String?>())
+        server.dispatch { request ->
+            val cursor = request.requestUrl?.queryParameter("cursor")
+            receivedCursors += cursor
+            val body = if (cursor == null) {
+                WireFixtures.libraryPageJson(
+                    items = listOf(WireFixtures.libraryItemSummaryJson(id = "i1", title = "page one")),
+                    nextCursor = "c2",
+                )
+            } else {
+                WireFixtures.libraryPageJson(
+                    items = listOf(WireFixtures.libraryItemSummaryJson(id = "i2", title = "page two")),
+                )
+            }
+            MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(body)
+        }
+        val viewModel = LibraryViewModel(trustedConnectionManager())
+        settleState { viewModel.uiState.value.items.isNotEmpty() }
+        assertEquals("c2", viewModel.uiState.value.nextCursor)
+
+        viewModel.loadMore()
+        settleState { viewModel.uiState.value.items.size == 2 }
+
+        assertEquals(listOf(null, "c2"), receivedCursors)
+        assertEquals(listOf("page one", "page two"), viewModel.uiState.value.items.map { it.title })
+        assertEquals(null, viewModel.uiState.value.nextCursor)
+
+        // The last page is in: further loadMore calls must not hit the server again.
+        viewModel.loadMore()
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(2, receivedCursors.size)
+    }
+
+    @Test
+    fun `a failing next page keeps the list and flags a retryable error`() = runTest(dispatcher) {
+        var failNextPage = true
+        server.dispatch { request ->
+            val cursor = request.requestUrl?.queryParameter("cursor")
+            if (cursor != null && failNextPage) {
+                MockResponse().setResponseCode(502)
+                    .setBody("""{"code":"abs_unreachable","message":"Audiobookshelf down"}""")
+            } else {
+                MockResponse().setResponseCode(200)
+                    .setHeader("Content-Type", "application/json")
+                    .setBody(
+                        WireFixtures.libraryPageJson(
+                            items = listOf(
+                                WireFixtures.libraryItemSummaryJson(id = "i-$cursor", title = "page after $cursor"),
+                            ),
+                            nextCursor = if (cursor == null) "c2" else null,
+                        ),
+                    )
+            }
+        }
+        val viewModel = LibraryViewModel(trustedConnectionManager())
+        settleState { viewModel.uiState.value.items.isNotEmpty() }
+
+        viewModel.loadMore()
+        settleState { viewModel.uiState.value.loadMoreError }
+
+        // The loaded page survives, the full-screen error stays clear, and the cursor is kept
+        // so the page can be retried.
+        assertEquals(1, viewModel.uiState.value.items.size)
+        assertEquals(null, viewModel.uiState.value.error)
+        assertEquals("c2", viewModel.uiState.value.nextCursor)
+
+        failNextPage = false
+        viewModel.loadMore()
+        settleState { viewModel.uiState.value.items.size == 2 }
+
+        assertTrue(!viewModel.uiState.value.loadMoreError)
+        assertEquals(null, viewModel.uiState.value.nextCursor)
+    }
+
+    @Test
+    fun `a new query restarts pagination from the first page`() = runTest(dispatcher) {
+        server.dispatch { request ->
+            val cursor = request.requestUrl?.queryParameter("cursor")
+            val q = request.requestUrl?.queryParameter("q")
+            MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(
+                    WireFixtures.libraryPageJson(
+                        items = listOf(
+                            WireFixtures.libraryItemSummaryJson(id = "$q-$cursor", title = q ?: "all"),
+                        ),
+                        // Every page claims a successor, so the cursor is non-null when the
+                        // query changes - the fresh load must not carry it over.
+                        nextCursor = "next-after-$cursor",
+                    ),
+                )
+        }
+        val viewModel = LibraryViewModel(trustedConnectionManager())
+        settleState { viewModel.uiState.value.items.isNotEmpty() }
+        viewModel.loadMore()
+        settleState { viewModel.uiState.value.items.size == 2 }
+
+        viewModel.search("cat")
+        settleState { viewModel.uiState.value.items.singleOrNull()?.title == "cat" }
+
+        // The cat load starts over: one page, requested without a cursor (id "cat-null").
+        assertEquals("cat-null", viewModel.uiState.value.items.single().id)
+    }
+
+    @Test
+    fun `a query change cancels an in-flight page load so its stale page never appends`() = runTest(dispatcher) {
+        // The next-page response is held until the test releases it, so the query changes while
+        // loadNextPage is genuinely suspended on the server - the actual race the collectLatest
+        // structure protects against (unlike the test above, which changes query only after the
+        // page has fully landed).
+        val pageBlocked = CountDownLatch(1)
+        server.dispatch { request ->
+            val cursor = request.requestUrl?.queryParameter("cursor")
+            val q = request.requestUrl?.queryParameter("q")
+            receivedQueries += q
+            when {
+                cursor != null -> {
+                    pageBlocked.await()
+                    MockResponse().setResponseCode(200)
+                        .setHeader("Content-Type", "application/json")
+                        .setBody(
+                            WireFixtures.libraryPageJson(
+                                items = listOf(WireFixtures.libraryItemSummaryJson(id = "stale", title = "stale page")),
+                            ),
+                        )
+                }
+                else -> MockResponse().setResponseCode(200)
+                    .setHeader("Content-Type", "application/json")
+                    .setBody(
+                        WireFixtures.libraryPageJson(
+                            items = listOf(WireFixtures.libraryItemSummaryJson(id = "${q}-first", title = q ?: "all")),
+                            nextCursor = if (q == null) "c2" else null,
+                        ),
+                    )
+            }
+        }
+        val viewModel = LibraryViewModel(trustedConnectionManager())
+        settleState { viewModel.uiState.value.nextCursor == "c2" }
+
+        // Kick off the next page and wait until it is actually in flight (request received,
+        // now parked on the latch), then change the query while it hangs.
+        viewModel.loadMore()
+        settleState { viewModel.uiState.value.loadingMore }
+        viewModel.search("cat")
+        dispatcher.scheduler.advanceTimeBy(301) // clear the 300ms search debounce
+        settleState { viewModel.uiState.value.items.singleOrNull()?.title == "cat" }
+
+        // Release the held page and give it a chance to (wrongly) append.
+        pageBlocked.countDown()
+        repeat(5) { dispatcher.scheduler.advanceUntilIdle(); Thread.sleep(20) }
+
+        // collectLatest cancelled the null-query page load, so its "stale" item never landed.
+        assertEquals(listOf("cat-first"), viewModel.uiState.value.items.map { it.id })
+        assertTrue(viewModel.uiState.value.items.none { it.id == "stale" })
     }
 
     @Test
