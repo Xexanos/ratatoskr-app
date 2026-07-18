@@ -14,21 +14,22 @@
 #     These suites exercise no API-26-specific behaviour, so API 36 is the meaningful target.
 #   - the minified wire smoke (MinifiedWireSmokeTest against the R8-shrunk `minified`
 #     variant) runs on API 36 only, for the same reason. It exists because the JVM R8 gate
-#     in ci.yml cannot see runtime resolution gaps (SPEC section 8) - see its job comment.
+#     in ci.yml cannot see runtime resolution gaps (SPEC section 8) - see its matrix comment.
 #
 # Two-stage design:
 #   1. `warm-avd` boots one emulator per API level (on a cache miss only) purely to populate
-#      the AVD snapshot cache, so the stage-2 jobs never pay the ~3-6 min cold-boot cost.
-#   2. One job per suite, each on its own runner in parallel, restoring that cache. Parallel
+#      the AVD snapshot cache, so the stage-2 cells never pay the ~3-6 min cold-boot cost.
+#   2. `test` - a single matrixed job whose `include:` list enumerates every suite/API-level
+#      cell. Each cell runs on its own runner in parallel, restoring that cache. Parallel
 #      cache *reads* of one key are safe; parallel *writes* on a cold cache race, which stage
-#      1 avoids by warming each key exactly once before any test job starts.
+#      1 avoids by warming each key exactly once before any test cell starts.
 #
-# Snapshot loading (emulator-options): API 36 loads the warmed snapshot (-no-snapshot-save:
-# load, don't re-save) and comes up clean in ~3 min. The API-26 component job cold-boots
-# (-no-snapshot: neither load nor save): on API 26 sys.boot_completed fires ~5 s in, before
-# the framework `settings` service is up, so the warm job captures a half-initialised
-# snapshot; restoring it leaves adb permanently "offline" and the job hangs. Cold-booting
-# lets the system fully initialise before the tests attach.
+# Snapshot loading (emulator-options, set per matrix cell): API 36 loads the warmed snapshot
+# (-no-snapshot-save: load, don't re-save) and comes up clean in ~3 min. The API-26 component
+# cell cold-boots (-no-snapshot: neither load nor save): on API 26 sys.boot_completed fires
+# ~5 s in, before the framework `settings` service is up, so the warm job captures a
+# half-initialised snapshot; restoring it leaves adb permanently "offline" and the job hangs.
+# Cold-booting lets the system fully initialise before the tests attach.
 #
 # paths-ignore skips this (expensive) run when a PR changes only docs/metadata that can't
 # affect the build. Denylist, not allowlist: any other path still triggers it, so a code
@@ -53,7 +54,7 @@ concurrency:
 jobs:
   # Stage 1: populate the AVD snapshot cache for each API level. No tests run here - just
   # enough of an emulator boot to let reactivecircus/android-emulator-runner save a snapshot.
-  # API 26 is warmed too (the component job restores its AVD from this cache, then cold-boots).
+  # API 26 is warmed too (the component cell restores its AVD from this cache, then cold-boots).
   warm-avd:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -104,21 +105,69 @@ jobs:
           disable-animations: false
           script: echo "Warmed the AVD snapshot for caching."
 
-  # Stage 2: one job per suite, each on its own runner in parallel, restoring the cache
-  # `warm-avd` populated (force-avd-creation: false, same key) so it boots from the warm
-  # snapshot instead of creating the AVD from scratch.
-
-  # Component tests run on BOTH API levels - this is the API-level-sensitive layer (TLS /
-  # Keystore). API 26 cold-boots (see header); API 36 loads the warmed snapshot.
-  test-component:
+  # Stage 2: one matrixed job, one cell per suite/API-level, each on its own runner in
+  # parallel, restoring the cache `warm-avd` populated (force-avd-creation: false, same key)
+  # so it boots from the warm snapshot instead of creating the AVD from scratch. The
+  # `include:` list is the single source of what runs; each cell's fields carry everything
+  # that used to differ between the old one-job-per-suite definitions.
+  test:
     needs: warm-avd
+    name: ${{ matrix.suite }} (${{ matrix.api-level }})
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: ${{ matrix.timeout }}
 
     strategy:
       fail-fast: false
       matrix:
-        api-level: [26, 36]
+        include:
+          # core-network component suite - the API-level-sensitive layer (TLS / Keystore),
+          # so it runs at both ends of the supported range. API 26 cold-boots (-no-snapshot,
+          # see header); API 36 loads the warmed snapshot (-no-snapshot-save).
+          - suite: component
+            api-level: 26
+            timeout: 15
+            gradle: ':core-network:connectedDebugAndroidTest'
+            emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          - suite: component
+            api-level: 36
+            timeout: 15
+            gradle: ':core-network:connectedDebugAndroidTest'
+            emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          # Whole-app UI flow: API 36 only (the API-26 emulator can't reliably drive the full
+          # Compose UI stack - see header).
+          - suite: integration
+            api-level: 36
+            timeout: 15
+            gradle: ':app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=io.github.xexanos.ratatoskr.ui.AppFlowTest'
+            emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          # Minified wire smoke against the R8-shrunk `minified` variant (-PminifiedTests).
+          # The JVM gate in ci.yml (assembleMinifiedAndroidTest) proves the keep rules parse
+          # and R8's reference tracing passes, but only an on-device run catches *runtime*
+          # gaps: classes the androidTest APK expects to resolve from the shrunk app APK (AGP
+          # filters app-provided deps out of the test APK), and members reached only
+          # reflectively. Both bit main before this cell existed (kotlin.LazyKt
+          # NoClassDefFoundError; Moshi's reflective defaults-constructor lookup). The full
+          # AppFlowTest against minified stays post-merge in release-validation.yml (SPEC
+          # section 8). The two R8 runs make the build slower, hence the longer timeout.
+          - suite: minified-smoke
+            api-level: 36
+            timeout: 20
+            gradle: '-PminifiedTests :app:connectedMinifiedAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=io.github.xexanos.ratatoskr.ui.MinifiedWireSmokeTest'
+            emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          # Accessibility checks, run twice because contrast is theme-dependent. `pre` flips
+          # the emulator into the target ui mode before the suite runs.
+          - suite: a11y-light
+            api-level: 36
+            timeout: 15
+            pre: adb shell cmd uimode night no
+            gradle: ':app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=io.github.xexanos.ratatoskr.ui.AccessibilityChecksTest'
+            emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          - suite: a11y-dark
+            api-level: 36
+            timeout: 15
+            pre: adb shell cmd uimode night yes
+            gradle: ':app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=io.github.xexanos.ratatoskr.ui.AccessibilityChecksTest'
+            emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
 
     steps:
       - name: Check out (with the contract submodule)
@@ -127,19 +176,10 @@ jobs:
           submodules: true
 
       - name: Enable KVM for the emulator
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
+        uses: ./.github/actions/enable-kvm
 
-      - name: Set up JDK 21
-        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5.5.0
-        with:
-          distribution: temurin
-          java-version: 21
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
+      - name: Set up the JDK and Gradle build environment
+        uses: ./.github/actions/setup-build-env
 
       - name: Restore the warmed AVD snapshot
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -154,7 +194,7 @@ jobs:
       - name: Pre-install the Android Emulator SDK package (retry the flaky download)
         uses: ./.github/actions/preinstall-emulator
 
-      - name: Run the core-network component suite
+      - name: Run the ${{ matrix.suite }} suite
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: ${{ matrix.api-level }}
@@ -162,354 +202,39 @@ jobs:
           target: default
           # Pin a 420dpi phone profile: the runner's default AVD is a small low-density
           # screen where full-screen previews scroll and ATF measures clipped elements
-          # (false contrast findings). This matches the profile the suite is verified
-          # against locally.
+          # (false contrast findings). Matches the profile the suites are verified against
+          # locally.
           profile: pixel_6
-          # Restore the cached AVD (don't recreate it) and boot from the snapshot without
-          # rewriting it; params must match the warm-avd job above for the snapshot to load.
+          # Restore the cached AVD (don't recreate it); params must match warm-avd for the
+          # snapshot to load. emulator-options is per-cell (API 26 cold-boots - see header).
           force-avd-creation: false
-          # API 36 loads the warmed snapshot; API 26 cold-boots (ignores it) - see header.
-          emulator-options: ${{ matrix.api-level == 26 && '-no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none' || '-no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none' }}
+          emulator-options: ${{ matrix.emulator-options }}
           disable-animations: true
-          # On API 26 the emulator's own teardown ("emu kill") hangs on orphaned
-          # crashpad_handler crash-reporter processes, running the job to its timeout
-          # even though the tests already passed (android-emulator-runner#385). The
-          # action runs each script line as its own `sh -c` (no shared shell), so a
-          # trap won't work; instead reap crashpad_handler on the trailing lines - they
-          # run after the tests but before the action's blocking teardown, letting the
-          # emulator process tree exit cleanly. `-f` is required: "crashpad_handler" is
-          # 16 chars and pkill matches the 15-char-truncated comm by default (zero
-          # matches), so match the full command line. The `[c]` regex trick keeps the
-          # pattern from matching pkill's own `sh -c` line (which literally contains
-          # "[c]rashpad_handler", so the regex misses it) - without it pkill SIGTERMs its
-          # own parent shell and the step dies. `|| true`: pkill exits 1 on no match.
+          # `pre` (empty for most cells) runs before the suite - the a11y cells use it to set
+          # the ui mode. Then the gradle suite, then the crashpad reaping:
+          # on API 26 the emulator's own teardown ("emu kill") hangs on orphaned
+          # crashpad_handler crash-reporter processes, running the job to its timeout even
+          # though the tests already passed (android-emulator-runner#385). The action runs
+          # each script line as its own `sh -c` (no shared shell), so a trap won't work;
+          # instead reap crashpad_handler on the trailing lines - they run after the tests
+          # but before the action's blocking teardown, letting the emulator process tree exit
+          # cleanly. `-f` is required: "crashpad_handler" is 16 chars and pkill matches the
+          # 15-char-truncated comm by default (zero matches), so match the full command line.
+          # The `[c]` regex trick keeps the pattern from matching pkill's own `sh -c` line
+          # (which literally contains "[c]rashpad_handler", so the regex misses it) - without
+          # it pkill SIGTERMs its own parent shell and the step dies. `|| true`: pkill exits
+          # 1 on no match.
           script: |
-            ./gradlew :core-network:connectedDebugAndroidTest
+            ${{ matrix.pre }}
+            ./gradlew ${{ matrix.gradle }}
             pkill -f -SIGTERM '[c]rashpad_handler' || true
             sleep 5
             pkill -f -SIGKILL '[c]rashpad_handler' || true
 
       - name: Upload the test reports on failure
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: ./.github/actions/upload-test-reports
         with:
-          name: instrumented-test-reports-component-api${{ matrix.api-level }}
-          path: |
-            app/build/reports/androidTests/connected
-            app/build/outputs/androidTest-results/connected
-            core-network/build/reports/androidTests/connected
-            core-network/build/outputs/androidTest-results/connected
-          retention-days: 14
-
-  # Whole-app UI flow: API 36 only (see header - the API-26 emulator can't reliably drive
-  # the full Compose UI stack).
-  test-integration:
-    needs: warm-avd
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    strategy:
-      fail-fast: false
-      matrix:
-        api-level: [36]
-
-    steps:
-      - name: Check out (with the contract submodule)
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          submodules: true
-
-      - name: Enable KVM for the emulator
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5.5.0
-        with:
-          distribution: temurin
-          java-version: 21
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
-
-      - name: Restore the warmed AVD snapshot
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ~/.android/avd/*
-            ~/.android/adb*
-          key: avd-api${{ matrix.api-level }}-x86_64-default-pixel_6
-
-      # Retry sdkmanager's flaky emulator-package download before the action's own install
-      # hits it - see the composite action for the full rationale.
-      - name: Pre-install the Android Emulator SDK package (retry the flaky download)
-        uses: ./.github/actions/preinstall-emulator
-
-      - name: Run the whole-app integration flow
-        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
-        with:
-          api-level: ${{ matrix.api-level }}
-          arch: x86_64
-          target: default
-          profile: pixel_6
-          force-avd-creation: false
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          disable-animations: true
-          # See test-component: reap orphaned crashpad_handler on the trailing lines so
-          # the emulator teardown can't hang the job (android-emulator-runner#385).
-          script: |
-            ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=io.github.xexanos.ratatoskr.ui.AppFlowTest
-            pkill -f -SIGTERM '[c]rashpad_handler' || true
-            sleep 5
-            pkill -f -SIGKILL '[c]rashpad_handler' || true
-
-      - name: Upload the test reports on failure
-        if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: instrumented-test-reports-integration-api${{ matrix.api-level }}
-          path: |
-            app/build/reports/androidTests/connected
-            app/build/outputs/androidTest-results/connected
-            core-network/build/reports/androidTests/connected
-            core-network/build/outputs/androidTest-results/connected
-          retention-days: 14
-
-  # Minified wire smoke: API 36 only (see header). Runs MinifiedWireSmokeTest against the
-  # R8-shrunk `minified` variant (-PminifiedTests). The JVM gate in ci.yml
-  # (assembleMinifiedAndroidTest) proves the keep rules parse and R8's reference tracing
-  # passes, but only an on-device run catches *runtime* gaps: classes the androidTest APK
-  # expects to resolve from the shrunk app APK (AGP filters app-provided dependencies out
-  # of the test APK), and members reached only reflectively. Both bit main before this job
-  # existed - a kotlin.LazyKt NoClassDefFoundError at instrumentation start, and Moshi's
-  # reflective defaults-constructor lookup (NoSuchMethodException). The full AppFlowTest
-  # against minified stays post-merge in release-validation.yml (SPEC section 8): its
-  # failure modes overlap heavily with this smoke, so per PR the short suite buys almost
-  # all the signal at a fraction of the cost.
-  test-minified-smoke:
-    needs: warm-avd
-    runs-on: ubuntu-latest
-    # The two R8 runs (app + test APK) make the build a few minutes slower than the
-    # debug-variant jobs; the suite itself is seconds.
-    timeout-minutes: 20
-
-    strategy:
-      fail-fast: false
-      matrix:
-        api-level: [36]
-
-    steps:
-      - name: Check out (with the contract submodule)
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          submodules: true
-
-      - name: Enable KVM for the emulator
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5.5.0
-        with:
-          distribution: temurin
-          java-version: 21
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
-
-      - name: Restore the warmed AVD snapshot
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ~/.android/avd/*
-            ~/.android/adb*
-          key: avd-api${{ matrix.api-level }}-x86_64-default-pixel_6
-
-      # Retry sdkmanager's flaky emulator-package download before the action's own install
-      # hits it - see the composite action for the full rationale.
-      - name: Pre-install the Android Emulator SDK package (retry the flaky download)
-        uses: ./.github/actions/preinstall-emulator
-
-      - name: Run the wire smoke against the minified build
-        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
-        with:
-          api-level: ${{ matrix.api-level }}
-          arch: x86_64
-          target: default
-          profile: pixel_6
-          force-avd-creation: false
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          disable-animations: true
-          # See test-component: reap orphaned crashpad_handler on the trailing lines so
-          # the emulator teardown can't hang the job (android-emulator-runner#385).
-          script: |
-            ./gradlew -PminifiedTests :app:connectedMinifiedAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=io.github.xexanos.ratatoskr.ui.MinifiedWireSmokeTest
-            pkill -f -SIGTERM '[c]rashpad_handler' || true
-            sleep 5
-            pkill -f -SIGKILL '[c]rashpad_handler' || true
-
-      - name: Upload the test reports on failure
-        if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: instrumented-test-reports-minified-smoke-api${{ matrix.api-level }}
-          path: |
-            app/build/reports/androidTests/connected
-            app/build/outputs/androidTest-results/connected
-          retention-days: 14
-
-  # Accessibility, light mode: API 36 only (see header).
-  test-a11y-light:
-    needs: warm-avd
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    strategy:
-      fail-fast: false
-      matrix:
-        api-level: [36]
-
-    steps:
-      - name: Check out (with the contract submodule)
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          submodules: true
-
-      - name: Enable KVM for the emulator
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5.5.0
-        with:
-          distribution: temurin
-          java-version: 21
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
-
-      - name: Restore the warmed AVD snapshot
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ~/.android/avd/*
-            ~/.android/adb*
-          key: avd-api${{ matrix.api-level }}-x86_64-default-pixel_6
-
-      # Retry sdkmanager's flaky emulator-package download before the action's own install
-      # hits it - see the composite action for the full rationale.
-      - name: Pre-install the Android Emulator SDK package (retry the flaky download)
-        uses: ./.github/actions/preinstall-emulator
-
-      - name: Run the accessibility suite in light mode
-        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
-        with:
-          api-level: ${{ matrix.api-level }}
-          arch: x86_64
-          target: default
-          profile: pixel_6
-          force-avd-creation: false
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          disable-animations: true
-          # See test-component: reap orphaned crashpad_handler on the trailing lines so
-          # the emulator teardown can't hang the job (android-emulator-runner#385).
-          script: |
-            adb shell cmd uimode night no
-            ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=io.github.xexanos.ratatoskr.ui.AccessibilityChecksTest
-            pkill -f -SIGTERM '[c]rashpad_handler' || true
-            sleep 5
-            pkill -f -SIGKILL '[c]rashpad_handler' || true
-
-      - name: Upload the test reports on failure
-        if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: instrumented-test-reports-a11y-light-api${{ matrix.api-level }}
-          path: |
-            app/build/reports/androidTests/connected
-            app/build/outputs/androidTest-results/connected
-            core-network/build/reports/androidTests/connected
-            core-network/build/outputs/androidTest-results/connected
-          retention-days: 14
-
-  # Accessibility, dark mode: API 36 only (see header).
-  test-a11y-dark:
-    needs: warm-avd
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    strategy:
-      fail-fast: false
-      matrix:
-        api-level: [36]
-
-    steps:
-      - name: Check out (with the contract submodule)
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          submodules: true
-
-      - name: Enable KVM for the emulator
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5.5.0
-        with:
-          distribution: temurin
-          java-version: 21
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
-
-      - name: Restore the warmed AVD snapshot
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ~/.android/avd/*
-            ~/.android/adb*
-          key: avd-api${{ matrix.api-level }}-x86_64-default-pixel_6
-
-      # Retry sdkmanager's flaky emulator-package download before the action's own install
-      # hits it - see the composite action for the full rationale.
-      - name: Pre-install the Android Emulator SDK package (retry the flaky download)
-        uses: ./.github/actions/preinstall-emulator
-
-      - name: Run the accessibility suite in dark mode
-        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
-        with:
-          api-level: ${{ matrix.api-level }}
-          arch: x86_64
-          target: default
-          profile: pixel_6
-          force-avd-creation: false
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          disable-animations: true
-          # See test-component: reap orphaned crashpad_handler on the trailing lines so
-          # the emulator teardown can't hang the job (android-emulator-runner#385).
-          script: |
-            adb shell cmd uimode night yes
-            ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=io.github.xexanos.ratatoskr.ui.AccessibilityChecksTest
-            pkill -f -SIGTERM '[c]rashpad_handler' || true
-            sleep 5
-            pkill -f -SIGKILL '[c]rashpad_handler' || true
-
-      - name: Upload the test reports on failure
-        if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: instrumented-test-reports-a11y-dark-api${{ matrix.api-level }}
-          path: |
-            app/build/reports/androidTests/connected
-            app/build/outputs/androidTest-results/connected
-            core-network/build/reports/androidTests/connected
-            core-network/build/outputs/androidTest-results/connected
-          retention-days: 14
+          # minified-smoke produces no core-network reports; the composite's default path
+          # list includes them and upload-artifact just warns on the missing dir (harmless).
+          name: instrumented-test-reports-${{ matrix.suite }}-api${{ matrix.api-level }}
