@@ -15,11 +15,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.MusicNote
@@ -37,14 +39,18 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -63,6 +69,7 @@ import io.github.xexanos.ratatoskr.ui.UiTestTags
 import io.github.xexanos.ratatoskr.ui.theme.RatatoskrTheme
 import io.github.xexanos.ratatoskr.ui.toMessage
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -75,6 +82,11 @@ import kotlin.math.roundToInt
 data class LibraryUiState(
     val loading: Boolean = false,
     val items: List<LibraryItemSummary> = emptyList(),
+    // Cursor for the page after the ones already in `items`; null once the last page is in.
+    val nextCursor: String? = null,
+    val loadingMore: Boolean = false,
+    // The last load-more attempt failed; the footer offers a tap-to-retry instead of a spinner.
+    val loadMoreError: Boolean = false,
     val error: String? = null,
 )
 
@@ -88,20 +100,34 @@ class LibraryViewModel(
 
     private val query = MutableStateFlow<String?>(null)
 
+    // Buffered so a request arriving while a page load is in flight is kept (and coalesced with
+    // any later ones) instead of dropped - the scroll position is still near the end when the
+    // page lands, and the UI's trigger won't fire again until the threshold is crossed anew.
+    private val loadMoreRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
     init {
         // One search pipeline for the whole screen: the initial (null) load runs immediately,
         // keystrokes are debounced, identical queries are ignored, and collectLatest cancels an
         // in-flight request when a newer query arrives so results can't land out of order.
+        // Follow-up pages are collected INSIDE the same block, so they always belong to the
+        // current query and die with it - a stale cursor can never append to fresh results.
         viewModelScope.launch {
             query
                 .debounce { if (it == null) 0L else SEARCH_DEBOUNCE_MS }
                 .distinctUntilChanged()
-                .collectLatest { load(it) }
+                .collectLatest { q ->
+                    load(q)
+                    loadMoreRequests.collect { loadNextPage(q) }
+                }
         }
     }
 
     fun search(query: String) {
         this.query.value = query.ifBlank { null }
+    }
+
+    fun loadMore() {
+        loadMoreRequests.tryEmit(Unit)
     }
 
     private suspend fun load(query: String?) {
@@ -112,8 +138,26 @@ class LibraryViewModel(
             return
         }
         _uiState.value = when (val result = client.listLibraryItems(query = query)) {
-            is ApiResult.Success -> LibraryUiState(items = result.data.items)
+            is ApiResult.Success ->
+                LibraryUiState(items = result.data.items, nextCursor = result.data.nextCursor)
             is ApiResult.Failure -> LibraryUiState(error = result.error.toMessage())
+        }
+    }
+
+    private suspend fun loadNextPage(query: String?) {
+        val cursor = _uiState.value.nextCursor ?: return
+        val client = connectionManager.client() ?: return
+        _uiState.value = _uiState.value.copy(loadingMore = true, loadMoreError = false)
+        _uiState.value = when (val result = client.listLibraryItems(query = query, cursor = cursor)) {
+            is ApiResult.Success -> _uiState.value.copy(
+                items = _uiState.value.items + result.data.items,
+                nextCursor = result.data.nextCursor,
+                loadingMore = false,
+            )
+            // Keep the loaded items and the cursor: the footer flips to a tap-to-retry row
+            // instead of replacing a working list with the full-screen error state. Scrolling
+            // back into the trigger zone retries too.
+            is ApiResult.Failure -> _uiState.value.copy(loadingMore = false, loadMoreError = true)
         }
     }
 
@@ -146,17 +190,22 @@ fun LibraryScreen(
             query = it
             viewModel.search(it)
         },
+        onLoadMore = viewModel::loadMore,
         onOpenItem = onOpenItem,
         onOpenNowPlaying = onOpenNowPlaying,
         onOpenSettings = onOpenSettings,
     )
 }
 
+// How many rows before the end of the list the next page is requested.
+private const val LOAD_MORE_THRESHOLD = 8
+
 @Composable
 private fun LibraryContent(
     state: LibraryUiState,
     query: String,
     onQueryChange: (String) -> Unit,
+    onLoadMore: () -> Unit = {},
     onOpenItem: (String) -> Unit,
     onOpenNowPlaying: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -219,13 +268,62 @@ private fun LibraryContent(
 
             state.items.isEmpty() -> EmptyLibrary(query)
 
-            else -> LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(state.items, key = { it.id }) { item ->
-                    LibraryRow(item, onClick = { onOpenItem(item.id) })
+            else -> {
+                val listState = rememberLazyListState()
+                // Ask for the next page a few rows before the end, so it is usually there by
+                // the time the user reaches it. derivedStateOf keeps this from recomposing on
+                // every scroll frame: it only changes when the threshold is crossed.
+                val nearEnd by remember(listState) {
+                    derivedStateOf {
+                        val info = listState.layoutInfo
+                        val last = info.visibleItemsInfo.lastOrNull()?.index ?: -1
+                        last >= info.totalItemsCount - 1 - LOAD_MORE_THRESHOLD
+                    }
+                }
+                LaunchedEffect(nearEnd, state.nextCursor) {
+                    if (nearEnd && state.nextCursor != null) onLoadMore()
+                }
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(state.items, key = { it.id }) { item ->
+                        LibraryRow(item, onClick = { onOpenItem(item.id) })
+                    }
+                    if (state.nextCursor != null) {
+                        item(key = "load-more") {
+                            if (state.loadMoreError) {
+                                Box(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(min = 48.dp)
+                                        .clickable(onClick = onLoadMore)
+                                        .padding(vertical = 12.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text(
+                                        stringResource(R.string.library_load_more_failed),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        textAlign = TextAlign.Center,
+                                    )
+                                }
+                            } else {
+                                val loadingDesc = stringResource(R.string.library_loading_more)
+                                Box(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 16.dp)
+                                        .semantics { contentDescription = loadingDesc },
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    CircularProgressIndicator()
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -369,6 +467,36 @@ internal fun LibraryEmptyPreview() = RatatoskrTheme {
     Surface {
         LibraryContent(
             state = LibraryUiState(items = emptyList()),
+            query = "",
+            onQueryChange = {},
+            onOpenItem = {},
+            onOpenNowPlaying = {},
+            onOpenSettings = {},
+        )
+    }
+}
+
+@Preview(name = "Library - loading more", widthDp = 360, heightDp = 800)
+@Composable
+internal fun LibraryLoadingMorePreview() = RatatoskrTheme {
+    Surface {
+        LibraryContent(
+            state = LibraryUiState(items = previewItems, nextCursor = "c2", loadingMore = true),
+            query = "",
+            onQueryChange = {},
+            onOpenItem = {},
+            onOpenNowPlaying = {},
+            onOpenSettings = {},
+        )
+    }
+}
+
+@Preview(name = "Library - load more failed", widthDp = 360, heightDp = 800)
+@Composable
+internal fun LibraryLoadMoreFailedPreview() = RatatoskrTheme {
+    Surface {
+        LibraryContent(
+            state = LibraryUiState(items = previewItems, nextCursor = "c2", loadMoreError = true),
             query = "",
             onQueryChange = {},
             onOpenItem = {},

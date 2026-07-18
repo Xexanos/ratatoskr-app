@@ -134,6 +134,114 @@ class LibraryViewModelTest {
     }
 
     @Test
+    fun `loadMore follows the cursor and appends the next page`() = runTest(dispatcher) {
+        val receivedCursors = Collections.synchronizedList(mutableListOf<String?>())
+        server.dispatch { request ->
+            val cursor = request.requestUrl?.queryParameter("cursor")
+            receivedCursors += cursor
+            val body = if (cursor == null) {
+                WireFixtures.libraryPageJson(
+                    items = listOf(WireFixtures.libraryItemSummaryJson(id = "i1", title = "page one")),
+                    nextCursor = "c2",
+                )
+            } else {
+                WireFixtures.libraryPageJson(
+                    items = listOf(WireFixtures.libraryItemSummaryJson(id = "i2", title = "page two")),
+                )
+            }
+            MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(body)
+        }
+        val viewModel = LibraryViewModel(trustedConnectionManager())
+        settleState { viewModel.uiState.value.items.isNotEmpty() }
+        assertEquals("c2", viewModel.uiState.value.nextCursor)
+
+        viewModel.loadMore()
+        settleState { viewModel.uiState.value.items.size == 2 }
+
+        assertEquals(listOf(null, "c2"), receivedCursors)
+        assertEquals(listOf("page one", "page two"), viewModel.uiState.value.items.map { it.title })
+        assertEquals(null, viewModel.uiState.value.nextCursor)
+
+        // The last page is in: further loadMore calls must not hit the server again.
+        viewModel.loadMore()
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(2, receivedCursors.size)
+    }
+
+    @Test
+    fun `a failing next page keeps the list and flags a retryable error`() = runTest(dispatcher) {
+        var failNextPage = true
+        server.dispatch { request ->
+            val cursor = request.requestUrl?.queryParameter("cursor")
+            if (cursor != null && failNextPage) {
+                MockResponse().setResponseCode(502)
+                    .setBody("""{"code":"abs_unreachable","message":"Audiobookshelf down"}""")
+            } else {
+                MockResponse().setResponseCode(200)
+                    .setHeader("Content-Type", "application/json")
+                    .setBody(
+                        WireFixtures.libraryPageJson(
+                            items = listOf(
+                                WireFixtures.libraryItemSummaryJson(id = "i-$cursor", title = "page after $cursor"),
+                            ),
+                            nextCursor = if (cursor == null) "c2" else null,
+                        ),
+                    )
+            }
+        }
+        val viewModel = LibraryViewModel(trustedConnectionManager())
+        settleState { viewModel.uiState.value.items.isNotEmpty() }
+
+        viewModel.loadMore()
+        settleState { viewModel.uiState.value.loadMoreError }
+
+        // The loaded page survives, the full-screen error stays clear, and the cursor is kept
+        // so the page can be retried.
+        assertEquals(1, viewModel.uiState.value.items.size)
+        assertEquals(null, viewModel.uiState.value.error)
+        assertEquals("c2", viewModel.uiState.value.nextCursor)
+
+        failNextPage = false
+        viewModel.loadMore()
+        settleState { viewModel.uiState.value.items.size == 2 }
+
+        assertTrue(!viewModel.uiState.value.loadMoreError)
+        assertEquals(null, viewModel.uiState.value.nextCursor)
+    }
+
+    @Test
+    fun `a new query restarts pagination from the first page`() = runTest(dispatcher) {
+        server.dispatch { request ->
+            val cursor = request.requestUrl?.queryParameter("cursor")
+            val q = request.requestUrl?.queryParameter("q")
+            MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(
+                    WireFixtures.libraryPageJson(
+                        items = listOf(
+                            WireFixtures.libraryItemSummaryJson(id = "$q-$cursor", title = q ?: "all"),
+                        ),
+                        // Every page claims a successor, so the cursor is non-null when the
+                        // query changes - the fresh load must not carry it over.
+                        nextCursor = "next-after-$cursor",
+                    ),
+                )
+        }
+        val viewModel = LibraryViewModel(trustedConnectionManager())
+        settleState { viewModel.uiState.value.items.isNotEmpty() }
+        viewModel.loadMore()
+        settleState { viewModel.uiState.value.items.size == 2 }
+
+        viewModel.search("cat")
+        settleState { viewModel.uiState.value.items.singleOrNull()?.title == "cat" }
+
+        // The cat load starts over: one page, requested without a cursor (id "cat-null").
+        assertEquals("cat-null", viewModel.uiState.value.items.single().id)
+    }
+
+    @Test
     fun `no configured server surfaces a specific error`() = runTest(dispatcher) {
         val store = DataStoreConnectionStore(
             PreferenceDataStoreFactory.create(scope = CoroutineScope(dispatcher)) {

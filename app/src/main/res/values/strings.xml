@@ -36,6 +36,8 @@
     <string name="library_no_results_body">No audiobooks match %1$s. Try a shorter search.</string>
     <string name="library_finished">Finished</string>
     <string name="library_percent">%1$d%%</string>
+    <string name="library_loading_more">Loading more audiobooks</string>
+    <string name="library_load_more_failed">Couldn\'t load more audiobooks. Tap to retry.</string>
 
     <!-- Speakers -->
     <string name="speakers_title">Choose a speaker</string>
