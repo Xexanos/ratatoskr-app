@@ -102,26 +102,36 @@ client-side from the existing `progress` field. No change needed for the visual.
 **Proposed change (recommended): a dedicated shelf endpoint.**
 
 ```yaml
-/library/continue:
+/library/in-progress:
   get:
-    operationId: listContinueListening
+    operationId: listInProgressItems
     summary: Books currently in progress, most-recently-listened first
     parameters:
       - name: limit
         in: query
-        schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        required: false
+        schema: { type: integer, minimum: 1, maximum: 50, default: 25 }
     responses:
-      "200": { LibraryItemPage or a plain array of LibraryItemSummary }
+      "200": { $ref: "#/components/schemas/LibraryItemPage" }
 ```
 
+- **Name: `/library/in-progress`** — a self-describing REST noun. ABS's own term is "Continue
+  Listening", but that is a personalized *shelf* served via `/api/libraries/{id}/personalized`,
+  not a REST path — so the vocabulary is ABS's while the path is ours, and a generic name reads
+  clearly without ABS knowledge. (`/library/continue` was verb-y and vague.)
+- **Response = `LibraryItemPage`**, reused for consistency with `/library/items` (same client
+  type and rendering). The shelf returns one complete page — `nextCursor` is null — so the
+  envelope honestly says "that's all". If shelf-level fields are ever needed later, a superset
+  schema (`allOf [LibraryItemPage, { …new optional fields }]`) stays non-breaking and
+  oasdiff-clean; a bare array could never gain a sibling field, which is why it was rejected.
 - Server returns only in-progress items (not finished, position > 0), ordered by ABS recency.
-- Small and bounded; likely no pagination (a shelf, not the whole library).
+- A shelf, not the whole library: bounded by `limit`, so no pagination in practice.
 - Cleanly decouples the shelf from the browse list, which stays alphabetical and paginated as-is.
 - The app renders this as a section on top of the Library screen; the full list follows unchanged.
 
 **Alternative considered.** A `sort=recent` query param on `/library/items`. Lighter (no new path),
 but it entangles the shelf with the main list's pagination and still needs the server-side recency
-data. The dedicated endpoint mirrors ABS's model and keeps the two concerns separate.
+data. The dedicated endpoint keeps the two concerns separate.
 
 **Optional add-on.** Expose recency for display ("Continue at 3:24 · 2 days ago") by adding an
 optional `updatedAt` (date-time) to `Progress`. Additive; only if the shelf UX wants the timestamp.
@@ -132,7 +142,7 @@ optional `updatedAt` (date-time) to `Progress`. Additive; only if the shelf UX w
 
 - Library rows and the shelf: `coverUrl` with `?h=<rowHeightPx>` (a small Coil interceptor sets
   `h` from the resolved row height); now-playing: `coverUrl` at full size (no `h`).
-- A "Continue listening" section at the top of the Library screen, fed by `GET /library/continue`.
+- A "Continue listening" section at the top of the Library screen, fed by `GET /library/in-progress`.
 - In-progress marking on rows: derived from the existing `progress` (no contract dependency).
 
 ## Open questions for the server side
@@ -140,7 +150,6 @@ optional `updatedAt` (date-time) to `Progress`. Additive; only if the shelf UX w
 - Cover buckets: which height buckets does the server clamp `h` to, and does it re-encode
   (JPEG quality/format) for smaller payloads? Delegate `?height=` to ABS vs. scale in Ratatoskr.
 - Confirm the deployed ABS version exposes a `height` parameter on its cover endpoint.
-- `/library/continue`: return a `LibraryItemPage` (for symmetry / future paging) or a plain array?
 - Does the shelf want `Progress.updatedAt` for a "last listened" label, or is order enough for v1?
 
 ## Next step
