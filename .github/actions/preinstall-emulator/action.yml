@@ -38,7 +38,13 @@ runs:
         # silently no-opping (the bug this replaces: a too-shallow find matched nothing and
         # the step exit-0'd every time, so the retry loop below never ran).
         echo "Pre-installing the Android Emulator package via ${sdkmanager}"
+        # `yes` gets SIGPIPE (exit 141) the moment sdkmanager stops reading - benign and the
+        # normal way `yes | cmd` ends, but this step runs under `set -o pipefail`, which would
+        # otherwise fail on it. Drop pipefail just for this pipe so sdkmanager's own exit
+        # status is what counts (a real license failure still surfaces via set -e).
+        set +o pipefail
         yes | "$sdkmanager" --licenses > /dev/null
+        set -o pipefail
         ok=false
         for attempt in 1 2 3; do
           if "$sdkmanager" --install emulator --channel=0 > /dev/null; then
