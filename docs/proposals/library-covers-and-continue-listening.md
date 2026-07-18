@@ -1,4 +1,4 @@
-# Contract proposal: list cover thumbnails + continue-listening ordering
+# Contract proposal: cover-proxy endpoint + continue-listening ordering
 
 **Status:** draft (app-side). This sketches what the app needs from the server contract for
 issues #55 (covers in the list) and #52 (actively-listened books lead the list, specially
@@ -6,8 +6,8 @@ marked). It drives a change to `ratatoskr-server/contract/openapi.yaml`, which f
 server's own versioning rules (server SPEC section 6). Nothing here is built app-side until the
 contract lands — the app is a thin remote.
 
-Both parts are **additive and backward-compatible** (new optional field / new endpoint), so they
-are oasdiff-clean and fit a **minor** contract bump, like the 1.1.0 refresh-token-rotation change.
+Both parts are **additive and backward-compatible** (each adds a new endpoint), so they are
+oasdiff-clean and fit a **minor** contract bump, like the 1.1.0 refresh-token-rotation change.
 They are independent and can ship separately.
 
 ## Current contract (for reference)
@@ -20,36 +20,67 @@ coverUrl:  { type: string, nullable: true, description: "Absolute URL served by 
 progress:  $ref Progress   # Progress = { positionSeconds: double, isFinished: bool }
 ```
 
-So covers are **not** missing, and `progress` already tells the client whether a book is in
-progress. What is missing is (A) a list-sized cover variant and (B) server-side ordering.
+`progress` already tells the client whether a book is in progress. Covers, **despite the field,
+are not served yet**: no cover-image path exists among the ten defined paths, and the server does
+not populate `coverUrl` today (it is effectively always null). So the two gaps are (A) a
+cover-proxy endpoint with scaling and (B) server-side ordering.
 
 ---
 
-## Part A — list cover thumbnails (#55)
+## Part A — cover delivery: a size-parameterized cover-proxy endpoint (#55)
 
-**Problem.** `coverUrl` is a single full-size cover. Rendering it in every list row is wasteful on
-bandwidth and, on low-end devices (explicitly in scope, see #65), risks large decoded bitmaps. The
-list wants a small, **server-scaled** image; full size is only needed on now-playing.
+**Current state.** `LibraryItemSummary.coverUrl` exists in the schema (nullable, "served by
+Ratatoskr"), but the server does **not implement cover serving yet** — `coverUrl` is effectively
+always null today, and no cover-image path is defined in the contract. So this is *build new*, not
+*document existing*.
 
-**Proposed change.** Add an optional `thumbnailUrl` to `LibraryItemSummary`:
+**Why `coverUrl` must be a Ratatoskr URL, not ABS.** The phone has no Audiobookshelf credentials
+(the whole projection exists so it never needs them) and is network-isolated to Ratatoskr (ABS may
+sit on a private network it cannot reach). A direct ABS link — or a redirect to ABS — breaks both.
+So Ratatoskr **proxies** covers: it fetches the image from ABS server-side with its own ABS
+credentials and serves it under its own auth (the "may require the token" in the field description).
+
+**Proposed change: a cover-proxy endpoint, scaled by height.**
 
 ```yaml
-thumbnailUrl:
-  type: string
-  nullable: true
-  description: |
-    Absolute URL of a small, server-scaled cover variant for list/grid rows. Full-size
-    artwork is coverUrl. Sizing is the server's concern (thin client).
+/library/items/{itemId}/cover:
+  get:
+    operationId: getLibraryItemCover
+    summary: Cover image for an item, proxied from Audiobookshelf (optionally scaled)
+    parameters:
+      - $ref: "#/components/parameters/ItemId"
+      - name: h
+        in: query
+        description: |
+          Target max height in pixels for a scaled variant. The client sets it from the row
+          height × device density, so low-density devices request fewer pixels and high-density
+          devices more. Omitted = full/original. The server clamps to a small set of buckets.
+        schema: { type: integer, minimum: 1, maximum: 2048 }
+    responses:
+      "200": { description: Image bytes, content: { image/*: {} } }
+      "401": { $ref: Unauthorized }
+      "404": { $ref: NotFound }
+      "502": { $ref: UpstreamError }
 ```
 
-- The app uses `thumbnailUrl` in library rows and the continue-listening shelf, `coverUrl` on
-  now-playing. If `thumbnailUrl` is null, fall back to `coverUrl`.
-- Scaling stays server-side (thin client). Target roughly a list-row cover at ~3x density
-  (~200 px wide); the exact size is the server's call.
+`coverUrl` becomes an absolute URL pointing at this path (server-provided, so the client stays
+dumb); the client appends `?h=<px>` for a scaled variant and omits it for full size on now-playing.
 
-**Alternative considered.** A size/`?w=` query param on the cover URL. Rejected: `coverUrl` is an
-opaque absolute URL to the client, so a second explicit URL keeps the client dumb and the server in
-control of sizing/caching.
+**Scale by height, not width.** Covers are portrait; in a list the row height is the fixed
+dimension and width follows the aspect ratio, so a height target keeps row heights consistent
+across covers of varying ratios. The client requests `h = rowHeightDp × density`, which is what
+makes the result density-correct — low-density devices ask for fewer pixels, exactly as expected.
+
+**Scaling is delegable to ABS.** ABS's own cover endpoint accepts a `height` parameter and scales
+on the fly, so Ratatoskr can pass the client's `h` straight upstream (`?height=`) instead of doing
+image work itself. It should still **cache** the result and **clamp `h` to a few buckets** (e.g.
+nearest of {128, 256, 384, original}) so it neither hammers ABS nor caches unbounded sizes. (Worth
+confirming `height` support against the deployed ABS version.)
+
+**Rejected alternatives.**
+- A fixed `thumbnailUrl` field (one pixel size for every device) — fails the density point above.
+- A direct ABS link or a redirect to ABS — breaks the thin-client / no-ABS-credentials / network
+  isolation model.
 
 ---
 
@@ -99,16 +130,18 @@ optional `updatedAt` (date-time) to `Progress`. Additive; only if the shelf UX w
 
 ## App-side consumption (once the contract lands)
 
-- Library rows: `thumbnailUrl` (fallback `coverUrl`); now-playing: `coverUrl`.
+- Library rows and the shelf: `coverUrl` with `?h=<rowHeightPx>` (a small Coil interceptor sets
+  `h` from the resolved row height); now-playing: `coverUrl` at full size (no `h`).
 - A "Continue listening" section at the top of the Library screen, fed by `GET /library/continue`.
 - In-progress marking on rows: derived from the existing `progress` (no contract dependency).
 
 ## Open questions for the server side
 
+- Cover buckets: which height buckets does the server clamp `h` to, and does it re-encode
+  (JPEG quality/format) for smaller payloads? Delegate `?height=` to ABS vs. scale in Ratatoskr.
+- Confirm the deployed ABS version exposes a `height` parameter on its cover endpoint.
 - `/library/continue`: return a `LibraryItemPage` (for symmetry / future paging) or a plain array?
 - Does the shelf want `Progress.updatedAt` for a "last listened" label, or is order enough for v1?
-- Thumbnail size/format policy (a fixed size vs. a couple of buckets); RGB-565-friendly encoding
-  helps low-end decode (#65) but is a server-rendering detail.
 
 ## Next step
 
