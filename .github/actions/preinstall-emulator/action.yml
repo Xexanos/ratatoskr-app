@@ -20,13 +20,24 @@ runs:
   steps:
     - shell: bash
       run: |
-        # Not on PATH yet at this point in the job - the emulator-runner action's own
-        # JS wrapper is what adds it. Resolve the binary directly under $ANDROID_HOME.
-        sdkmanager="$(find "$ANDROID_HOME/cmdline-tools" -maxdepth 2 -name sdkmanager -type f | head -n1)"
-        if [ -z "$sdkmanager" ]; then
-          echo "::warning::sdkmanager not found under \$ANDROID_HOME/cmdline-tools; skipping the pre-install."
+        # sdkmanager is NOT on PATH here - the emulator-runner action's own JS wrapper is
+        # what adds it later, so resolve it explicitly. It lives at
+        # cmdline-tools/latest/bin/sdkmanager - the exact path android-emulator-runner
+        # expects to be populated. Anchor to that; fall back to a versioned cmdline-tools
+        # dir (find -maxdepth 3 reaches <version>/bin/sdkmanager, which is three levels
+        # below cmdline-tools) only if `latest` is absent.
+        sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+        if [ ! -x "$sdkmanager" ]; then
+          sdkmanager="$(find "$ANDROID_HOME/cmdline-tools" -maxdepth 3 -name sdkmanager -type f 2>/dev/null | head -n1)"
+        fi
+        if [ -z "$sdkmanager" ] || [ ! -x "$sdkmanager" ]; then
+          echo "::warning::sdkmanager not found under \$ANDROID_HOME/cmdline-tools; skipping the pre-install (the emulator-runner action will still try its own install)."
           exit 0
         fi
+        # Log the resolved path so the run proves this step actually installs rather than
+        # silently no-opping (the bug this replaces: a too-shallow find matched nothing and
+        # the step exit-0'd every time, so the retry loop below never ran).
+        echo "Pre-installing the Android Emulator package via ${sdkmanager}"
         yes | "$sdkmanager" --licenses > /dev/null
         ok=false
         for attempt in 1 2 3; do
