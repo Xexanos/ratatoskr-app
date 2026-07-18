@@ -1,0 +1,31 @@
+# Uploads the connected-test HTML reports and result XML as a build artifact. Callers wrap
+# this with `if: failure()` so it only runs when a suite failed.
+#
+# `path` defaults to both the app and core-network report/result directories; suites that
+# only produce app reports (e.g. the minified smoke) pass the app-only subset. Missing paths
+# are a warning, not an error (upload-artifact's if-no-files-found default is `warn`).
+#
+# Local composite action (referenced as ./.github/actions/upload-test-reports): requires the
+# repo to be checked out first, which every calling job already does.
+name: Upload the instrumented test reports
+description: Upload connected-test reports and result XML as a retention-limited artifact.
+inputs:
+  name:
+    description: Artifact name (must be unique within the run).
+    required: true
+  path:
+    description: Newline-separated list of paths to upload.
+    required: false
+    default: |
+      app/build/reports/androidTests/connected
+      app/build/outputs/androidTest-results/connected
+      core-network/build/reports/androidTests/connected
+      core-network/build/outputs/androidTest-results/connected
+runs:
+  using: composite
+  steps:
+    - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: ${{ inputs.name }}
+        path: ${{ inputs.path }}
+        retention-days: 14

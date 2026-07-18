@@ -1,0 +1,27 @@
+# Sets up the JVM/Gradle build environment shared by every job that runs Gradle: Temurin
+# JDK 21 plus gradle/actions/setup-gradle (Gradle caching + wrapper-jar checksum validation).
+# Bundled here so the JDK version and both action SHAs live in one place - Dependabot's
+# github-actions ecosystem scans composite action.yml files too, so the pins still get
+# update PRs.
+#
+# NOT included here on purpose: actions/checkout (must run first, before this action can be
+# resolved from the repo) and android-actions/setup-android (only ci.yml provisions the full
+# SDK; the emulator jobs get their SDK from android-emulator-runner). Those stay inline.
+#
+# Local composite action (referenced as ./.github/actions/setup-build-env): requires the
+# repo to be checked out first, which every calling job already does.
+name: Set up the JDK and Gradle build environment
+description: Install Temurin JDK 21 and configure Gradle (caching + wrapper validation).
+runs:
+  using: composite
+  steps:
+    - name: Set up JDK 21
+      uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5.5.0
+      with:
+        distribution: temurin
+        java-version: '21'
+
+    - name: Set up Gradle
+      # Caches Gradle and validates the wrapper jar against known-good checksums,
+      # complementing the pinned distributionSha256Sum in gradle-wrapper.properties.
+      uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
