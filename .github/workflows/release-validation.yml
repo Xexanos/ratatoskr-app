@@ -102,6 +102,12 @@ jobs:
             ~/.android/adb*
           key: avd-api36-x86_64-default-pixel_6
 
+      # Retry sdkmanager's flaky emulator-package download before the action's own install
+      # hits it - see the composite action for the full rationale. Worth the same fix here:
+      # a flake on this job reads as a main regression, not a PR failure.
+      - name: Pre-install the Android Emulator SDK package (retry the flaky download)
+        uses: ./.github/actions/preinstall-emulator
+
       - name: Run the integration flow against the minified build
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:

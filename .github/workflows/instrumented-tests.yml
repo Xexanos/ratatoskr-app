@@ -86,6 +86,13 @@ jobs:
             ~/.android/adb*
           key: avd-api${{ matrix.api-level }}-x86_64-default-pixel_6
 
+      # Retry sdkmanager's flaky emulator-package download before the action's own install
+      # hits it - see the composite action for the full rationale. Only on a cache miss,
+      # where warm-avd actually boots the emulator below.
+      - name: Pre-install the Android Emulator SDK package (retry the flaky download)
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: ./.github/actions/preinstall-emulator
+
       # On a cache miss, create the AVD once and let it save a snapshot (no -no-snapshot-save).
       - name: Warm the AVD snapshot
         if: steps.avd-cache.outputs.cache-hit != 'true'
@@ -144,6 +151,11 @@ jobs:
             ~/.android/avd/*
             ~/.android/adb*
           key: avd-api${{ matrix.api-level }}-x86_64-default-pixel_6
+
+      # Retry sdkmanager's flaky emulator-package download before the action's own install
+      # hits it - see the composite action for the full rationale.
+      - name: Pre-install the Android Emulator SDK package (retry the flaky download)
+        uses: ./.github/actions/preinstall-emulator
 
       - name: Run the core-network component suite
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
@@ -233,6 +245,11 @@ jobs:
             ~/.android/adb*
           key: avd-api${{ matrix.api-level }}-x86_64-default-pixel_6
 
+      # Retry sdkmanager's flaky emulator-package download before the action's own install
+      # hits it - see the composite action for the full rationale.
+      - name: Pre-install the Android Emulator SDK package (retry the flaky download)
+        uses: ./.github/actions/preinstall-emulator
+
       - name: Run the whole-app integration flow
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
@@ -315,6 +332,11 @@ jobs:
             ~/.android/adb*
           key: avd-api${{ matrix.api-level }}-x86_64-default-pixel_6
 
+      # Retry sdkmanager's flaky emulator-package download before the action's own install
+      # hits it - see the composite action for the full rationale.
+      - name: Pre-install the Android Emulator SDK package (retry the flaky download)
+        uses: ./.github/actions/preinstall-emulator
+
       - name: Run the wire smoke against the minified build
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
@@ -382,6 +404,11 @@ jobs:
             ~/.android/avd/*
             ~/.android/adb*
           key: avd-api${{ matrix.api-level }}-x86_64-default-pixel_6
+
+      # Retry sdkmanager's flaky emulator-package download before the action's own install
+      # hits it - see the composite action for the full rationale.
+      - name: Pre-install the Android Emulator SDK package (retry the flaky download)
+        uses: ./.github/actions/preinstall-emulator
 
       - name: Run the accessibility suite in light mode
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
@@ -453,6 +480,11 @@ jobs:
             ~/.android/avd/*
             ~/.android/adb*
           key: avd-api${{ matrix.api-level }}-x86_64-default-pixel_6
+
+      # Retry sdkmanager's flaky emulator-package download before the action's own install
+      # hits it - see the composite action for the full rationale.
+      - name: Pre-install the Android Emulator SDK package (retry the flaky download)
+        uses: ./.github/actions/preinstall-emulator
 
       - name: Run the accessibility suite in dark mode
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
