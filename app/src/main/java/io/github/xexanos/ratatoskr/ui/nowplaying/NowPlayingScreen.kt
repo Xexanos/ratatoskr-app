@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
@@ -60,6 +59,7 @@ import io.github.xexanos.ratatoskr.network.domain.LibraryItemSummary
 import io.github.xexanos.ratatoskr.network.domain.PlaybackState
 import io.github.xexanos.ratatoskr.network.domain.RatatoskrError
 import io.github.xexanos.ratatoskr.network.domain.Session
+import io.github.xexanos.ratatoskr.ui.common.CoverImage
 import io.github.xexanos.ratatoskr.ui.KnotLoader
 import io.github.xexanos.ratatoskr.ui.UiError
 import io.github.xexanos.ratatoskr.ui.UiTestTags
@@ -271,7 +271,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.NowPlayingContent(
     onStop: () -> Unit,
 ) {
     Spacer(Modifier.height(16.dp))
-    CoverArt(title = session.item?.title ?: session.itemId)
+    CoverArt(title = session.item?.title ?: session.itemId, coverUrl = session.item?.coverUrl)
 
     Spacer(Modifier.height(28.dp))
     Text(
@@ -374,34 +374,17 @@ private fun androidx.compose.foundation.layout.ColumnScope.NowPlayingContent(
 }
 
 @Composable
-private fun CoverArt(title: String) {
-    val initial = title.trim().firstOrNull()?.uppercase()
+private fun CoverArt(title: String, coverUrl: String?) {
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-        Surface(
+        CoverImage(
+            title = title,
+            coverUrl = coverUrl,
             modifier = Modifier.size(260.dp),
             shape = MaterialTheme.shapes.extraLarge,
-            color = MaterialTheme.colorScheme.secondaryContainer,
+            initialStyle = MaterialTheme.typography.displayLarge,
             shadowElevation = 8.dp,
             tonalElevation = 2.dp,
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                if (initial != null) {
-                    Text(
-                        text = initial,
-                        style = MaterialTheme.typography.displayLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                    )
-                } else {
-                    Icon(
-                        Icons.Default.MusicNote,
-                        contentDescription = null,
-                        modifier = Modifier.size(96.dp),
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                    )
-                }
-            }
-        }
+        )
     }
 }
 

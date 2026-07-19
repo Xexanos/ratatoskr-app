@@ -74,6 +74,10 @@
     <string name="settings_forget_cert">Forget certificate and re-trust</string>
     <string name="settings_forget_cert_hint">Removes the pinned certificate. You will confirm the server\'s fingerprint again on the next connection.</string>
     <string name="settings_sign_out">Sign out</string>
+    <string name="settings_section_storage">Storage</string>
+    <string name="settings_clear_image_cache">Clear image cache</string>
+    <string name="settings_clear_image_cache_hint">Removes downloaded cover art. Covers are re-downloaded as needed — use this if a cover changed on the server.</string>
+    <string name="settings_image_cache_cleared">Image cache cleared</string>
 
     <!-- Loading -->
     <string name="knot_loader_description">Loading indicator: the Ratatoskr knot with a copper squirrel running the strand</string>

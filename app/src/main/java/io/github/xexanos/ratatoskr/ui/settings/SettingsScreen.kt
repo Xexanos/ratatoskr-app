@@ -18,17 +18,21 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -50,10 +54,17 @@ data class SettingsUiState(
     val serverUrl: String? = null,
     val certForgotten: Boolean = false,
     val signedOut: Boolean = false,
+    val imageCacheCleared: Boolean = false,
 )
 
 class SettingsViewModel(
     private val connectionManager: ConnectionManager,
+    /**
+     * Empties the cover caches (CoverImages.clear, injected as a function so this ViewModel
+     * stays JVM-unit-testable). Run on sign-out and forget-server too: a signed-out device
+     * keeps no artwork of the library it left.
+     */
+    private val clearCoverCache: suspend () -> Unit,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -71,6 +82,7 @@ class SettingsViewModel(
         viewModelScope.launch {
             connectionManager.connectionStore.forgetFingerprint()
             connectionManager.invalidate()
+            clearCoverCache()
             _uiState.value = _uiState.value.copy(certForgotten = true)
         }
     }
@@ -78,8 +90,22 @@ class SettingsViewModel(
     fun signOut() {
         viewModelScope.launch {
             connectionManager.tokenStore.clear()
+            clearCoverCache()
             _uiState.value = _uiState.value.copy(signedOut = true)
         }
+    }
+
+    /** Immediate and dialog-free: clearing is lossless, covers simply re-download. */
+    fun clearImageCache() {
+        viewModelScope.launch {
+            clearCoverCache()
+            _uiState.value = _uiState.value.copy(imageCacheCleared = true)
+        }
+    }
+
+    /** Called once the snackbar confirming the clear has been shown. */
+    fun imageCacheClearedShown() {
+        _uiState.value = _uiState.value.copy(imageCacheCleared = false)
     }
 }
 
@@ -90,15 +116,30 @@ fun SettingsScreen(
     onSignedOut: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val cacheClearedMessage = stringResource(R.string.settings_image_cache_cleared)
 
     LaunchedEffect(state.certForgotten) { if (state.certForgotten) onReTrust() }
     LaunchedEffect(state.signedOut) { if (state.signedOut) onSignedOut() }
+    LaunchedEffect(state.imageCacheCleared) {
+        if (state.imageCacheCleared) {
+            viewModel.imageCacheClearedShown()
+            snackbarHostState.showSnackbar(cacheClearedMessage)
+        }
+    }
 
-    SettingsContent(
-        state = state,
-        onForgetCertificate = viewModel::forgetCertificate,
-        onSignOut = viewModel::signOut,
-    )
+    Box(modifier = Modifier.fillMaxSize()) {
+        SettingsContent(
+            state = state,
+            onForgetCertificate = viewModel::forgetCertificate,
+            onSignOut = viewModel::signOut,
+            onClearImageCache = viewModel::clearImageCache,
+        )
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
+    }
 }
 
 @Composable
@@ -106,6 +147,7 @@ private fun SettingsContent(
     state: SettingsUiState,
     onForgetCertificate: () -> Unit,
     onSignOut: () -> Unit,
+    onClearImageCache: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         Text(
@@ -180,6 +222,24 @@ private fun SettingsContent(
         )
 
         Spacer(Modifier.height(32.dp))
+        SectionLabel(stringResource(R.string.settings_section_storage))
+        OutlinedButton(
+            onClick = onClearImageCache,
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+        ) {
+            Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.settings_clear_image_cache))
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            stringResource(R.string.settings_clear_image_cache_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 4.dp),
+        )
+
+        Spacer(Modifier.height(32.dp))
         SectionLabel(stringResource(R.string.settings_section_account))
         OutlinedButton(
             onClick = onSignOut,
@@ -216,6 +276,7 @@ internal fun SettingsPreview() = RatatoskrTheme {
             state = SettingsUiState(serverUrl = "https://ratatoskr.home:8080"),
             onForgetCertificate = {},
             onSignOut = {},
+            onClearImageCache = {},
         )
     }
 }
@@ -228,6 +289,7 @@ private fun SettingsUnconfiguredPreview() = RatatoskrTheme {
             state = SettingsUiState(serverUrl = null),
             onForgetCertificate = {},
             onSignOut = {},
+            onClearImageCache = {},
         )
     }
 }

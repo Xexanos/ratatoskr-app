@@ -24,8 +24,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
+import androidx.compose.runtime.CompositionLocalProvider
 import io.github.xexanos.ratatoskr.di.AppContainer
 import io.github.xexanos.ratatoskr.ui.KnotLoader
+import io.github.xexanos.ratatoskr.ui.common.LocalCoverImageLoader
 import io.github.xexanos.ratatoskr.ui.rememberDelayedVisible
 import io.github.xexanos.ratatoskr.ui.navigation.RatatoskrNavHost
 import io.github.xexanos.ratatoskr.ui.navigation.Route
@@ -41,31 +43,33 @@ class MainActivity : ComponentActivity() {
         val container = (application as RatatoskrApp).container
 
         setContent {
-            RatatoskrTheme {
-                Scaffold(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        // Bridges Compose testTags to UiAutomator resource-ids so the
-                        // black-box E2E harness (ratatoskr-e2e, Maestro/UiAutomator) can
-                        // locate the same elements the Compose UI tests find by testTag.
-                        .semantics { testTagsAsResourceId = true },
-                ) { innerPadding ->
-                    Surface(modifier = Modifier.padding(innerPadding)) {
-                        // Resolve the start route off the main thread (see decideStartDestination),
-                        // showing a brief loader instead of blocking onCreate.
-                        var startDestination by remember { mutableStateOf<Route?>(null) }
-                        LaunchedEffect(Unit) {
-                            startDestination = decideStartDestination(container)
-                        }
-                        when (val dest = startDestination) {
-                            // Resolving the start route is normally sub-second; only show the
-                            // loader if it takes long enough to be worth it, so it never flashes.
-                            null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                if (rememberDelayedVisible(active = true)) {
-                                    KnotLoader(label = stringResource(R.string.app_loading))
-                                }
+            CompositionLocalProvider(LocalCoverImageLoader provides container.coverImages.imageLoader) {
+                RatatoskrTheme {
+                    Scaffold(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            // Bridges Compose testTags to UiAutomator resource-ids so the
+                            // black-box E2E harness (ratatoskr-e2e, Maestro/UiAutomator) can
+                            // locate the same elements the Compose UI tests find by testTag.
+                            .semantics { testTagsAsResourceId = true },
+                    ) { innerPadding ->
+                        Surface(modifier = Modifier.padding(innerPadding)) {
+                            // Resolve the start route off the main thread (see decideStartDestination),
+                            // showing a brief loader instead of blocking onCreate.
+                            var startDestination by remember { mutableStateOf<Route?>(null) }
+                            LaunchedEffect(Unit) {
+                                startDestination = decideStartDestination(container)
                             }
-                            else -> RatatoskrNavHost(container = container, startDestination = dest)
+                            when (val dest = startDestination) {
+                                // Resolving the start route is normally sub-second; only show the
+                                // loader if it takes long enough to be worth it, so it never flashes.
+                                null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    if (rememberDelayedVisible(active = true)) {
+                                        KnotLoader(label = stringResource(R.string.app_loading))
+                                    }
+                                }
+                                else -> RatatoskrNavHost(container = container, startDestination = dest)
+                            }
                         }
                     }
                 }

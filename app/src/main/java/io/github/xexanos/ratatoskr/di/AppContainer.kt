@@ -10,6 +10,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStoreFile
+import io.github.xexanos.ratatoskr.covers.CoverImages
 import io.github.xexanos.ratatoskr.data.ConnectionManager
 import io.github.xexanos.ratatoskr.network.persist.DataStoreConnectionStore
 import io.github.xexanos.ratatoskr.network.persist.KeystoreCrypto
@@ -35,15 +36,18 @@ class AppContainer(context: Context) {
     val tokenStore = TokenStore(tokenDataStore, KeystoreCrypto())
     val certificateInspector = CertificateInspector()
     val connectionManager = ConnectionManager(connectionStore, tokenStore)
+    val coverImages = CoverImages(appContext) { connectionManager.peekClient()?.coversCallFactory }
 
     /**
-     * Clears all locally persisted state (trusted server + certificate, auth tokens) and drops
-     * the cached client. Lives next to the store declarations so a newly added store is covered
-     * here by construction; used by the instrumented tests to start each from a clean install.
+     * Clears all locally persisted state (trusted server + certificate, auth tokens, cached
+     * cover images) and drops the cached client. Lives next to the store declarations so a
+     * newly added store is covered here by construction; used by the instrumented tests to
+     * start each from a clean install.
      */
     suspend fun reset() {
         connectionStore.clear()
         tokenStore.clear()
         connectionManager.invalidate()
+        coverImages.clear()
     }
 }

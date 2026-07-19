@@ -71,6 +71,10 @@
     <string name="settings_forget_cert">Zertifikat vergessen und neu vertrauen</string>
     <string name="settings_forget_cert_hint">Entfernt das gepinnte Zertifikat. Bei der nächsten Verbindung bestätigst du den Fingerabdruck des Servers erneut.</string>
     <string name="settings_sign_out">Abmelden</string>
+    <string name="settings_section_storage">Speicher</string>
+    <string name="settings_clear_image_cache">Bilder-Cache leeren</string>
+    <string name="settings_clear_image_cache_hint">Entfernt heruntergeladene Cover. Cover werden bei Bedarf neu geladen — nützlich, wenn sich ein Cover auf dem Server geändert hat.</string>
+    <string name="settings_image_cache_cleared">Bilder-Cache geleert</string>
 
     <!-- Loading -->
     <string name="knot_loader_description">Ladeanzeige: der Ratatoskr-Knoten mit einem Kupfer-Eichhörnchen, das den Strang entlangläuft</string>

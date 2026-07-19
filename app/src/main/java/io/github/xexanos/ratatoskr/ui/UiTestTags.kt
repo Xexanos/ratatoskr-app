@@ -18,4 +18,5 @@ object UiTestTags {
     const val LIBRARY_ROW = "library_row"
     const val SPEAKER_ROW = "speaker_row"
     const val NOWPLAYING_SEEK = "nowplaying_seek"
+    const val COVER_PLACEHOLDER = "cover_placeholder"
 }
