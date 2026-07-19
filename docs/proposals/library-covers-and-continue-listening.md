@@ -6,9 +6,9 @@ marked). It drives a change to `ratatoskr-server/contract/openapi.yaml`, which f
 server's own versioning rules (server SPEC section 6). Nothing here is built app-side until the
 contract lands — the app is a thin remote.
 
-Both parts are **additive and backward-compatible** (each adds a new endpoint), so they are
-oasdiff-clean and fit a **minor** contract bump, like the 1.1.0 refresh-token-rotation change.
-They are independent and can ship separately.
+Both parts are **additive and backward-compatible** (new endpoints, plus schema changes that keep
+every existing field), so they are oasdiff-clean and fit a **minor** contract bump, like the 1.1.0
+refresh-token-rotation change. They are independent and can ship separately.
 
 ## Current contract (for reference)
 
@@ -112,22 +112,50 @@ client-side from the existing `progress` field. No change needed for the visual.
         required: false
         schema: { type: integer, minimum: 1, maximum: 50, default: 25 }
     responses:
-      "200": { $ref: "#/components/schemas/LibraryItemPage" }
+      "200": { $ref: "#/components/schemas/LibraryItemList" }
 ```
 
 - **Name: `/library/in-progress`** — a self-describing REST noun. ABS's own term is "Continue
   Listening", but that is a personalized *shelf* served via `/api/libraries/{id}/personalized`,
   not a REST path — so the vocabulary is ABS's while the path is ours, and a generic name reads
   clearly without ABS knowledge. (`/library/continue` was verb-y and vague.)
-- **Response = `LibraryItemPage`**, reused for consistency with `/library/items` (same client
-  type and rendering). The shelf returns one complete page — `nextCursor` is null — so the
-  envelope honestly says "that's all". If shelf-level fields are ever needed later, a superset
-  schema (`allOf [LibraryItemPage, { …new optional fields }]`) stays non-breaking and
-  oasdiff-clean; a bare array could never gain a sibling field, which is why it was rejected.
+- **Response = `LibraryItemList`**, a new base schema holding only the always-present part
+  (`items`). Pagination is the *specialization*, not the default: the browse list adds the cursor
+  on top of the base, so the shelf carries no `nextCursor` at all — instead of a misleading,
+  always-null field that weakly implies "more could come" when it never does. See "Schema
+  hierarchy" below.
 - Server returns only in-progress items (not finished, position > 0), ordered by ABS recency.
-- A shelf, not the whole library: bounded by `limit`, so no pagination in practice.
+- A shelf, not the whole library: bounded by `limit`, so no pagination.
 - Cleanly decouples the shelf from the browse list, which stays alphabetical and paginated as-is.
 - The app renders this as a section on top of the Library screen; the full list follows unchanged.
+
+**Schema hierarchy (base + specialization).** Extract the always-needed part into a base and make
+the paginated list extend it; shelves use the base:
+
+```yaml
+LibraryItemList:              # base — only the always-present part
+  type: object
+  required: [items]
+  properties:
+    items: { type: array, items: { $ref: "#/components/schemas/LibraryItemSummary" } }
+
+LibraryItemPage:             # browse-list specialization = base + cursor
+  allOf:
+    - $ref: "#/components/schemas/LibraryItemList"
+    - type: object
+      properties:
+        nextCursor: { type: string, nullable: true, description: Present when more items are available. }
+```
+
+- Refactoring today's flat `LibraryItemPage` into this `allOf` resolves to the identical
+  `{ items, nextCursor? }`, so `/library/items` is unchanged — **non-breaking, oasdiff-clean**.
+- Future shelves (#51: series, collections, playlists) return `LibraryItemList`, sharing an honest
+  base instead of each carrying a vestigial cursor. A shelf that later needs its own envelope
+  fields extends it again, e.g. `SeriesShelf: allOf [LibraryItemList, { seriesName }]`. The
+  contract already uses this `allOf` pattern (`LibraryItem` extends `LibraryItemSummary`), and the
+  Kotlin generator handles it.
+- If a full paginated in-progress *view* is ever wanted, `/library/in-progress` can switch to
+  `LibraryItemPage` and add a `cursor` param — additive, non-breaking.
 
 **Alternative considered.** A `sort=recent` query param on `/library/items`. Lighter (no new path),
 but it entangles the shelf with the main list's pagination and still needs the server-side recency
