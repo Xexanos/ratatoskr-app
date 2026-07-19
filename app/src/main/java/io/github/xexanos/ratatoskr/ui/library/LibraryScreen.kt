@@ -37,7 +37,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
@@ -175,7 +174,11 @@ class LibraryViewModel(
             else _uiState.value.copy(loading = true, error = null)
         val client = connectionManager.client()
         if (client == null) {
-            _uiState.value = LibraryUiState(error = "No server configured.")
+            // Same rule as the failure branch below: a refresh over an existing list keeps the
+            // list and reports via the snackbar rather than wiping to the full-screen error.
+            _uiState.value =
+                if (showAsRefresh) _uiState.value.copy(refreshing = false, refreshError = "No server configured.")
+                else LibraryUiState(error = "No server configured.")
             return
         }
         _uiState.value = when (val result = client.listLibraryItems(query = query)) {
@@ -256,7 +259,11 @@ fun LibraryScreen(
         }
     }
 
-    Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { padding ->
+    // No nested Scaffold: MainActivity already hosts the single top-level Scaffold under
+    // enableEdgeToEdge(), so a second one would compute system-bar insets a second time. Host the
+    // snackbar in a Box overlay instead - the content is already inset by the outer Scaffold, so a
+    // bottom-aligned SnackbarHost clears the navigation bar.
+    Box(Modifier.fillMaxSize()) {
         LibraryContent(
             state = state,
             query = query,
@@ -269,8 +276,8 @@ fun LibraryScreen(
             onOpenItem = onOpenItem,
             onOpenNowPlaying = onOpenNowPlaying,
             onOpenSettings = onOpenSettings,
-            modifier = Modifier.padding(padding),
         )
+        SnackbarHost(snackbarHostState, Modifier.align(Alignment.BottomCenter))
     }
 }
 
@@ -288,9 +295,8 @@ private fun LibraryContent(
     onOpenItem: (String) -> Unit,
     onOpenNowPlaying: () -> Unit,
     onOpenSettings: () -> Unit,
-    modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+    Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
