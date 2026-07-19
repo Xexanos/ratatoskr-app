@@ -92,6 +92,8 @@ class AccessibilityChecksTest {
     @Test fun nowPlayingPaused() = runChecks { NowPlayingPausedPreview() }
     @Test fun nowPlayingEmpty() = runChecks { NowPlayingEmptyPreview() }
     @Test fun settings() = runChecks { SettingsPreview() }
+    @Test fun knotLoader() = runChecks { KnotLoaderPreview() }
+    @Test fun knotLoaderReduced() = runChecks { KnotLoaderReducedPreview() }
 
     /**
      * Canary: a knowingly inaccessible UI (unlabeled clickable, far below the 48dp

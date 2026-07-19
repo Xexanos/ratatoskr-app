@@ -1,0 +1,1 @@
+Loading screens now show the animated Ratatoskr knot instead of a generic spinner. It only appears when a wait is actually slow, so quick loads no longer flash an indicator.
