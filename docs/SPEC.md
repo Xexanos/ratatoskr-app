@@ -459,6 +459,19 @@ Decided with the implementing agent. Rationale in brief, so it is not re-litigat
   serialization library is whatever the chosen generator template uses (Moshi for
   `jvm-retrofit2`), configured leniently.
 - **Token storage:** Keystore-backed DataStore (encrypted at rest, section 5).
+- **Cover images:** Coil 3 (`coil-compose` + `coil-network-okhttp`). Apache-2.0 with no
+  Google or proprietary dependencies (F-Droid-safe, section 8); accepts an OkHttp
+  `Call.Factory`, which is exactly the hook for core-network's covers stack (TOFU trust and
+  bearer/refresh auth shared with the API client, but a separate dispatcher so image bursts
+  never queue playback commands) - no generated code touched; multiplatform-ready, matching
+  the KMP door kept open below. One app-lifetime `ImageLoader` owned by the AppContainer and
+  provided to the UI via a CompositionLocal (tests inject coil-test's FakeImageLoaderEngine).
+  Covers are requested server-scaled through quantized height buckets (`?h=` 128/256/512/1024,
+  rounded up from the measured layout size, capped at 1024 even for now-playing). Disk cache:
+  50 MB LRU; HTTP cache headers are deliberately ignored - Audiobookshelf sends none on the
+  proxy's request path, so respecting them would disable caching entirely. Stale covers are
+  the accepted trade-off, bounded by LRU eviction and the Settings "clear image cache" action;
+  sign-out and forget-server wipe the caches.
 - **`minSdk` 26** (Android 8.0): safely covers the Keystore-backed encrypted storage and
   TLS requirements and provides `java.time` (for `Session.updatedAt`) without core-library
   desugaring. Raising coverage to older devices (minSdk 23 + desugaring) is possible but
@@ -481,15 +494,24 @@ ratatoskr-app/
 │   ├── library/             #   browse and search
 │   ├── speakers/            #   speaker picker
 │   ├── nowplaying/          #   play/pause/seek/stop, position display
-│   └── settings/            #   server URL, certificate re-trust/forget, sign-out
+│   ├── settings/            #   server URL, certificate re-trust/forget, sign-out,
+│   │                        #   clear image cache
+│   ├── common/              #   shared composables: CoverImage, the one cover tile every
+│   │                        #   surface renders (list rows, shelves, now-playing)
+│   └── covers/              #   cover-image loading (section 12): the app-lifetime Coil
+│                            #   ImageLoader, the bucketed ?h interceptor, disk cache and
+│                            #   cache clearing
 │
 └── core-network/           # everything that talks to the server; app depends on this
     ├── generated/           #   openapi-generator output - NEVER hand-edited
     ├── api/                 #   thin wrapper over the generated client: maps generated
-    │                        #   DTOs to domain models, absorbs contract changes in one
-    │                        #   place, tolerant to unknown fields; also the bearer/refresh
-    │                        #   interceptors and the single-flight, session-aware refresh
-    │                        #   guard (section 5)
+    │                        #   DTOs to domain models (resolving the origin-relative
+    │                        #   coverUrl to an absolute URL), absorbs contract changes in
+    │                        #   one place, tolerant to unknown fields; also the
+    │                        #   bearer/refresh interceptors, the single-flight,
+    │                        #   session-aware refresh guard (section 5), and the covers
+    │                        #   Call.Factory (shared trust/auth, own dispatcher) the app's
+    │                        #   image loader consumes
     ├── domain/              #   domain models (library item, speaker, session, tokens) and
     │                        #   the ApiResult type — the only types the app module sees
     ├── tls/                 #   TOFU trust manager and certificate-fetch helper (section 6)

@@ -25,3 +25,28 @@ _Avoid_: pinned section, in-progress list
 A book with progress present, position > 0 and not finished. Defined by the server; the
 app never re-derives shelf membership itself.
 _Avoid_: active, started, listening
+
+### Covers
+
+**Cover**:
+A book's artwork, always served by the Ratatoskr server's cover proxy under the app's own
+auth - never fetched from Audiobookshelf directly. "No cover" shows as a failed load (404),
+or as a null cover URL once the server implements it; it is never a sentinel value.
+_Avoid_: thumbnail, artwork (as distinct concepts - there is only the cover, at different sizes)
+
+**Cover URL** (`coverUrl`):
+In the app's domain model: the absolute, bearer-authenticated URL a cover is loadable from.
+On the wire the server sends an origin-relative path; resolving it is the wrapper's job, so
+nothing above the wrapper ever sees a relative value.
+
+**Cover bucket**:
+One of the quantized heights {128, 256, 512, 1024} the app requests covers at (`?h=`),
+rounded up from the rendered size and capped at 1024. Surfaces whose rows land in the same
+bucket share one cached image; nothing ever requests an unquantized or original size.
+_Avoid_: thumbnail size, resolution
+
+**Placeholder tile**:
+The title-initial tile shown where a cover would be - identical while a cover loads and
+when none exists, so a coverless book looks finished, not broken. (Its visual design is
+under review: issue #78.)
+_Avoid_: fallback image, error state (it is deliberately not a distinct state)
