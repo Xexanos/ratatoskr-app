@@ -122,7 +122,7 @@ private const val TAIL_FRACTION = 0.20f // length of the fading comet tail, as a
 private const val TAIL_SEGMENTS = 24
 private const val TAIL_MAX_ALPHA = 0.30f // matches the SVG stroke opacity
 private const val HALO_ALPHA = 0.22f
-private const val CYCLE_MILLIS = 2400 // one lap of the runner, matching the SVG animation
+private const val CYCLE_MILLIS = 4000 // one lap of the runner, matching the SVG animation (dur=4s)
 
 /**
  * The Ratatoskr brand loader: the woven-knot mark with a copper squirrel running the strand.
