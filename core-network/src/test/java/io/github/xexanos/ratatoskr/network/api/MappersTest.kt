@@ -8,6 +8,7 @@ package io.github.xexanos.ratatoskr.network.api
 import io.github.xexanos.ratatoskr.network.domain.PlaybackState
 import io.github.xexanos.ratatoskr.network.generated.infrastructure.Serializer
 import io.github.xexanos.ratatoskr.network.generated.model.LibraryItem as GenLibraryItem
+import io.github.xexanos.ratatoskr.network.generated.model.LibraryItemSummary as GenLibraryItemSummary
 import io.github.xexanos.ratatoskr.network.generated.model.PlaybackState as GenPlaybackState
 import io.github.xexanos.ratatoskr.network.generated.model.Progress as GenProgress
 import io.github.xexanos.ratatoskr.network.generated.model.Session as GenSession
@@ -34,7 +35,7 @@ class MappersTest {
             narrator = "Andy Serkis",
         )
 
-        val domain = gen.toDomain()
+        val domain = gen.toDomain(baseUrl = "https://ratatoskr.home:8080")
 
         assertEquals("42", domain.summary.id)
         assertEquals("The Hobbit", domain.summary.title)
@@ -42,6 +43,54 @@ class MappersTest {
         assertEquals(120.5, domain.summary.progress!!.positionSeconds, 0.0)
         assertEquals("There and back again", domain.description)
         assertEquals("Andy Serkis", domain.narrator)
+    }
+
+    // --- coverUrl resolution (contract 1.3.x sends a path relative to the server origin;
+    // --- the wrapper absorbs that so the domain model always carries a loadable URL) --------
+
+    @Test
+    fun `relative coverUrl resolves against the base url`() {
+        assertEquals(
+            "https://ratatoskr.home:8080/v1/library/items/42/cover",
+            resolveCoverUrl("/v1/library/items/42/cover", "https://ratatoskr.home:8080"),
+        )
+    }
+
+    @Test
+    fun `trailing slash on the base url does not double the separator`() {
+        assertEquals(
+            "https://ratatoskr.home:8080/v1/library/items/42/cover",
+            resolveCoverUrl("/v1/library/items/42/cover", "https://ratatoskr.home:8080/"),
+        )
+    }
+
+    @Test
+    fun `absolute coverUrl passes through untouched`() {
+        // Tolerant-reader guard: contract 1.1.0 described the field as an absolute URL, and a
+        // future server could return to that. Never re-prefix an already-absolute value.
+        assertEquals(
+            "https://elsewhere.example/cover.jpg",
+            resolveCoverUrl("https://elsewhere.example/cover.jpg", "https://ratatoskr.home:8080"),
+        )
+    }
+
+    @Test
+    fun `null coverUrl stays null`() {
+        assertEquals(null, resolveCoverUrl(null, "https://ratatoskr.home:8080"))
+    }
+
+    @Test
+    fun `summary mapping resolves the cover url`() {
+        val gen = GenLibraryItemSummary(
+            id = "42",
+            title = "The Hobbit",
+            durationSeconds = 39600.0,
+            coverUrl = "/v1/library/items/42/cover",
+        )
+
+        val domain = gen.toDomain(baseUrl = "https://ratatoskr.home:8080")
+
+        assertEquals("https://ratatoskr.home:8080/v1/library/items/42/cover", domain.coverUrl)
     }
 
     @Test

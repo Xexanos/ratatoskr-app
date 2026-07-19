@@ -53,6 +53,8 @@ class RatatoskrClientTest {
             playbackApi = retrofit.create(PlaybackApi::class.java),
             tokenStore = tokens,
             moshi = moshi,
+            baseUrl = server.url("/").toString(),
+            coversCallFactory = OkHttpClient(),
         )
     }
 
