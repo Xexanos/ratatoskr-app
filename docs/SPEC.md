@@ -500,7 +500,8 @@ ratatoskr-app/
 │   │                        #   surface renders (list rows, shelves, now-playing)
 │   └── covers/              #   cover-image loading (section 12): the app-lifetime Coil
 │                            #   ImageLoader, the bucketed ?h interceptor, disk cache and
-│                            #   cache clearing
+│                            #   cache clearing. Not a screen: lives beside data/ and di/
+│                            #   in the app module's root package, outside ui/
 │
 └── core-network/           # everything that talks to the server; app depends on this
     ├── generated/           #   openapi-generator output - NEVER hand-edited
@@ -513,7 +514,9 @@ ratatoskr-app/
     │                        #   Call.Factory (shared trust/auth, own dispatcher) the app's
     │                        #   image loader consumes
     ├── domain/              #   domain models (library item, speaker, session, tokens) and
-    │                        #   the ApiResult type — the only types the app module sees
+    │                        #   the ApiResult type — the only server-derived types the app
+    │                        #   module sees (the covers Call.Factory above is the one
+    │                        #   deliberate OkHttp-typed exception, for the image loader)
     ├── tls/                 #   TOFU trust manager and certificate-fetch helper (section 6)
     └── persist/             #   Keystore-backed encrypted token store and the trusted-
                              #   server / fingerprint store (sections 5, 6)
