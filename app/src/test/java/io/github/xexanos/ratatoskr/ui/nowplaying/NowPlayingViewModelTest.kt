@@ -14,8 +14,10 @@ import io.github.xexanos.ratatoskr.data.ConnectionManager
 import io.github.xexanos.ratatoskr.network.FakeTokenAccess
 import io.github.xexanos.ratatoskr.network.WireFixtures
 import io.github.xexanos.ratatoskr.network.domain.PlaybackState
+import io.github.xexanos.ratatoskr.network.domain.RatatoskrError
 import io.github.xexanos.ratatoskr.network.persist.DataStoreConnectionStore
 import io.github.xexanos.ratatoskr.network.testutil.HttpsMockServer
+import io.github.xexanos.ratatoskr.ui.UiError
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -132,7 +134,7 @@ class NowPlayingViewModelTest {
         assertTrue(connectionManager.isSessionActive())
 
         viewModel.refresh() // 502 -> banner; session and active flag retained
-        assertEquals("Sonos is unavailable", viewModel.uiState.value.error)
+        assertEquals("Sonos is unavailable", ((viewModel.uiState.value.error as UiError.Domain).error as RatatoskrError.Upstream).message)
         assertTrue(connectionManager.isSessionActive())
 
         viewModel.refresh() // 404 -> relinquished: card gone, banner cleared, refresh un-suppressed
@@ -151,7 +153,7 @@ class NowPlayingViewModelTest {
 
         viewModel.refresh()
 
-        assertEquals("Audiobookshelf down", viewModel.uiState.value.error)
+        assertEquals("Audiobookshelf down", ((viewModel.uiState.value.error as UiError.Domain).error as RatatoskrError.Upstream).message)
     }
 
     @Test

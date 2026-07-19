@@ -16,6 +16,7 @@ import io.github.xexanos.ratatoskr.network.WireFixtures
 import io.github.xexanos.ratatoskr.network.persist.ConnectionStore
 import io.github.xexanos.ratatoskr.network.persist.DataStoreConnectionStore
 import io.github.xexanos.ratatoskr.network.testutil.HttpsMockServer
+import io.github.xexanos.ratatoskr.ui.UiError
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -121,6 +122,6 @@ class SignInViewModelTest {
         viewModel.signIn("alex", "secret")
         waitUntil { viewModel.uiState.value != SignInUiState.Submitting }
 
-        assertEquals(SignInUiState.Error("No server configured."), viewModel.uiState.value)
+        assertEquals(SignInUiState.Error(UiError.NoServer), viewModel.uiState.value)
     }
 }

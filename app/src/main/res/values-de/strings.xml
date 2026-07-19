@@ -71,4 +71,15 @@
     <string name="settings_forget_cert">Zertifikat vergessen und neu vertrauen</string>
     <string name="settings_forget_cert_hint">Entfernt das gepinnte Zertifikat. Bei der nächsten Verbindung bestätigst du den Fingerabdruck des Servers erneut.</string>
     <string name="settings_sign_out">Abmelden</string>
+
+    <!-- Errors -->
+    <string name="error_no_server">Kein Server konfiguriert.</string>
+    <string name="error_unauthorized">Anmeldung abgelaufen. Bitte melde dich erneut an.</string>
+    <string name="error_no_active_session">Gerade wird nichts wiedergegeben.</string>
+    <string name="error_not_found">Nicht gefunden.</string>
+    <string name="error_server">Der Server hat einen Fehler gemeldet (%1$d).</string>
+    <string name="error_upstream">Audiobookshelf oder Sonos ist nicht verfügbar.</string>
+    <string name="error_cert_untrusted">Dem Serverzertifikat wird nicht vertraut. Bestätige es in den Einstellungen erneut, falls es sich geändert hat.</string>
+    <string name="error_network">Server nicht erreichbar. Prüfe die URL und dein Netzwerk.</string>
+    <string name="error_unexpected">Etwas ist schiefgelaufen.</string>
 </resources>

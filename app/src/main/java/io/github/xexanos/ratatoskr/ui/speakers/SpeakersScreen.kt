@@ -50,8 +50,9 @@ import io.github.xexanos.ratatoskr.network.domain.ApiResult
 import io.github.xexanos.ratatoskr.network.domain.Speaker
 import io.github.xexanos.ratatoskr.ui.EmptyState
 import io.github.xexanos.ratatoskr.ui.UiTestTags
+import io.github.xexanos.ratatoskr.ui.UiError
+import io.github.xexanos.ratatoskr.ui.text
 import io.github.xexanos.ratatoskr.ui.theme.RatatoskrTheme
-import io.github.xexanos.ratatoskr.ui.toMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -62,7 +63,7 @@ data class SpeakersUiState(
     val speakers: List<Speaker> = emptyList(),
     val starting: Boolean = false,
     val started: Boolean = false,
-    val error: String? = null,
+    val error: UiError? = null,
 )
 
 class SpeakersViewModel(
@@ -78,12 +79,12 @@ class SpeakersViewModel(
     private fun loadSpeakers() {
         viewModelScope.launch {
             val client = connectionManager.client() ?: run {
-                _uiState.value = SpeakersUiState(loading = false, error = "No server configured.")
+                _uiState.value = SpeakersUiState(loading = false, error = UiError.NoServer)
                 return@launch
             }
             _uiState.value = when (val result = client.listSpeakers()) {
                 is ApiResult.Success -> SpeakersUiState(loading = false, speakers = result.data)
-                is ApiResult.Failure -> SpeakersUiState(loading = false, error = result.error.toMessage())
+                is ApiResult.Failure -> SpeakersUiState(loading = false, error = UiError.Domain(result.error))
             }
         }
     }
@@ -95,7 +96,7 @@ class SpeakersViewModel(
             when (val result = client.startSession(itemId, speakerId)) {
                 is ApiResult.Success -> _uiState.value = _uiState.value.copy(starting = false, started = true)
                 is ApiResult.Failure -> _uiState.value =
-                    _uiState.value.copy(starting = false, error = result.error.toMessage())
+                    _uiState.value.copy(starting = false, error = UiError.Domain(result.error))
             }
         }
     }
@@ -150,7 +151,7 @@ private fun SpeakersContent(
 
             state.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
-                    state.error,
+                    state.error.text(),
                     color = MaterialTheme.colorScheme.error,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(24.dp),

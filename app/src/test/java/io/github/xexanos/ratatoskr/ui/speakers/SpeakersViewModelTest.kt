@@ -13,8 +13,10 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import io.github.xexanos.ratatoskr.data.ConnectionManager
 import io.github.xexanos.ratatoskr.network.FakeTokenAccess
 import io.github.xexanos.ratatoskr.network.WireFixtures
+import io.github.xexanos.ratatoskr.network.domain.RatatoskrError
 import io.github.xexanos.ratatoskr.network.persist.DataStoreConnectionStore
 import io.github.xexanos.ratatoskr.network.testutil.HttpsMockServer
+import io.github.xexanos.ratatoskr.ui.UiError
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -93,7 +95,7 @@ class SpeakersViewModelTest {
 
         val state = viewModel.uiState.value
         assertFalse(state.loading)
-        assertEquals("No server configured.", state.error)
+        assertEquals(UiError.NoServer, state.error)
     }
 
     @Test
@@ -105,7 +107,7 @@ class SpeakersViewModelTest {
         val viewModel = SpeakersViewModel(trustedConnectionManager(), itemId = "i1")
         waitUntil { !viewModel.uiState.value.loading }
 
-        assertEquals("Sign-in expired. Please sign in again.", viewModel.uiState.value.error)
+        assertEquals(UiError.Domain(RatatoskrError.Unauthorized), viewModel.uiState.value.error)
     }
 
     @Test
@@ -150,6 +152,6 @@ class SpeakersViewModelTest {
         val state = viewModel.uiState.value
         assertFalse(state.starting)
         assertFalse(state.started)
-        assertEquals("Audiobookshelf down", state.error)
+        assertEquals("Audiobookshelf down", ((state.error as UiError.Domain).error as RatatoskrError.Upstream).message)
     }
 }
