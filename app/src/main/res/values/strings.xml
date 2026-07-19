@@ -38,6 +38,7 @@
     <string name="library_percent">%1$d%%</string>
     <string name="library_loading_more">Loading more audiobooks</string>
     <string name="library_load_more_failed">Couldn\'t load more audiobooks. Tap to retry.</string>
+    <string name="library_retry">Try again</string>
 
     <!-- Speakers -->
     <string name="speakers_title">Choose a speaker</string>
