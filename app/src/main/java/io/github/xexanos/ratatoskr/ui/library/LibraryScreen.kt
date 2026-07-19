@@ -69,11 +69,13 @@ import io.github.xexanos.ratatoskr.R
 import io.github.xexanos.ratatoskr.data.ConnectionManager
 import io.github.xexanos.ratatoskr.network.domain.ApiResult
 import io.github.xexanos.ratatoskr.network.domain.LibraryItemSummary
+import io.github.xexanos.ratatoskr.network.domain.RatatoskrError
 import io.github.xexanos.ratatoskr.network.domain.Progress
 import io.github.xexanos.ratatoskr.ui.EmptyState
+import io.github.xexanos.ratatoskr.ui.UiError
 import io.github.xexanos.ratatoskr.ui.UiTestTags
+import io.github.xexanos.ratatoskr.ui.text
 import io.github.xexanos.ratatoskr.ui.theme.RatatoskrTheme
-import io.github.xexanos.ratatoskr.ui.toMessage
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -97,9 +99,9 @@ data class LibraryUiState(
     val loadMoreError: Boolean = false,
     // A pull-to-refresh is reloading over an existing list (drives the pull indicator).
     val refreshing: Boolean = false,
-    // One-shot message for a refresh that failed while a list was already shown (a snackbar).
-    val refreshError: String? = null,
-    val error: String? = null,
+    // One-shot error for a refresh that failed while a list was already shown (a snackbar).
+    val refreshError: UiError? = null,
+    val error: UiError? = null,
 )
 
 // A single reload of the library. `userTriggered` distinguishes a pull-to-refresh / retry (which
@@ -177,8 +179,8 @@ class LibraryViewModel(
             // Same rule as the failure branch below: a refresh over an existing list keeps the
             // list and reports via the snackbar rather than wiping to the full-screen error.
             _uiState.value =
-                if (showAsRefresh) _uiState.value.copy(refreshing = false, refreshError = "No server configured.")
-                else LibraryUiState(error = "No server configured.")
+                if (showAsRefresh) _uiState.value.copy(refreshing = false, refreshError = UiError.NoServer)
+                else LibraryUiState(error = UiError.NoServer)
             return
         }
         _uiState.value = when (val result = client.listLibraryItems(query = query)) {
@@ -187,9 +189,9 @@ class LibraryViewModel(
             is ApiResult.Failure ->
                 if (showAsRefresh) {
                     // A refresh over an existing list failed: keep the list, report via a snackbar.
-                    _uiState.value.copy(refreshing = false, refreshError = result.error.toMessage())
+                    _uiState.value.copy(refreshing = false, refreshError = UiError.Domain(result.error))
                 } else {
-                    LibraryUiState(error = result.error.toMessage())
+                    LibraryUiState(error = UiError.Domain(result.error))
                 }
         }
     }
@@ -247,11 +249,12 @@ fun LibraryScreen(
     // A refresh that failed while the list stayed on screen: a one-shot snackbar that keeps the
     // list AND offers retry as its action (errors always offer retry first).
     val refreshError = state.refreshError
+    val refreshErrorText = refreshError?.text()
     val retryLabel = stringResource(R.string.library_retry)
     LaunchedEffect(refreshError) {
-        if (refreshError != null) {
+        if (refreshErrorText != null) {
             val result = snackbarHostState.showSnackbar(
-                message = refreshError,
+                message = refreshErrorText,
                 actionLabel = retryLabel,
             )
             viewModel.clearRefreshError()
@@ -349,7 +352,7 @@ private fun LibraryContent(
                     modifier = Modifier.padding(24.dp),
                 ) {
                     Text(
-                        state.error,
+                        state.error.text(),
                         color = MaterialTheme.colorScheme.error,
                         textAlign = TextAlign.Center,
                     )
@@ -626,7 +629,7 @@ internal fun LibraryLoadingPreview() = RatatoskrTheme {
 internal fun LibraryErrorPreview() = RatatoskrTheme {
     Surface {
         LibraryContent(
-            state = LibraryUiState(error = "Audiobookshelf is unreachable."),
+            state = LibraryUiState(error = UiError.Domain(RatatoskrError.Upstream(code = null, message = "Audiobookshelf is unreachable."))),
             query = "",
             onQueryChange = {},
             onOpenItem = {},

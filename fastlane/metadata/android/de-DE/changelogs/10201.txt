@@ -1,0 +1,1 @@
+Fehlermeldungen werden jetzt übersetzt (Deutsch) angezeigt statt immer auf Englisch.

@@ -74,4 +74,15 @@
     <string name="settings_forget_cert">Forget certificate and re-trust</string>
     <string name="settings_forget_cert_hint">Removes the pinned certificate. You will confirm the server\'s fingerprint again on the next connection.</string>
     <string name="settings_sign_out">Sign out</string>
+
+    <!-- Errors -->
+    <string name="error_no_server">No server configured.</string>
+    <string name="error_unauthorized">Sign-in expired. Please sign in again.</string>
+    <string name="error_no_active_session">Nothing is playing right now.</string>
+    <string name="error_not_found">Not found.</string>
+    <string name="error_server">The server reported an error (%1$d).</string>
+    <string name="error_upstream">Audiobookshelf or Sonos is unavailable.</string>
+    <string name="error_cert_untrusted">The server certificate is not trusted. Re-confirm it in settings if it changed.</string>
+    <string name="error_network">Cannot reach the server. Check the URL and your network.</string>
+    <string name="error_unexpected">Something went wrong.</string>
 </resources>

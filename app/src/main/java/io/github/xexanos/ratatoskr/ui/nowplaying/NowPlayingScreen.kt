@@ -61,9 +61,10 @@ import io.github.xexanos.ratatoskr.network.domain.LibraryItemSummary
 import io.github.xexanos.ratatoskr.network.domain.PlaybackState
 import io.github.xexanos.ratatoskr.network.domain.RatatoskrError
 import io.github.xexanos.ratatoskr.network.domain.Session
+import io.github.xexanos.ratatoskr.ui.UiError
 import io.github.xexanos.ratatoskr.ui.UiTestTags
+import io.github.xexanos.ratatoskr.ui.text
 import io.github.xexanos.ratatoskr.ui.theme.RatatoskrTheme
-import io.github.xexanos.ratatoskr.ui.toMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -77,7 +78,7 @@ private const val POLL_INTERVAL_MS = 5_000L
 data class NowPlayingUiState(
     val loading: Boolean = true,
     val session: Session? = null,
-    val error: String? = null,
+    val error: UiError? = null,
     val stopped: Boolean = false,
 )
 
@@ -124,7 +125,7 @@ class NowPlayingViewModel(
                         _uiState.value = _uiState.value.copy(loading = false, session = null, error = null)
                     }
                     else ->
-                        _uiState.value = _uiState.value.copy(loading = false, error = result.error.toMessage())
+                        _uiState.value = _uiState.value.copy(loading = false, error = UiError.Domain(result.error))
                 }
             }
         }
@@ -161,7 +162,7 @@ class NowPlayingViewModel(
                     _uiState.value = _uiState.value.copy(stopped = true)
                 }
                 is ApiResult.Failure ->
-                    _uiState.value = _uiState.value.copy(error = result.error.toMessage())
+                    _uiState.value = _uiState.value.copy(error = UiError.Domain(result.error))
             }
         }
     }
@@ -178,7 +179,7 @@ class NowPlayingViewModel(
                 // Only surface this action's error if a newer control hasn't superseded it.
                 is ApiResult.Failure ->
                     if (epoch == commandEpoch) {
-                        _uiState.value = _uiState.value.copy(error = result.error.toMessage())
+                        _uiState.value = _uiState.value.copy(error = UiError.Domain(result.error))
                     }
             }
         }
@@ -240,7 +241,7 @@ fun NowPlayingScreen(
             session == null ->
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
-                        state.error ?: stringResource(R.string.nowplaying_nothing_playing),
+                        state.error?.text() ?: stringResource(R.string.nowplaying_nothing_playing),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
@@ -262,7 +263,7 @@ fun NowPlayingScreen(
 @Composable
 private fun androidx.compose.foundation.layout.ColumnScope.NowPlayingContent(
     session: Session,
-    error: String?,
+    error: UiError?,
     onPause: () -> Unit,
     onResume: () -> Unit,
     onSeek: (Double) -> Unit,
@@ -361,7 +362,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.NowPlayingContent(
     error?.let {
         Spacer(Modifier.height(12.dp))
         Text(
-            it,
+            it.text(),
             color = MaterialTheme.colorScheme.error,
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
@@ -497,7 +498,7 @@ private fun previewSession(state: PlaybackState) = Session(
 @Composable
 private fun NowPlayingPreviewScaffold(
     session: Session?,
-    error: String? = null,
+    error: UiError? = null,
     loading: Boolean = false,
 ) {
     RatatoskrTheme {
@@ -516,7 +517,7 @@ private fun NowPlayingPreviewScaffold(
                     }
                     session == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
-                            error ?: stringResource(R.string.nowplaying_nothing_playing),
+                            error?.text() ?: stringResource(R.string.nowplaying_nothing_playing),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,

@@ -14,8 +14,10 @@ import io.github.xexanos.ratatoskr.data.ConnectionManager
 import io.github.xexanos.ratatoskr.network.FakeConnectionStore
 import io.github.xexanos.ratatoskr.network.FakeTokenAccess
 import io.github.xexanos.ratatoskr.network.WireFixtures
+import io.github.xexanos.ratatoskr.network.domain.RatatoskrError
 import io.github.xexanos.ratatoskr.network.persist.DataStoreConnectionStore
 import io.github.xexanos.ratatoskr.network.testutil.HttpsMockServer
+import io.github.xexanos.ratatoskr.ui.UiError
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -385,7 +387,7 @@ class LibraryViewModelTest {
         // do NOT wipe to the full-screen error.
         assertEquals(1, viewModel.uiState.value.items.size)
         assertEquals(null, viewModel.uiState.value.error)
-        assertEquals("No server configured.", viewModel.uiState.value.refreshError)
+        assertEquals(UiError.NoServer, viewModel.uiState.value.refreshError)
         assertTrue(!viewModel.uiState.value.refreshing)
     }
 
@@ -400,7 +402,7 @@ class LibraryViewModelTest {
 
         settleState { viewModel.uiState.value.error != null }
 
-        assertEquals("No server configured.", viewModel.uiState.value.error)
+        assertEquals(UiError.NoServer, viewModel.uiState.value.error)
         assertTrue(viewModel.uiState.value.items.isEmpty())
     }
 
@@ -414,6 +416,6 @@ class LibraryViewModelTest {
 
         settleState { viewModel.uiState.value.error != null }
 
-        assertEquals("Audiobookshelf down", viewModel.uiState.value.error)
+        assertEquals("Audiobookshelf down", ((viewModel.uiState.value.error as UiError.Domain).error as RatatoskrError.Upstream).message)
     }
 }

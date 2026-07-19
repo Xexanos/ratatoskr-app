@@ -50,8 +50,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.xexanos.ratatoskr.R
 import io.github.xexanos.ratatoskr.data.ConnectionManager
 import io.github.xexanos.ratatoskr.network.domain.ApiResult
+import io.github.xexanos.ratatoskr.network.domain.RatatoskrError
+import io.github.xexanos.ratatoskr.ui.UiError
+import io.github.xexanos.ratatoskr.ui.text
 import io.github.xexanos.ratatoskr.ui.theme.RatatoskrTheme
-import io.github.xexanos.ratatoskr.ui.toMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -61,7 +63,7 @@ sealed interface SignInUiState {
     data object Idle : SignInUiState
     data object Submitting : SignInUiState
     data object Success : SignInUiState
-    data class Error(val message: String) : SignInUiState
+    data class Error(val error: UiError) : SignInUiState
 }
 
 class SignInViewModel(
@@ -77,12 +79,12 @@ class SignInViewModel(
         viewModelScope.launch {
             val client = connectionManager.client()
             if (client == null) {
-                _uiState.value = SignInUiState.Error("No server configured.")
+                _uiState.value = SignInUiState.Error(UiError.NoServer)
                 return@launch
             }
             _uiState.value = when (val result = client.login(username, password)) {
                 is ApiResult.Success -> SignInUiState.Success
-                is ApiResult.Failure -> SignInUiState.Error(result.error.toMessage())
+                is ApiResult.Failure -> SignInUiState.Error(UiError.Domain(result.error))
             }
         }
     }
@@ -188,7 +190,7 @@ private fun SignInContent(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(
-                    state.message,
+                    state.error.text(),
                     color = MaterialTheme.colorScheme.onErrorContainer,
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(16.dp),
@@ -226,7 +228,7 @@ internal fun SignInIdlePreview() = RatatoskrTheme {
 @Preview(name = "Sign in - error", widthDp = 360, heightDp = 800)
 @Composable
 internal fun SignInErrorPreview() = RatatoskrTheme {
-    Surface { SignInContent(SignInUiState.Error("Sign-in expired. Please sign in again.")) { _, _ -> } }
+    Surface { SignInContent(SignInUiState.Error(UiError.Domain(RatatoskrError.Unauthorized))) { _, _ -> } }
 }
 
 @Preview(name = "Sign in - submitting", widthDp = 360, heightDp = 800)
