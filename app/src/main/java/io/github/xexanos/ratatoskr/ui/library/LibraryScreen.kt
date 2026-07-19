@@ -29,14 +29,20 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -76,6 +82,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -87,8 +95,16 @@ data class LibraryUiState(
     val loadingMore: Boolean = false,
     // The last load-more attempt failed; the footer offers a tap-to-retry instead of a spinner.
     val loadMoreError: Boolean = false,
+    // A pull-to-refresh is reloading over an existing list (drives the pull indicator).
+    val refreshing: Boolean = false,
+    // One-shot message for a refresh that failed while a list was already shown (a snackbar).
+    val refreshError: String? = null,
     val error: String? = null,
 )
+
+// A single reload of the library. `userTriggered` distinguishes a pull-to-refresh / retry (which
+// reloads over an existing list without the full-screen spinner) from a query change.
+private data class Reload(val query: String?, val userTriggered: Boolean)
 
 @OptIn(FlowPreview::class)
 class LibraryViewModel(
@@ -105,20 +121,29 @@ class LibraryViewModel(
     // page lands, and the UI's trigger won't fire again until the threshold is crossed anew.
     private val loadMoreRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
+    // Explicit reload requests (pull-to-refresh, retry-after-error). Buffered so one is kept if
+    // it arrives mid-load and coalesced with any others.
+    private val refreshRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
     init {
-        // One search pipeline for the whole screen: the initial (null) load runs immediately,
-        // keystrokes are debounced, identical queries are ignored, and collectLatest cancels an
-        // in-flight request when a newer query arrives so results can't land out of order.
-        // Follow-up pages are collected INSIDE the same block, so they always belong to the
-        // current query and die with it - a stale cursor can never append to fresh results.
+        // One reload pipeline for the whole screen. Two sources feed it, both funnelled through
+        // the same collectLatest so a newer reload cancels any in-flight load or page fetch:
+        //   - query changes: the initial (null) load runs immediately, keystrokes are debounced,
+        //     identical queries ignored.
+        //   - explicit refreshes: reload the CURRENT query, bypassing debounce and NOT swallowed
+        //     by distinctUntilChanged (a refresh of the same query must actually re-fetch).
+        // Follow-up pages are collected INSIDE the block, so they belong to the current reload and
+        // die with it - a stale cursor can never append to fresh results.
         viewModelScope.launch {
-            query
+            val queryChanges = query
                 .debounce { if (it == null) 0L else SEARCH_DEBOUNCE_MS }
                 .distinctUntilChanged()
-                .collectLatest { q ->
-                    load(q)
-                    loadMoreRequests.collect { loadNextPage(q) }
-                }
+                .map { Reload(it, userTriggered = false) }
+            val refreshes = refreshRequests.map { Reload(query.value, userTriggered = true) }
+            merge(queryChanges, refreshes).collectLatest { reload ->
+                load(reload.query, reload.userTriggered)
+                loadMoreRequests.collect { loadNextPage(reload.query) }
+            }
         }
     }
 
@@ -130,17 +155,42 @@ class LibraryViewModel(
         loadMoreRequests.tryEmit(Unit)
     }
 
-    private suspend fun load(query: String?) {
-        _uiState.value = _uiState.value.copy(loading = true, error = null)
+    /** Pull-to-refresh, or retry after a load error: reloads the current query in place. */
+    fun refresh() {
+        refreshRequests.tryEmit(Unit)
+    }
+
+    fun clearRefreshError() {
+        _uiState.value = _uiState.value.copy(refreshError = null)
+    }
+
+    private suspend fun load(query: String?, userTriggered: Boolean = false) {
+        // A user-triggered reload OVER an existing list shows the pull indicator and keeps the
+        // list; everything else (initial load, query change, retry with nothing shown) uses the
+        // full-screen spinner.
+        val showAsRefresh = userTriggered && _uiState.value.items.isNotEmpty()
+        _uiState.value =
+            if (showAsRefresh) _uiState.value.copy(refreshing = true, refreshError = null)
+            else _uiState.value.copy(loading = true, error = null)
         val client = connectionManager.client()
         if (client == null) {
-            _uiState.value = LibraryUiState(error = "No server configured.")
+            // Same rule as the failure branch below: a refresh over an existing list keeps the
+            // list and reports via the snackbar rather than wiping to the full-screen error.
+            _uiState.value =
+                if (showAsRefresh) _uiState.value.copy(refreshing = false, refreshError = "No server configured.")
+                else LibraryUiState(error = "No server configured.")
             return
         }
         _uiState.value = when (val result = client.listLibraryItems(query = query)) {
             is ApiResult.Success ->
                 LibraryUiState(items = result.data.items, nextCursor = result.data.nextCursor)
-            is ApiResult.Failure -> LibraryUiState(error = result.error.toMessage())
+            is ApiResult.Failure ->
+                if (showAsRefresh) {
+                    // A refresh over an existing list failed: keep the list, report via a snackbar.
+                    _uiState.value.copy(refreshing = false, refreshError = result.error.toMessage())
+                } else {
+                    LibraryUiState(error = result.error.toMessage())
+                }
         }
     }
 
@@ -185,6 +235,7 @@ fun LibraryScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var query by rememberSaveable { mutableStateOf("") }
+    val snackbarHostState = remember { SnackbarHostState() }
 
     // On process-death restore the text field's saved query comes back, but the ViewModel's
     // search flow restarts at null (full library). Re-issue the restored query so the results
@@ -193,29 +244,54 @@ fun LibraryScreen(
         if (query.isNotBlank()) viewModel.search(query)
     }
 
-    LibraryContent(
-        state = state,
-        query = query,
-        onQueryChange = {
-            query = it
-            viewModel.search(it)
-        },
-        onLoadMore = viewModel::loadMore,
-        onOpenItem = onOpenItem,
-        onOpenNowPlaying = onOpenNowPlaying,
-        onOpenSettings = onOpenSettings,
-    )
+    // A refresh that failed while the list stayed on screen: a one-shot snackbar that keeps the
+    // list AND offers retry as its action (errors always offer retry first).
+    val refreshError = state.refreshError
+    val retryLabel = stringResource(R.string.library_retry)
+    LaunchedEffect(refreshError) {
+        if (refreshError != null) {
+            val result = snackbarHostState.showSnackbar(
+                message = refreshError,
+                actionLabel = retryLabel,
+            )
+            viewModel.clearRefreshError()
+            if (result == SnackbarResult.ActionPerformed) viewModel.refresh()
+        }
+    }
+
+    // No nested Scaffold: MainActivity already hosts the single top-level Scaffold under
+    // enableEdgeToEdge(), so a second one would compute system-bar insets a second time. Host the
+    // snackbar in a Box overlay instead - the content is already inset by the outer Scaffold, so a
+    // bottom-aligned SnackbarHost clears the navigation bar.
+    Box(Modifier.fillMaxSize()) {
+        LibraryContent(
+            state = state,
+            query = query,
+            onQueryChange = {
+                query = it
+                viewModel.search(it)
+            },
+            onLoadMore = viewModel::loadMore,
+            onRefresh = viewModel::refresh,
+            onOpenItem = onOpenItem,
+            onOpenNowPlaying = onOpenNowPlaying,
+            onOpenSettings = onOpenSettings,
+        )
+        SnackbarHost(snackbarHostState, Modifier.align(Alignment.BottomCenter))
+    }
 }
 
 // How many rows before the end of the list the next page is requested.
 private const val LOAD_MORE_THRESHOLD = 8
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LibraryContent(
     state: LibraryUiState,
     query: String,
     onQueryChange: (String) -> Unit,
     onLoadMore: () -> Unit = {},
+    onRefresh: () -> Unit = {},
     onOpenItem: (String) -> Unit,
     onOpenNowPlaying: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -268,12 +344,20 @@ private fun LibraryContent(
             }
 
             state.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(
-                    state.error,
-                    color = MaterialTheme.colorScheme.error,
-                    textAlign = TextAlign.Center,
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.padding(24.dp),
-                )
+                ) {
+                    Text(
+                        state.error,
+                        color = MaterialTheme.colorScheme.error,
+                        textAlign = TextAlign.Center,
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Button(onClick = onRefresh) {
+                        Text(stringResource(R.string.library_retry))
+                    }
+                }
             }
 
             state.items.isEmpty() -> EmptyLibrary(query)
@@ -293,43 +377,49 @@ private fun LibraryContent(
                 LaunchedEffect(nearEnd, state.nextCursor) {
                     if (nearEnd && state.nextCursor != null) onLoadMore()
                 }
-                LazyColumn(
-                    state = listState,
+                PullToRefreshBox(
+                    isRefreshing = state.refreshing,
+                    onRefresh = onRefresh,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    items(state.items, key = { it.id }) { item ->
-                        LibraryRow(item, onClick = { onOpenItem(item.id) })
-                    }
-                    if (state.nextCursor != null) {
-                        item(key = "load-more") {
-                            if (state.loadMoreError) {
-                                Box(
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .heightIn(min = 48.dp)
-                                        .clickable(onClick = onLoadMore)
-                                        .padding(vertical = 12.dp),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Text(
-                                        stringResource(R.string.library_load_more_failed),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        textAlign = TextAlign.Center,
-                                    )
-                                }
-                            } else {
-                                val loadingDesc = stringResource(R.string.library_loading_more)
-                                Box(
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 16.dp)
-                                        .semantics { contentDescription = loadingDesc },
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    CircularProgressIndicator()
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(state.items, key = { it.id }) { item ->
+                            LibraryRow(item, onClick = { onOpenItem(item.id) })
+                        }
+                        if (state.nextCursor != null) {
+                            item(key = "load-more") {
+                                if (state.loadMoreError) {
+                                    Box(
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .heightIn(min = 48.dp)
+                                            .clickable(onClick = onLoadMore)
+                                            .padding(vertical = 12.dp),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Text(
+                                            stringResource(R.string.library_load_more_failed),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            textAlign = TextAlign.Center,
+                                        )
+                                    }
+                                } else {
+                                    val loadingDesc = stringResource(R.string.library_loading_more)
+                                    Box(
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 16.dp)
+                                            .semantics { contentDescription = loadingDesc },
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        CircularProgressIndicator()
+                                    }
                                 }
                             }
                         }
@@ -522,6 +612,21 @@ internal fun LibraryLoadingPreview() = RatatoskrTheme {
     Surface {
         LibraryContent(
             state = LibraryUiState(loading = true),
+            query = "",
+            onQueryChange = {},
+            onOpenItem = {},
+            onOpenNowPlaying = {},
+            onOpenSettings = {},
+        )
+    }
+}
+
+@Preview(name = "Library - error", widthDp = 360, heightDp = 800)
+@Composable
+internal fun LibraryErrorPreview() = RatatoskrTheme {
+    Surface {
+        LibraryContent(
+            state = LibraryUiState(error = "Audiobookshelf is unreachable."),
             query = "",
             onQueryChange = {},
             onOpenItem = {},

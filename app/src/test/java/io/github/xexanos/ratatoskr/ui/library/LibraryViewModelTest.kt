@@ -11,6 +11,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import io.github.xexanos.ratatoskr.data.ConnectionManager
+import io.github.xexanos.ratatoskr.network.FakeConnectionStore
 import io.github.xexanos.ratatoskr.network.FakeTokenAccess
 import io.github.xexanos.ratatoskr.network.WireFixtures
 import io.github.xexanos.ratatoskr.network.persist.DataStoreConnectionStore
@@ -32,6 +33,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.util.Collections
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.atomic.AtomicBoolean
 
 class LibraryViewModelTest {
 
@@ -292,6 +294,99 @@ class LibraryViewModelTest {
         // collectLatest cancelled the null-query page load, so its "stale" item never landed.
         assertEquals(listOf("cat-first"), viewModel.uiState.value.items.map { it.id })
         assertTrue(viewModel.uiState.value.items.none { it.id == "stale" })
+    }
+
+    @Test
+    fun `refresh reloads the current query in place`() = runTest(dispatcher) {
+        val viewModel = LibraryViewModel(trustedConnectionManager())
+        settleState { viewModel.uiState.value.items.isNotEmpty() } // initial (null) load
+
+        viewModel.search("cat")
+        settleState { viewModel.uiState.value.items.singleOrNull()?.title == "cat" }
+        val before = receivedQueries.size
+
+        viewModel.refresh()
+        settleState { receivedQueries.size == before + 1 }
+
+        // Reloaded the SAME query (cat), not reset to the full library.
+        assertEquals("cat", receivedQueries.last())
+        assertEquals("cat", viewModel.uiState.value.items.single().title)
+    }
+
+    @Test
+    fun `retry after a failed load re-issues the load and clears the error`() = runTest(dispatcher) {
+        val failFirst = AtomicBoolean(true)
+        server.dispatch { request ->
+            val q = request.requestUrl?.queryParameter("q")
+            receivedQueries += q
+            if (failFirst.getAndSet(false)) {
+                MockResponse().setResponseCode(502)
+                    .setBody("""{"code":"abs_unreachable","message":"Audiobookshelf down"}""")
+            } else {
+                MockResponse().setResponseCode(200)
+                    .setHeader("Content-Type", "application/json")
+                    .setBody(WireFixtures.libraryPageJson(items = listOf(WireFixtures.libraryItemSummaryJson(title = q ?: "all"))))
+            }
+        }
+        val viewModel = LibraryViewModel(trustedConnectionManager())
+        settleState { viewModel.uiState.value.error != null }
+        assertTrue(viewModel.uiState.value.items.isEmpty())
+
+        viewModel.refresh()
+        settleState { viewModel.uiState.value.items.isNotEmpty() }
+
+        assertEquals(null, viewModel.uiState.value.error)
+    }
+
+    @Test
+    fun `a failed refresh keeps the list and surfaces a one-shot refreshError`() = runTest(dispatcher) {
+        val failNow = AtomicBoolean(false)
+        server.dispatch { request ->
+            val q = request.requestUrl?.queryParameter("q")
+            receivedQueries += q
+            if (failNow.get()) {
+                MockResponse().setResponseCode(502)
+                    .setBody("""{"code":"abs_unreachable","message":"Audiobookshelf down"}""")
+            } else {
+                MockResponse().setResponseCode(200)
+                    .setHeader("Content-Type", "application/json")
+                    .setBody(WireFixtures.libraryPageJson(items = listOf(WireFixtures.libraryItemSummaryJson(title = q ?: "all"))))
+            }
+        }
+        val viewModel = LibraryViewModel(trustedConnectionManager())
+        settleState { viewModel.uiState.value.items.isNotEmpty() }
+
+        failNow.set(true)
+        viewModel.refresh()
+        settleState { viewModel.uiState.value.refreshError != null }
+
+        // The list survives; the failure is a one-shot, not the full-screen error state.
+        assertEquals(1, viewModel.uiState.value.items.size)
+        assertEquals(null, viewModel.uiState.value.error)
+        assertTrue(!viewModel.uiState.value.refreshing)
+
+        viewModel.clearRefreshError()
+        assertEquals(null, viewModel.uiState.value.refreshError)
+    }
+
+    @Test
+    fun `a refresh that fails because the server became unconfigured keeps the list`() = runTest(dispatcher) {
+        // In-memory store (FakeConnectionStore) so clearing mid-session is synchronous and avoids
+        // the real DataStore's Windows file-rename flakiness. Configured -> load -> clear -> refresh.
+        val store = FakeConnectionStore(baseUrl = server.baseUrl, fingerprint = server.fingerprint)
+        val viewModel = LibraryViewModel(ConnectionManager(store, FakeTokenAccess()))
+        settleState { viewModel.uiState.value.items.isNotEmpty() }
+
+        store.clear() // the server becomes unconfigured mid-session
+        viewModel.refresh()
+        settleState { viewModel.uiState.value.refreshError != null }
+
+        // Same contract as a network-failed refresh: keep the list, report via the snackbar,
+        // do NOT wipe to the full-screen error.
+        assertEquals(1, viewModel.uiState.value.items.size)
+        assertEquals(null, viewModel.uiState.value.error)
+        assertEquals("No server configured.", viewModel.uiState.value.refreshError)
+        assertTrue(!viewModel.uiState.value.refreshing)
     }
 
     @Test

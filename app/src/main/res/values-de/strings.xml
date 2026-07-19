@@ -36,6 +36,7 @@
     <string name="library_percent">%1$d&#160;%%</string>
     <string name="library_loading_more">Weitere Hörbücher werden geladen</string>
     <string name="library_load_more_failed">Weitere Hörbücher konnten nicht geladen werden. Zum Wiederholen tippen.</string>
+    <string name="library_retry">Erneut versuchen</string>
 
     <!-- Speakers -->
     <string name="speakers_title">Lautsprecher auswählen</string>
