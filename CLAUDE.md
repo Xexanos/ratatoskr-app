@@ -21,3 +21,17 @@ Working agreements:
 - The technology stack (SPEC section 12) and the screen and module structure (SPEC
   section 13) are decided and recorded in the SPEC; changes to them go through the SPEC
   first.
+
+## Agent skills
+
+### Issue tracker
+
+Issues tracked in this repo's GitHub Issues (`Xexanos/ratatoskr-app`) via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five-role vocabulary (needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout (CONTEXT.md + docs/adr/ at repo root, created lazily). See `docs/agents/domain.md`.
