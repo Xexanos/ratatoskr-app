@@ -72,8 +72,10 @@ import io.github.xexanos.ratatoskr.network.domain.LibraryItemSummary
 import io.github.xexanos.ratatoskr.network.domain.RatatoskrError
 import io.github.xexanos.ratatoskr.network.domain.Progress
 import io.github.xexanos.ratatoskr.ui.EmptyState
+import io.github.xexanos.ratatoskr.ui.KnotLoader
 import io.github.xexanos.ratatoskr.ui.UiError
 import io.github.xexanos.ratatoskr.ui.UiTestTags
+import io.github.xexanos.ratatoskr.ui.rememberDelayedVisible
 import io.github.xexanos.ratatoskr.ui.text
 import io.github.xexanos.ratatoskr.ui.theme.RatatoskrTheme
 import kotlinx.coroutines.FlowPreview
@@ -342,8 +344,10 @@ private fun LibraryContent(
             modifier = Modifier.fillMaxWidth().testTag(UiTestTags.LIBRARY_SEARCH),
         )
         when {
+            // The delay covers both first load and search: quick responses never flash the
+            // loader, only genuinely slow ones escalate to the knot.
             state.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+                if (rememberDelayedVisible(state.loading)) KnotLoader()
             }
 
             state.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

@@ -23,7 +23,6 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -61,8 +60,10 @@ import io.github.xexanos.ratatoskr.network.domain.LibraryItemSummary
 import io.github.xexanos.ratatoskr.network.domain.PlaybackState
 import io.github.xexanos.ratatoskr.network.domain.RatatoskrError
 import io.github.xexanos.ratatoskr.network.domain.Session
+import io.github.xexanos.ratatoskr.ui.KnotLoader
 import io.github.xexanos.ratatoskr.ui.UiError
 import io.github.xexanos.ratatoskr.ui.UiTestTags
+import io.github.xexanos.ratatoskr.ui.rememberDelayedVisible
 import io.github.xexanos.ratatoskr.ui.text
 import io.github.xexanos.ratatoskr.ui.theme.RatatoskrTheme
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -235,7 +236,7 @@ fun NowPlayingScreen(
         when {
             state.loading ->
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
+                    if (rememberDelayedVisible(state.loading)) KnotLoader()
                 }
 
             session == null ->
@@ -513,7 +514,7 @@ private fun NowPlayingPreviewScaffold(
                 Spacer(Modifier.height(8.dp))
                 when {
                     loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
+                        if (rememberDelayedVisible(loading)) KnotLoader()
                     }
                     session == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(

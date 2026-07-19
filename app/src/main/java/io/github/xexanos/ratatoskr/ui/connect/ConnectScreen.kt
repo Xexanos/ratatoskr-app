@@ -22,7 +22,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -55,7 +54,9 @@ import io.github.xexanos.ratatoskr.data.ConnectionManager
 import io.github.xexanos.ratatoskr.network.domain.CertificateInfo
 import io.github.xexanos.ratatoskr.network.persist.ConnectionStore
 import io.github.xexanos.ratatoskr.network.tls.CertificateInspector
+import io.github.xexanos.ratatoskr.ui.KnotLoader
 import io.github.xexanos.ratatoskr.ui.UiTestTags
+import io.github.xexanos.ratatoskr.ui.rememberDelayedVisible
 import io.github.xexanos.ratatoskr.ui.theme.RatatoskrTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -202,13 +203,14 @@ private fun ConnectContent(
 
             ConnectUiState.Inspecting -> {
                 Spacer(Modifier.height(8.dp))
-                CircularProgressIndicator()
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    stringResource(R.string.connect_inspecting),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                // Reading the certificate is normally sub-second; only escalate to the loader
+                // once the wait is long enough to be worth showing, so it never flashes.
+                if (rememberDelayedVisible(active = true)) {
+                    KnotLoader(
+                        size = 72.dp,
+                        label = stringResource(R.string.connect_inspecting),
+                    )
+                }
             }
 
             is ConnectUiState.Confirm -> CertificateCard(

@@ -75,6 +75,10 @@
     <string name="settings_forget_cert_hint">Removes the pinned certificate. You will confirm the server\'s fingerprint again on the next connection.</string>
     <string name="settings_sign_out">Sign out</string>
 
+    <!-- Loading -->
+    <string name="knot_loader_description">Loading indicator: the Ratatoskr knot with a copper squirrel running the strand</string>
+    <string name="app_loading">Loading...</string>
+
     <!-- Errors -->
     <string name="error_no_server">No server configured.</string>
     <string name="error_unauthorized">Sign-in expired. Please sign in again.</string>

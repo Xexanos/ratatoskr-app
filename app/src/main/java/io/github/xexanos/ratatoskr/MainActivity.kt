@@ -12,7 +12,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.LaunchedEffect
@@ -22,9 +21,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import io.github.xexanos.ratatoskr.di.AppContainer
+import io.github.xexanos.ratatoskr.ui.KnotLoader
+import io.github.xexanos.ratatoskr.ui.rememberDelayedVisible
 import io.github.xexanos.ratatoskr.ui.navigation.RatatoskrNavHost
 import io.github.xexanos.ratatoskr.ui.navigation.Route
 import io.github.xexanos.ratatoskr.ui.theme.RatatoskrTheme
@@ -56,8 +58,12 @@ class MainActivity : ComponentActivity() {
                             startDestination = decideStartDestination(container)
                         }
                         when (val dest = startDestination) {
+                            // Resolving the start route is normally sub-second; only show the
+                            // loader if it takes long enough to be worth it, so it never flashes.
                             null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                CircularProgressIndicator()
+                                if (rememberDelayedVisible(active = true)) {
+                                    KnotLoader(label = stringResource(R.string.app_loading))
+                                }
                             }
                             else -> RatatoskrNavHost(container = container, startDestination = dest)
                         }

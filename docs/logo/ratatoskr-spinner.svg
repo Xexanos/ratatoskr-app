@@ -8,28 +8,28 @@
   <defs><path id="ratatoskr-route" d="M236.43,190.60 C213.03,204.13 182.81,199.57 157.41,208.81 C132.02,218.06 111.80,240.97 85.18,245.65 C67.79,224.95 67.04,194.41 53.52,171.00 C40.01,147.59 13.93,131.66 4.70,106.26 C22.06,85.54 52.02,79.49 72.72,62.12 C93.43,44.75 104.59,16.30 128.00,2.80 C151.41,16.30 162.57,44.75 183.28,62.12 C203.98,79.49 233.94,85.54 251.30,106.26 C242.07,131.66 215.99,147.59 202.48,171.00 C188.96,194.41 188.21,224.95 170.82,245.65 C144.20,240.97 123.98,218.06 98.59,208.81 C73.19,199.57 42.97,204.13 19.57,190.60 C19.56,163.57 38.61,139.68 43.31,113.07 C48.00,86.45 38.26,57.48 47.52,32.09 C74.14,27.38 100.97,42.00 128.00,42.00 C155.03,42.00 181.86,27.38 208.48,32.09 C217.74,57.48 208.00,86.45 212.69,113.07 C217.39,139.68 236.44,163.57 236.43,190.60 Z" fill="none" pathLength="1000"/></defs>
   <g class="rat-spin">
   <use href="#ratatoskr-route" stroke="#A93B28" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" opacity="0.30" stroke-dasharray="36 964">
-    <animate attributeName="stroke-dashoffset" dur="2.4s" repeatCount="indefinite" calcMode="linear" values="36;-964"/>
+    <animate attributeName="stroke-dashoffset" dur="4s" repeatCount="indefinite" calcMode="linear" values="36;-964"/>
   </use>
   <use href="#ratatoskr-route" stroke="#A93B28" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" opacity="0.30" stroke-dasharray="73 927">
-    <animate attributeName="stroke-dashoffset" dur="2.4s" repeatCount="indefinite" calcMode="linear" values="73;-927"/>
+    <animate attributeName="stroke-dashoffset" dur="4s" repeatCount="indefinite" calcMode="linear" values="73;-927"/>
   </use>
   <use href="#ratatoskr-route" stroke="#A93B28" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" opacity="0.30" stroke-dasharray="110 890">
-    <animate attributeName="stroke-dashoffset" dur="2.4s" repeatCount="indefinite" calcMode="linear" values="110;-890"/>
+    <animate attributeName="stroke-dashoffset" dur="4s" repeatCount="indefinite" calcMode="linear" values="110;-890"/>
   </use>
   <use href="#ratatoskr-route" stroke="#A93B28" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" opacity="0.30" stroke-dasharray="146 854">
-    <animate attributeName="stroke-dashoffset" dur="2.4s" repeatCount="indefinite" calcMode="linear" values="146;-854"/>
+    <animate attributeName="stroke-dashoffset" dur="4s" repeatCount="indefinite" calcMode="linear" values="146;-854"/>
   </use>
   <use href="#ratatoskr-route" stroke="#A93B28" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" opacity="0.30" stroke-dasharray="183 817">
-    <animate attributeName="stroke-dashoffset" dur="2.4s" repeatCount="indefinite" calcMode="linear" values="183;-817"/>
+    <animate attributeName="stroke-dashoffset" dur="4s" repeatCount="indefinite" calcMode="linear" values="183;-817"/>
   </use>
   <use href="#ratatoskr-route" stroke="#A93B28" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" opacity="0.30" stroke-dasharray="220 780">
-    <animate attributeName="stroke-dashoffset" dur="2.4s" repeatCount="indefinite" calcMode="linear" values="220;-780"/>
+    <animate attributeName="stroke-dashoffset" dur="4s" repeatCount="indefinite" calcMode="linear" values="220;-780"/>
   </use>
   <circle class="rat-runner" r="12" fill="#A93B28" opacity="0.22">
-    <animateMotion dur="2.4s" repeatCount="indefinite" calcMode="paced"><mpath href="#ratatoskr-route"/></animateMotion>
+    <animateMotion dur="4s" repeatCount="indefinite" calcMode="paced"><mpath href="#ratatoskr-route"/></animateMotion>
   </circle>
   <circle class="rat-runner" r="6.5" fill="#A93B28">
-    <animateMotion dur="2.4s" repeatCount="indefinite" calcMode="paced"><mpath href="#ratatoskr-route"/></animateMotion>
+    <animateMotion dur="4s" repeatCount="indefinite" calcMode="paced"><mpath href="#ratatoskr-route"/></animateMotion>
   </circle>
   </g>
 </svg>

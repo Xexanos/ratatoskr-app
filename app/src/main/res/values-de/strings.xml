@@ -72,6 +72,10 @@
     <string name="settings_forget_cert_hint">Entfernt das gepinnte Zertifikat. Bei der nächsten Verbindung bestätigst du den Fingerabdruck des Servers erneut.</string>
     <string name="settings_sign_out">Abmelden</string>
 
+    <!-- Loading -->
+    <string name="knot_loader_description">Ladeanzeige: der Ratatoskr-Knoten mit einem Kupfer-Eichhörnchen, das den Strang entlangläuft</string>
+    <string name="app_loading">Wird geladen…</string>
+
     <!-- Errors -->
     <string name="error_no_server">Kein Server konfiguriert.</string>
     <string name="error_unauthorized">Anmeldung abgelaufen. Bitte melde dich erneut an.</string>

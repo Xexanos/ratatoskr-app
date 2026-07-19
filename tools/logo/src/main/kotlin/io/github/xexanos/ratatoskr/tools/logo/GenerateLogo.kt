@@ -422,7 +422,7 @@ fun centerlinePath(): String {
  *  VectorDrawable has no SMIL, so the app redraws this in Compose; the SVG is the reference. */
 fun spinnerSvg(): String {
     val copper = COPPER_RAMP.first()
-    val dur = "2.4s"
+    val dur = "4s"
     val k = 6
     val trail = 220
     val route = centerlinePath()

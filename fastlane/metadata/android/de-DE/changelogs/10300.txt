@@ -1,0 +1,1 @@
+Ladeanzeigen zeigen jetzt den animierten Ratatoskr-Knoten statt eines allgemeinen Spinners. Er erscheint nur bei wirklich langsamen Wartezeiten, sodass schnelle Ladevorgänge keine Anzeige mehr aufblitzen lassen.
