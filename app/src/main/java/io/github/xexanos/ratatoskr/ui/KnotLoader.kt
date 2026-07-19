@@ -26,6 +26,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,7 +41,6 @@ import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.asAndroidPath
-import androidx.compose.ui.graphics.asComposePath
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.PathParser
@@ -222,11 +222,14 @@ private fun AnimatedKnot(modifier: Modifier, geometry: KnotGeometry, frameColor:
             repeatMode = RepeatMode.Restart,
         ),
     )
+    // Reused across frames so the per-frame draw doesn't allocate a scratch path / position array.
+    val scratch = remember { Path() }
+    val pos = remember { FloatArray(2) }
     Canvas(modifier) {
         drawPath(geometry.frame, color = frameColor)
         // Read the animated head only inside the draw lambda: this invalidates the draw phase
         // each frame without triggering recomposition.
-        drawComet(geometry, head, runnerColor)
+        drawComet(geometry, head, runnerColor, scratch, pos)
     }
 }
 
@@ -242,29 +245,36 @@ private fun StaticKnot(modifier: Modifier, geometry: KnotGeometry, frameColor: C
  * runner itself (a translucent halo under a solid dot). [head] is the head position as a fraction
  * `[0,1)` of the path length.
  */
-private fun DrawScope.drawComet(geo: KnotGeometry, head: Float, color: Color) {
+private fun DrawScope.drawComet(
+    geo: KnotGeometry,
+    head: Float,
+    color: Color,
+    scratch: Path,
+    pos: FloatArray,
+) {
     val length = geo.length
     if (length <= 0f) return
     val headDist = head * length
     val tailLen = length * TAIL_FRACTION
     val seg = tailLen / TAIL_SEGMENTS
-    val scratch = android.graphics.Path()
+    val androidScratch = scratch.asAndroidPath()
     for (i in 0 until TAIL_SEGMENTS) {
         val stop = headDist - i * seg
         val start = headDist - (i + 1) * seg
         // Nearest the head is brightest; fade to transparent at the tail end.
         val alpha = TAIL_MAX_ALPHA * (1f - i.toFloat() / TAIL_SEGMENTS)
+        // wrappedRanges allocates a small list per segment; kept for one pure, unit-tested seam
+        // function - a fair trade since the loader is transient (only shown on slow waits).
         for ((s, e) in wrappedRanges(start, stop, length)) {
             scratch.rewind()
-            geo.measure.getSegment(s, e, scratch, true)
+            geo.measure.getSegment(s, e, androidScratch, true)
             drawPath(
-                scratch.asComposePath(),
+                scratch,
                 color = color.copy(alpha = alpha),
                 style = Stroke(width = geo.strokePx, cap = StrokeCap.Round, join = StrokeJoin.Round),
             )
         }
     }
-    val pos = FloatArray(2)
     geo.measure.getPosTan(headDist.mod(length), pos, null)
     val center = Offset(pos[0], pos[1])
     drawCircle(color.copy(alpha = HALO_ALPHA), radius = geo.haloPx, center = center)
@@ -303,7 +313,7 @@ internal fun KnotLoaderPreview() = RatatoskrTheme {
 @Preview(name = "Knot loader - reduced motion", widthDp = 360, heightDp = 300)
 @Composable
 internal fun KnotLoaderReducedPreview() = RatatoskrTheme {
-    androidx.compose.runtime.CompositionLocalProvider(LocalReducedMotion provides true) {
+    CompositionLocalProvider(LocalReducedMotion provides true) {
         Surface {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 KnotLoader(label = stringResource(R.string.app_loading))
