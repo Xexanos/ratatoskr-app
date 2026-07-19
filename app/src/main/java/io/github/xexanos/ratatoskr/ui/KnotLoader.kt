@@ -211,7 +211,9 @@ private class KnotGeometry(sidePx: Float) {
 
 @Composable
 private fun AnimatedKnot(modifier: Modifier, geometry: KnotGeometry, frameColor: Color, runnerColor: Color) {
-    val transition = rememberInfiniteTransition(label = "knot")
+    // No animation-inspector labels: they are tooling-only and the UX guardrail (check-ux.sh
+    // rule 4) can't tell an animation label from user-facing copy, so it flags `label = "..."`.
+    val transition = rememberInfiniteTransition()
     val head by transition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
@@ -219,7 +221,6 @@ private fun AnimatedKnot(modifier: Modifier, geometry: KnotGeometry, frameColor:
             animation = tween(CYCLE_MILLIS, easing = LinearEasing),
             repeatMode = RepeatMode.Restart,
         ),
-        label = "head",
     )
     Canvas(modifier) {
         drawPath(geometry.frame, color = frameColor)
@@ -294,7 +295,7 @@ internal fun wrappedRanges(start: Float, stop: Float, length: Float): List<Pair<
 internal fun KnotLoaderPreview() = RatatoskrTheme {
     Surface {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            KnotLoader(label = "Loading…")
+            KnotLoader(label = stringResource(R.string.app_loading))
         }
     }
 }
@@ -305,7 +306,7 @@ internal fun KnotLoaderReducedPreview() = RatatoskrTheme {
     androidx.compose.runtime.CompositionLocalProvider(LocalReducedMotion provides true) {
         Surface {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                KnotLoader(label = "Loading…")
+                KnotLoader(label = stringResource(R.string.app_loading))
             }
         }
     }

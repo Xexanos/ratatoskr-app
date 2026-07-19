@@ -77,7 +77,7 @@
 
     <!-- Loading -->
     <string name="knot_loader_description">Loading indicator: the Ratatoskr knot with a copper squirrel running the strand</string>
-    <string name="app_loading">Loading…</string>
+    <string name="app_loading">Loading...</string>
 
     <!-- Errors -->
     <string name="error_no_server">No server configured.</string>
