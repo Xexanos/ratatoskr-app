@@ -10,3 +10,6 @@
 -dontwarn org.codehaus.mojo.animal_sniffer.**
 -dontwarn com.google.auto.value.**
 -dontwarn javax.lang.model.**
+# coil-test's transitive com.google.android.material references appcompat's DrawableWrapper;
+# appcompat is not on the test APK's runtime classpath and no test reaches that code path.
+-dontwarn androidx.appcompat.graphics.drawable.DrawableWrapper
