@@ -38,6 +38,14 @@
 -keep class okio.** { *; }
 -keep class androidx.core.** { *; }
 -keep class androidx.collection.** { *; }
+
+# coil-test (androidTest-only, ships in the test APK) hands CoverImageTest a coil3.ColorImage,
+# a coil-core class no app code constructs - R8 would strip it from the app APK. Kept narrowly
+# (not coil3.**) on purpose: the cover-loading path through Coil is NEW release-shape surface,
+# and the minified integration flow exists to validate exactly that under the release keep
+# rules; a wholesale coil3.** keep would exempt it. Widen only if a future coil-test API
+# reaches further unreferenced coil-core classes.
+-keep class coil3.ColorImage { *; }
 -keep class androidx.compose.ui.** { *; }
 -keep class androidx.compose.runtime.** { *; }
 -keep class androidx.activity.** { *; }
