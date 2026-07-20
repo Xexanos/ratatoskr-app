@@ -25,8 +25,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.ImageLoader
+import coil3.compose.LocalPlatformContext
 import coil3.compose.SubcomposeAsyncImage
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 import io.github.xexanos.ratatoskr.ui.UiTestTags
+import io.github.xexanos.ratatoskr.ui.theme.LocalReducedMotion
 
 /**
  * The cover [ImageLoader], provided by the activity from the AppContainer. A CompositionLocal
@@ -56,7 +60,8 @@ fun CoverImage(
     title: String,
     coverUrl: String?,
     modifier: Modifier = Modifier,
-    shape: Shape = MaterialTheme.shapes.medium,
+    // 8 dp - the design's cover-thumbnail radius (ux-design: Shape tokens), shapes.small here.
+    shape: Shape = MaterialTheme.shapes.small,
     initialStyle: TextStyle = MaterialTheme.typography.titleLarge,
     shadowElevation: Dp = 0.dp,
     tonalElevation: Dp = 0.dp,
@@ -73,8 +78,15 @@ fun CoverImage(
             // "no cover" - render the tile without ever issuing a request.
             InitialTile(title, initialStyle)
         } else {
+            // Per-request crossfade instead of the loader-wide default so "remove animations"
+            // is honored: the wait is already communicated by the placeholder tile, so under
+            // reduced motion the cover may simply appear (same convention as the knot loader).
+            val reducedMotion = LocalReducedMotion.current
             SubcomposeAsyncImage(
-                model = coverUrl,
+                model = ImageRequest.Builder(LocalPlatformContext.current)
+                    .data(coverUrl)
+                    .crossfade(!reducedMotion)
+                    .build(),
                 imageLoader = LocalCoverImageLoader.current,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,

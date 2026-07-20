@@ -9,7 +9,6 @@ import android.content.Context
 import coil3.ImageLoader
 import coil3.disk.DiskCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
-import coil3.request.crossfade
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Call
@@ -65,7 +64,8 @@ class CoverImages(
                 add(OkHttpNetworkFetcherFactory(callFactory = { delegatingCallFactory }))
             }
             .diskCache { diskCache }
-            .crossfade(true)
+            // No loader-wide crossfade: CoverImage sets it per request, where it can honor
+            // the reduced-motion setting (ux-design: motion) - one source of truth.
             .build()
     }
 
