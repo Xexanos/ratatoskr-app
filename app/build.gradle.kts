@@ -7,19 +7,23 @@ plugins {
     alias(libs.plugins.roborazzi)
 }
 
-// Screenshot golden tests for the cover-placeholder tiles (SPEC section 9): Roborazzi generates
-// one Robolectric test per @Preview under the scanned package and renders it on the JVM - no
-// emulator, so it runs in the existing unit-test job. Baselines live in src/test/screenshots
-// (committed); `recordRoborazziDebug` regenerates them, `verifyRoborazziDebug` (CI) fails on
-// pixel drift in the knot mark, spinner size, or tile tones.
+// Screenshot golden tests for every UI @Preview (SPEC section 9, issue #76): Roborazzi
+// generates one Robolectric test per @Preview under the scanned package and renders it on the
+// JVM - no emulator, so it runs in the existing unit-test job. Baselines live in
+// src/test/screenshots (committed); `recordRoborazziDebug` regenerates them,
+// `verifyRoborazziDebug` (CI) fails on any pixel drift across the screens and shared tiles.
 roborazzi {
     outputDir.set(layout.projectDirectory.dir("src/test/screenshots"))
     @OptIn(ExperimentalRoborazziApi::class)
     generateComposePreviewRobolectricTests {
         enable = true
-        // Scope to the shared cover tiles. Deliberately excludes io.github.xexanos.ratatoskr.ui,
-        // whose KnotLoader previews animate a comet - a moving frame makes an unstable golden.
-        packages = listOf("io.github.xexanos.ratatoskr.ui.common")
+        // Every @Preview under the ui tree - all screens and shared components. Infinite
+        // animations (the knot loader's comet, the cover spinner) render deterministically at
+        // the fixed initial frame because Roborazzi pauses the composition clock.
+        packages = listOf("io.github.xexanos.ratatoskr.ui")
+        // Capture private @Preview functions too (e.g. the sign-in "submitting" and settings
+        // "not configured" states), so the golden set matches the previews the screens declare.
+        includePrivatePreviews = true
         // Pinned so the render is machine-independent: SDK 35 (Robolectric-supported) at the
         // default mdpi density, so 56 dp -> 56 px and 260 dp -> 260 px.
         robolectricConfig = mapOf("sdk" to "[35]")
