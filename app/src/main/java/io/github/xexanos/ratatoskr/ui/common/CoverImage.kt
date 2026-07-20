@@ -7,6 +7,7 @@ package io.github.xexanos.ratatoskr.ui.common
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -17,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.ImageLoader
@@ -115,7 +117,15 @@ private fun LoadingTile(withSpinner: Boolean) {
         // that keeps turning over a dead request would claim work that isn't happening.
         if (withSpinner && rememberDelayedVisible(active = true)) {
             CircularProgressIndicator(
-                modifier = Modifier.fillMaxSize(0.35f),
+                // Proportional on the 56 dp row tile (~20 dp) but capped so the 260 dp
+                // now-playing tile still gets a small spinner, not a 91 dp ring. Cleared
+                // semantics: the tile is decorative (title/author are adjacent text), and the
+                // indicator's built-in progressSemantics would otherwise leak "in progress"
+                // into every row announcement - one announcement, not two (KnotLoader rule).
+                modifier = Modifier
+                    .fillMaxSize(0.35f)
+                    .sizeIn(maxWidth = 40.dp, maxHeight = 40.dp)
+                    .clearAndSetSemantics {},
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
             )
         }
