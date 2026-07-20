@@ -57,7 +57,7 @@ class LibraryViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
-        dispatchItems { request ->
+        dispatchLibrary { request ->
             val q = request.requestUrl?.queryParameter("q")
             receivedQueries += q
             jsonResponse(
@@ -86,7 +86,7 @@ class LibraryViewModelTest {
      * dispatches and their request logs stay untouched by the shelf request the initial load
      * now also fires.
      */
-    private fun dispatchItems(
+    private fun dispatchLibrary(
         shelf: () -> MockResponse = ::defaultShelfResponse,
         items: (okhttp3.mockwebserver.RecordedRequest) -> MockResponse,
     ) {
@@ -176,7 +176,7 @@ class LibraryViewModelTest {
     @Test
     fun `loadMore follows the cursor and appends the next page`() = runTest(dispatcher) {
         val receivedCursors = Collections.synchronizedList(mutableListOf<String?>())
-        dispatchItems { request ->
+        dispatchLibrary { request ->
             val cursor = request.requestUrl?.queryParameter("cursor")
             receivedCursors += cursor
             val body = if (cursor == null) {
@@ -211,7 +211,7 @@ class LibraryViewModelTest {
     @Test
     fun `a failing next page keeps the list and flags a retryable error`() = runTest(dispatcher) {
         var failNextPage = true
-        dispatchItems { request ->
+        dispatchLibrary { request ->
             val cursor = request.requestUrl?.queryParameter("cursor")
             if (cursor != null && failNextPage) {
                 MockResponse().setResponseCode(502)
@@ -249,7 +249,7 @@ class LibraryViewModelTest {
 
     @Test
     fun `a new query restarts pagination from the first page`() = runTest(dispatcher) {
-        dispatchItems { request ->
+        dispatchLibrary { request ->
             val cursor = request.requestUrl?.queryParameter("cursor")
             val q = request.requestUrl?.queryParameter("q")
             jsonResponse(
@@ -282,7 +282,7 @@ class LibraryViewModelTest {
         // structure protects against (unlike the test above, which changes query only after the
         // page has fully landed).
         val pageBlocked = CountDownLatch(1)
-        dispatchItems { request ->
+        dispatchLibrary { request ->
             val cursor = request.requestUrl?.queryParameter("cursor")
             val q = request.requestUrl?.queryParameter("q")
             receivedQueries += q
@@ -343,7 +343,7 @@ class LibraryViewModelTest {
     @Test
     fun `retry after a failed load re-issues the load and clears the error`() = runTest(dispatcher) {
         val failFirst = AtomicBoolean(true)
-        dispatchItems { request ->
+        dispatchLibrary { request ->
             val q = request.requestUrl?.queryParameter("q")
             receivedQueries += q
             if (failFirst.getAndSet(false)) {
@@ -366,7 +366,7 @@ class LibraryViewModelTest {
     @Test
     fun `a failed refresh keeps the list and surfaces a one-shot refreshError`() = runTest(dispatcher) {
         val failNow = AtomicBoolean(false)
-        dispatchItems { request ->
+        dispatchLibrary { request ->
             val q = request.requestUrl?.queryParameter("q")
             receivedQueries += q
             if (failNow.get()) {
@@ -433,7 +433,7 @@ class LibraryViewModelTest {
         // neither response is out proves the fetches run in parallel (a sequential load would
         // block the second request behind the first's held response).
         val responsesBlocked = CountDownLatch(1)
-        dispatchItems(
+        dispatchLibrary(
             shelf = {
                 responsesBlocked.await()
                 defaultShelfResponse()
@@ -464,7 +464,7 @@ class LibraryViewModelTest {
 
     @Test
     fun `a successfully empty shelf loads as no shelf items`() = runTest(dispatcher) {
-        dispatchItems(shelf = { jsonResponse(WireFixtures.inProgressShelfJson(items = emptyList())) }) { request ->
+        dispatchLibrary(shelf = { jsonResponse(WireFixtures.inProgressShelfJson(items = emptyList())) }) { request ->
             receivedQueries += request.requestUrl?.queryParameter("q")
             jsonResponse(WireFixtures.libraryPageJson(items = listOf(WireFixtures.libraryItemSummaryJson(title = "all"))))
         }
@@ -501,7 +501,7 @@ class LibraryViewModelTest {
 
     @Test
     fun `a failing request surfaces the mapped error`() = runTest(dispatcher) {
-        dispatchItems {
+        dispatchLibrary {
             MockResponse().setResponseCode(502)
                 .setBody("""{"code":"abs_unreachable","message":"Audiobookshelf down"}""")
         }

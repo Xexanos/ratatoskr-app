@@ -213,8 +213,8 @@ class LibraryViewModel(
                     shelfResult.data
                 }
                 // Not fetched, or failed: keep whatever is held - stale beats a blanked shelf.
-                // (The visible, retryable shelf-error row from the spec is a follow-up cut;
-                // this tracer covers the happy path, issue #83.)
+                // (This tracer covers the happy path, issue #83; the visible, retryable
+                // shelf-error row from the spec is the follow-up cut, issue #84.)
                 else -> _uiState.value.shelfItems
             }
             _uiState.value = when (pageResult) {
@@ -638,6 +638,24 @@ internal fun LibraryShelfLoadedPreview() = RatatoskrTheme {
         LibraryContent(
             state = LibraryUiState(items = previewItems, shelfItems = previewShelfItems),
             query = "",
+            onQueryChange = {},
+            onOpenItem = {},
+            onOpenNowPlaying = {},
+            onOpenSettings = {},
+        )
+    }
+}
+
+// A non-blank search field hides the shelf and both headers even though the held shelf items
+// are still in state - the visibility rule lives here in previews (spec #80's testing
+// decision), to be picked up by the screenshot goldens (#76).
+@Preview(name = "Library - searching, shelf hidden", widthDp = 360, heightDp = 800)
+@Composable
+internal fun LibrarySearchingShelfHiddenPreview() = RatatoskrTheme {
+    Surface {
+        LibraryContent(
+            state = LibraryUiState(items = previewItems.take(1), shelfItems = previewShelfItems),
+            query = "hobbit",
             onQueryChange = {},
             onOpenItem = {},
             onOpenNowPlaying = {},
