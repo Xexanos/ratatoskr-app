@@ -1,7 +1,29 @@
+import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.roborazzi)
+}
+
+// Screenshot golden tests for the cover-placeholder tiles (SPEC section 9): Roborazzi generates
+// one Robolectric test per @Preview under the scanned package and renders it on the JVM - no
+// emulator, so it runs in the existing unit-test job. Baselines live in src/test/screenshots
+// (committed); `recordRoborazziDebug` regenerates them, `verifyRoborazziDebug` (CI) fails on
+// pixel drift in the knot mark, spinner size, or tile tones.
+roborazzi {
+    outputDir.set(layout.projectDirectory.dir("src/test/screenshots"))
+    @OptIn(ExperimentalRoborazziApi::class)
+    generateComposePreviewRobolectricTests {
+        enable = true
+        // Scope to the shared cover tiles. Deliberately excludes io.github.xexanos.ratatoskr.ui,
+        // whose KnotLoader previews animate a comet - a moving frame makes an unstable golden.
+        packages = listOf("io.github.xexanos.ratatoskr.ui.common")
+        // Pinned so the render is machine-independent: SDK 35 (Robolectric-supported) at the
+        // default mdpi density, so 56 dp -> 56 px and 260 dp -> 260 px.
+        robolectricConfig = mapOf("sdk" to "[35]")
+    }
 }
 
 android {
@@ -64,6 +86,17 @@ android {
     buildFeatures {
         compose = true
     }
+    testOptions {
+        unitTests {
+            // Robolectric needs the merged resources on the classpath to inflate the theme;
+            // pixelCopyRenderMode = hardware is Roborazzi's recommended path for pixel-accurate
+            // Compose rendering under native graphics.
+            isIncludeAndroidResources = true
+            all {
+                it.systemProperties["robolectric.pixelCopyRenderMode"] = "hardware"
+            }
+        }
+    }
 }
 
 dependencies {
@@ -93,6 +126,14 @@ dependencies {
     // ViewModel unit tests (SPEC section 9, unit level): reuse the same fakes/fixtures the
     // instrumented UI integration tests use, so wire-format shapes never diverge between them.
     testImplementation(testFixtures(project(":core-network")))
+    // Screenshot goldens for the cover-placeholder previews. The scanner-support artifact
+    // pulls in roborazzi core/compose; robolectric provides the JVM Android runtime, and the
+    // preview scanner discovers the @Preview functions the generated test renders.
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.roborazzi.compose.preview.scanner.support)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.composable.preview.scanner)
+    testImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.compose.ui.test.junit4.accessibility)
