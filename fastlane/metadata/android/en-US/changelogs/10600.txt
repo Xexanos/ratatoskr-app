@@ -1,0 +1,1 @@
+The "Continue listening" shelf now stands up to a bad connection: if it can't load while the rest of the library works, you get a tap-to-retry row in its place instead of a silent gap, and a shelf that already loaded stays put through a failed refresh. Returning from a book quietly refreshes the shelf so what you just played leads it.

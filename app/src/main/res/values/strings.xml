@@ -36,6 +36,8 @@
     <string name="library_no_results_body">No audiobooks match %1$s. Try a shorter search.</string>
     <string name="library_shelf_header">Continue listening</string>
     <string name="library_all_books_header">All books</string>
+    <string name="library_shelf_error_title">Couldn\'t load your shelf</string>
+    <string name="library_shelf_error_retry">Tap to retry</string>
     <string name="library_finished">Finished</string>
     <string name="library_percent">%1$d%%</string>
     <string name="library_loading_more">Loading more audiobooks</string>

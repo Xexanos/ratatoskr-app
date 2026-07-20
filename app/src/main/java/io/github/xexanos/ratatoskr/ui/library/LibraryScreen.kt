@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -82,6 +83,7 @@ import io.github.xexanos.ratatoskr.ui.rememberDelayedVisible
 import io.github.xexanos.ratatoskr.ui.text
 import io.github.xexanos.ratatoskr.ui.theme.RatatoskrTheme
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -103,6 +105,12 @@ data class LibraryUiState(
     // Empty means "no section" - the UI renders nothing for it. Held (not cleared) across
     // search reloads, so clearing the search restores the shelf without a refetch.
     val shelfItems: List<LibraryItemSummary> = emptyList(),
+    // The shelf slot's inline tap-to-retry row: the last shelf fetch failed with nothing held.
+    // Mutually exclusive with a non-empty shelfItems (stale data beats a failed refresh), and
+    // never raised alongside the full-screen `error` - one message at a time. Distinct from an
+    // empty shelf, which renders no section at all: a broken shelf must never look like "no
+    // books in progress".
+    val shelfError: Boolean = false,
     // Cursor for the page after the ones already in `items`; null once the last page is in.
     val nextCursor: String? = null,
     val loadingMore: Boolean = false,
@@ -141,6 +149,15 @@ class LibraryViewModel(
     // Whether the shelf has ever loaded successfully. Distinguishes the first no-query load
     // (fetch the shelf) from a search being cleared (redisplay the held shelf, no refetch).
     private var shelfLoaded = false
+
+    // Whether the screen has composed at least once for this ViewModel. The first composition
+    // belongs to the initial load (which already carries the shelf fetch); every later one is
+    // a re-entry (back from Now Playing, etc.) and refetches the shelf silently.
+    private var screenEntered = false
+
+    // The in-flight shelf-only refresh, so a newer one replaces a still-running older one
+    // instead of racing it for the state write.
+    private var shelfRefresh: Job? = null
 
     init {
         // One reload pipeline for the whole screen. Two sources feed it, both funnelled through
@@ -181,6 +198,49 @@ class LibraryViewModel(
         _uiState.value = _uiState.value.copy(refreshError = null)
     }
 
+    /** Called every time the Library screen enters composition (see [screenEntered]). */
+    fun onScreenEntered() {
+        if (!screenEntered) {
+            screenEntered = true
+            return
+        }
+        refreshShelf()
+    }
+
+    /**
+     * Refetches ONLY the shelf: the error row's tap-to-retry, and the silent refetch on
+     * re-entering the Library. The browse list, its cursor, and the scroll position stay
+     * untouched, and no loading state is raised. Skipped while a query is active (the shelf
+     * is never fetched during a search) or while a full reload is running (that reload
+     * carries its own shelf fetch).
+     */
+    fun refreshShelf() {
+        if (query.value != null || _uiState.value.loading || _uiState.value.refreshing) return
+        // While the full-screen error owns the screen, its retry refetches everything at once:
+        // a shelf-only success would be invisible behind it, and a shelf-only failure must not
+        // raise a second message.
+        if (_uiState.value.error != null) return
+        shelfRefresh?.cancel()
+        shelfRefresh = viewModelScope.launch {
+            val (shelfItems, shelfError) = shelfSlotAfter(connectionManager.client()?.listInProgressItems())
+            _uiState.value = _uiState.value.copy(shelfItems = shelfItems, shelfError = shelfError)
+        }
+    }
+
+    /**
+     * The shelf-slot rule applied to one shelf fetch outcome: fresh data fills the slot, a
+     * failure (or an unconfigured server, result null) keeps what is held - stale beats error -
+     * and the error row is raised only when there is nothing held to show instead.
+     */
+    private fun shelfSlotAfter(result: ApiResult<List<LibraryItemSummary>>?): Pair<List<LibraryItemSummary>, Boolean> {
+        if (result is ApiResult.Success) {
+            shelfLoaded = true
+            return result.data to false
+        }
+        val held = _uiState.value.shelfItems
+        return held to held.isEmpty()
+    }
+
     private suspend fun load(query: String?, userTriggered: Boolean = false) {
         // A user-triggered reload OVER an existing list shows the pull indicator and keeps the
         // list; everything else (initial load, query change, retry with nothing shown) uses the
@@ -205,18 +265,18 @@ class LibraryViewModel(
         // with the page; the single loading state waits for both, so the shelf never pops in
         // after the list.
         val fetchShelf = query == null && (userTriggered || !shelfLoaded)
+        // A full reload supersedes any shelf-only refresh still in flight: what this reload
+        // fetches (or carries through) is the newer truth, and a stale shelf-only result
+        // landing late must not overwrite it.
+        shelfRefresh?.cancel()
         coroutineScope {
             val shelfDeferred = if (fetchShelf) async { client.listInProgressItems() } else null
             val pageResult = client.listLibraryItems(query = query)
-            val shelfItems = when (val shelfResult = shelfDeferred?.await()) {
-                is ApiResult.Success -> {
-                    shelfLoaded = true
-                    shelfResult.data
-                }
-                // Not fetched, or failed: keep whatever is held - stale beats a blanked shelf.
-                // (This tracer covers the happy path, issue #83; the visible, retryable
-                // shelf-error row from the spec is the follow-up cut, issue #84.)
-                else -> _uiState.value.shelfItems
+            val (shelfItems, shelfError) = when (val shelfResult = shelfDeferred?.await()) {
+                // Not fetched (search, or query cleared with the shelf already loaded): carry
+                // the slot through unchanged.
+                null -> _uiState.value.shelfItems to _uiState.value.shelfError
+                else -> shelfSlotAfter(shelfResult)
             }
             _uiState.value = when (pageResult) {
                 is ApiResult.Success ->
@@ -224,12 +284,22 @@ class LibraryViewModel(
                         items = pageResult.data.items,
                         nextCursor = pageResult.data.nextCursor,
                         shelfItems = shelfItems,
+                        shelfError = shelfError,
                     )
                 is ApiResult.Failure ->
                     if (showAsRefresh) {
-                        // A refresh over an existing list failed: keep the list, report via a snackbar.
-                        _uiState.value.copy(refreshing = false, refreshError = UiError.Domain(pageResult.error))
+                        // A refresh over an existing list failed: keep the list, report via a
+                        // snackbar - but a shelf result that DID land in parallel still applies.
+                        _uiState.value.copy(
+                            refreshing = false,
+                            refreshError = UiError.Domain(pageResult.error),
+                            shelfItems = shelfItems,
+                            shelfError = shelfError,
+                        )
                     } else {
+                        // The full-screen error owns the whole screen (its retry refetches the
+                        // shelf too), so the shelf slot's own error row is never raised with it
+                        // - one message, even when both requests failed.
                         LibraryUiState(error = UiError.Domain(pageResult.error), shelfItems = shelfItems)
                     }
             }
@@ -281,9 +351,12 @@ fun LibraryScreen(
 
     // On process-death restore the text field's saved query comes back, but the ViewModel's
     // search flow restarts at null (full library). Re-issue the restored query so the results
-    // match what the search box shows.
+    // match what the search box shows. Then report the (re-)entry: re-entering the Library
+    // (e.g. back from Now Playing) silently refetches the shelf so the just-played book leads
+    // it - the search() call must come first so an active query keeps the shelf fetch gated.
     LaunchedEffect(Unit) {
         if (query.isNotBlank()) viewModel.search(query)
+        viewModel.onScreenEntered()
     }
 
     // A refresh that failed while the list stayed on screen: a one-shot snackbar that keeps the
@@ -316,6 +389,7 @@ fun LibraryScreen(
             },
             onLoadMore = viewModel::loadMore,
             onRefresh = viewModel::refresh,
+            onRetryShelf = viewModel::refreshShelf,
             onOpenItem = onOpenItem,
             onOpenNowPlaying = onOpenNowPlaying,
             onOpenSettings = onOpenSettings,
@@ -335,6 +409,7 @@ private fun LibraryContent(
     onQueryChange: (String) -> Unit,
     onLoadMore: () -> Unit = {},
     onRefresh: () -> Unit = {},
+    onRetryShelf: () -> Unit = {},
     onOpenItem: (String) -> Unit,
     onOpenNowPlaying: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -427,8 +502,13 @@ private fun LibraryContent(
                 }
                 // The shelf hides the moment the search FIELD is non-blank (not the debounced
                 // query): results get the full screen instantly, and the held shelf comes
-                // straight back when the field is cleared.
+                // straight back when the field is cleared. A failed shelf keeps the slot
+                // (band, both headers) with an inline tap-to-retry row where its books would
+                // be - "failed" must never look like "no books in progress" (which renders no
+                // section at all).
                 val shelfVisible = query.isBlank() && state.shelfItems.isNotEmpty()
+                val shelfErrorVisible = query.isBlank() && state.shelfError && state.shelfItems.isEmpty()
+                val shelfSlotVisible = shelfVisible || shelfErrorVisible
                 PullToRefreshBox(
                     isRefreshing = state.refreshing,
                     onRefresh = onRefresh,
@@ -440,9 +520,9 @@ private fun LibraryContent(
                         // Row spacing is each row's bottom padding (not spacedBy): the shelf's
                         // band must also fill the gaps between its rows, and item-owned padding
                         // keeps the band continuous where an arrangement gap would slice it.
-                        contentPadding = PaddingValues(top = if (shelfVisible) 12.dp else 16.dp, bottom = 24.dp),
+                        contentPadding = PaddingValues(top = if (shelfSlotVisible) 12.dp else 16.dp, bottom = 24.dp),
                     ) {
-                        if (shelfVisible) {
+                        if (shelfSlotVisible) {
                             // Keys are namespaced per section ("shelf:"/"browse:"): shelf books
                             // also keep their place in the browse list below (no deduplication),
                             // so a bare item id could occur twice in one LazyColumn.
@@ -463,6 +543,19 @@ private fun LibraryContent(
                                         .padding(bottom = 8.dp),
                                 ) {
                                     LibraryRow(item, onClick = { onOpenItem(item.id) })
+                                }
+                            }
+                            if (shelfErrorVisible) {
+                                item(key = "shelf-error") {
+                                    Box(
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .background(MaterialTheme.colorScheme.surfaceContainer)
+                                            .padding(horizontal = 16.dp)
+                                            .padding(bottom = 8.dp),
+                                    ) {
+                                        ShelfErrorRow(onRetry = onRetryShelf)
+                                    }
                                 }
                             }
                             // The hairline that closes the tonal band (screen 03, decision 6).
@@ -545,6 +638,44 @@ private fun LibrarySectionHeader(text: String, modifier: Modifier = Modifier) {
             .semantics { heading() }
             .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 6.dp),
     )
+}
+
+// The shelf slot's failure state (screen 03, .shelf-err): one tappable row in the place the
+// shelf's books would occupy, styled as an error so it cannot be read as content. The whole
+// row retries, and it refetches ONLY the shelf - the browse list below keeps working.
+@Composable
+private fun ShelfErrorRow(onRetry: () -> Unit) {
+    Surface(
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.errorContainer,
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onRetry),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Icons.Default.WarningAmber,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onErrorContainer,
+            )
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text(
+                    stringResource(R.string.library_shelf_error_title),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                )
+                Text(
+                    stringResource(R.string.library_shelf_error_retry),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -658,6 +789,25 @@ internal fun LibrarySearchingShelfHiddenPreview() = RatatoskrTheme {
         LibraryContent(
             state = LibraryUiState(items = previewItems.take(1), shelfItems = previewShelfItems),
             query = "hobbit",
+            onQueryChange = {},
+            onOpenItem = {},
+            onOpenNowPlaying = {},
+            onOpenSettings = {},
+        )
+    }
+}
+
+// The shelf failed with nothing held while the list works: the slot keeps the tonal band and
+// both section headers, with the tap-to-retry error row where the shelf's books would be.
+// Contrast with LibraryLoadedPreview below - a successfully EMPTY shelf renders no section at
+// all, so "failed" and "empty" can never look the same.
+@Preview(name = "Library - shelf failed", widthDp = 360, heightDp = 800)
+@Composable
+internal fun LibraryShelfErrorPreview() = RatatoskrTheme {
+    Surface {
+        LibraryContent(
+            state = LibraryUiState(items = previewItems, shelfError = true),
+            query = "",
             onQueryChange = {},
             onOpenItem = {},
             onOpenNowPlaying = {},
