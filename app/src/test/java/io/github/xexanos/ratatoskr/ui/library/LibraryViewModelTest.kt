@@ -36,6 +36,7 @@ import org.junit.rules.TemporaryFolder
 import java.util.Collections
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 class LibraryViewModelTest {
 
@@ -497,6 +498,170 @@ class LibraryViewModelTest {
         // Clearing reloaded the browse list but the shelf came from held state - no refetch.
         assertEquals(1, receivedShelfLimits.size)
         assertEquals(listOf("shelf book"), viewModel.uiState.value.shelfItems.map { it.title })
+    }
+
+    private fun failedResponse(): MockResponse =
+        MockResponse().setResponseCode(502)
+            .setBody("""{"code":"abs_unreachable","message":"Audiobookshelf down"}""")
+
+    /** Pumps the schedulers a few times so anything wrongly in flight gets a chance to land. */
+    private fun letPendingWorkLand() {
+        repeat(5) {
+            dispatcher.scheduler.advanceUntilIdle()
+            Thread.sleep(20)
+        }
+    }
+
+    @Test
+    fun `shelf failure with a working list flags the retryable error row`() = runTest(dispatcher) {
+        dispatchLibrary(shelf = ::failedResponse) { request ->
+            receivedQueries += request.requestUrl?.queryParameter("q")
+            jsonResponse(WireFixtures.libraryPageJson(items = listOf(WireFixtures.libraryItemSummaryJson(title = "all"))))
+        }
+        val viewModel = LibraryViewModel(trustedConnectionManager())
+
+        settleState { viewModel.uiState.value.items.isNotEmpty() }
+
+        // The list is up; the shelf slot flags its own failure instead of silently rendering
+        // nothing - a broken shelf must never look like "no books in progress".
+        assertTrue(viewModel.uiState.value.shelfError)
+        assertTrue(viewModel.uiState.value.shelfItems.isEmpty())
+        assertEquals(null, viewModel.uiState.value.error)
+    }
+
+    @Test
+    fun `retrying from the error row refetches only the shelf`() = runTest(dispatcher) {
+        val failShelf = AtomicBoolean(true)
+        dispatchLibrary(shelf = { if (failShelf.get()) failedResponse() else defaultShelfResponse() }) { request ->
+            receivedQueries += request.requestUrl?.queryParameter("q")
+            jsonResponse(WireFixtures.libraryPageJson(items = listOf(WireFixtures.libraryItemSummaryJson(title = "all"))))
+        }
+        val viewModel = LibraryViewModel(trustedConnectionManager())
+        settleState { viewModel.uiState.value.shelfError }
+        val pageRequestsBefore = receivedQueries.size
+
+        failShelf.set(false)
+        viewModel.refreshShelf()
+        settleState { viewModel.uiState.value.shelfItems.isNotEmpty() }
+
+        // The retry hit the in-progress endpoint once more and left the browse list alone.
+        assertTrue(!viewModel.uiState.value.shelfError)
+        assertEquals(listOf("shelf book"), viewModel.uiState.value.shelfItems.map { it.title })
+        assertEquals(2, receivedShelfLimits.size)
+        assertEquals(pageRequestsBefore, receivedQueries.size)
+    }
+
+    @Test
+    fun `both initial requests failing surface a single full-screen error`() = runTest(dispatcher) {
+        dispatchLibrary(shelf = ::failedResponse) { failedResponse() }
+        val viewModel = LibraryViewModel(trustedConnectionManager())
+
+        settleState { viewModel.uiState.value.error != null }
+
+        // One message: the full-screen error owns the screen, so the state must not ALSO
+        // claim the shelf slot's inline error row.
+        assertTrue(!viewModel.uiState.value.shelfError)
+        assertTrue(viewModel.uiState.value.items.isEmpty())
+        assertTrue(viewModel.uiState.value.shelfItems.isEmpty())
+    }
+
+    @Test
+    fun `re-entering the screen silently refetches the shelf without touching the list`() = runTest(dispatcher) {
+        val shelfFetches = AtomicInteger(0)
+        dispatchLibrary(
+            shelf = {
+                if (shelfFetches.incrementAndGet() == 1) {
+                    defaultShelfResponse()
+                } else {
+                    // The book played in the meantime now leads the shelf.
+                    jsonResponse(
+                        WireFixtures.inProgressShelfJson(
+                            items = listOf(
+                                WireFixtures.libraryItemSummaryJson(id = "s2", title = "just played"),
+                                WireFixtures.libraryItemSummaryJson(id = "s1", title = "shelf book"),
+                            ),
+                        ),
+                    )
+                }
+            },
+        ) { request ->
+            receivedQueries += request.requestUrl?.queryParameter("q")
+            jsonResponse(WireFixtures.libraryPageJson(items = listOf(WireFixtures.libraryItemSummaryJson(title = "all"))))
+        }
+        val viewModel = LibraryViewModel(trustedConnectionManager())
+        settleState { viewModel.uiState.value.shelfItems.isNotEmpty() }
+
+        // The screen composing for the first time is NOT a re-entry: the initial load already
+        // carries the shelf fetch, so no second request may fire.
+        viewModel.onScreenEntered()
+        letPendingWorkLand()
+        assertEquals(1, receivedShelfLimits.size)
+
+        // Coming back from Now Playing: the shelf refetches silently and reorders.
+        viewModel.onScreenEntered()
+        settleState { viewModel.uiState.value.shelfItems.size == 2 }
+
+        assertEquals(listOf("just played", "shelf book"), viewModel.uiState.value.shelfItems.map { it.title })
+        assertEquals(2, receivedShelfLimits.size)
+        // Silent: the browse list was not refetched and no loading state was raised.
+        assertEquals(1, receivedQueries.size)
+        assertTrue(!viewModel.uiState.value.loading)
+        assertTrue(!viewModel.uiState.value.refreshing)
+    }
+
+    @Test
+    fun `a failed silent shelf refresh keeps the stale shelf`() = runTest(dispatcher) {
+        val failShelf = AtomicBoolean(false)
+        dispatchLibrary(shelf = { if (failShelf.get()) failedResponse() else defaultShelfResponse() }) { request ->
+            receivedQueries += request.requestUrl?.queryParameter("q")
+            jsonResponse(WireFixtures.libraryPageJson(items = listOf(WireFixtures.libraryItemSummaryJson(title = "all"))))
+        }
+        val viewModel = LibraryViewModel(trustedConnectionManager())
+        settleState { viewModel.uiState.value.shelfItems.isNotEmpty() }
+        viewModel.onScreenEntered() // first composition
+
+        failShelf.set(true)
+        viewModel.onScreenEntered() // re-entry: the silent refetch fails
+        settleState { receivedShelfLimits.size == 2 }
+        letPendingWorkLand()
+
+        // Stale beats error: the held rows stay and no error row appears over them.
+        assertEquals(listOf("shelf book"), viewModel.uiState.value.shelfItems.map { it.title })
+        assertTrue(!viewModel.uiState.value.shelfError)
+        assertEquals(null, viewModel.uiState.value.error)
+    }
+
+    @Test
+    fun `pull-to-refresh refetches shelf and list together`() = runTest(dispatcher) {
+        val viewModel = LibraryViewModel(trustedConnectionManager())
+        settleState { viewModel.uiState.value.shelfItems.isNotEmpty() }
+
+        viewModel.refresh()
+        settleState {
+            receivedShelfLimits.size == 2 && receivedQueries.size == 2 && !viewModel.uiState.value.refreshing
+        }
+
+        assertEquals(listOf(null, null), receivedQueries)
+    }
+
+    @Test
+    fun `no shelf request is made while a search is active`() = runTest(dispatcher) {
+        val viewModel = LibraryViewModel(trustedConnectionManager())
+        settleState { viewModel.uiState.value.shelfItems.isNotEmpty() }
+        viewModel.onScreenEntered() // first composition
+
+        viewModel.search("cat")
+        settleState { viewModel.uiState.value.items.singleOrNull()?.title == "cat" }
+
+        // Every path that could fetch the shelf, while a query is active: re-entry,
+        // an explicit shelf retry, and pull-to-refresh over the results.
+        viewModel.onScreenEntered()
+        viewModel.refreshShelf()
+        viewModel.refresh()
+        settleState { receivedQueries.size == 3 }
+        letPendingWorkLand()
+
+        assertEquals(1, receivedShelfLimits.size)
     }
 
     @Test
