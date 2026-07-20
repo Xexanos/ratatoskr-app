@@ -157,7 +157,8 @@ private fun SignInContent(
             },
             singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-            shape = MaterialTheme.shapes.large,
+            // 8 dp - the design's text-field radius (ux-design: Shape tokens).
+            shape = MaterialTheme.shapes.small,
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(16.dp))
@@ -178,7 +179,7 @@ private fun SignInContent(
                 keyboardType = KeyboardType.Password,
                 imeAction = ImeAction.Done,
             ),
-            shape = MaterialTheme.shapes.large,
+            shape = MaterialTheme.shapes.small,
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(24.dp))

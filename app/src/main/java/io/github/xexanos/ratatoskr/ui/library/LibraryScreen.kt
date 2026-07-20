@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.PlayArrow
@@ -379,7 +380,8 @@ private fun LibraryContent(
                 )
             },
             singleLine = true,
-            shape = MaterialTheme.shapes.large,
+            // Full pill - the design's search-field shape (ux-design: Shape tokens).
+            shape = CircleShape,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).testTag(UiTestTags.LIBRARY_SEARCH),
         )
         when {
@@ -548,7 +550,7 @@ private fun LibrarySectionHeader(text: String, modifier: Modifier = Modifier) {
 @Composable
 private fun LibraryRow(item: LibraryItemSummary, onClick: () -> Unit) {
     Surface(
-        shape = MaterialTheme.shapes.extraLarge,
+        shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 1.dp,
         modifier = Modifier.fillMaxWidth().testTag(UiTestTags.LIBRARY_ROW).clickable(onClick = onClick),
