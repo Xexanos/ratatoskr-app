@@ -1,0 +1,1 @@
+Books without cover art now show the Ratatoskr knot instead of a lettered tile, so alphabetical stretches no longer read as a wall of identical initials. While a cover is still loading, the tile stays calm and empty; a small spinner appears only when the connection is genuinely slow, and a book whose cover fails to load is never falsely marked as having none.
