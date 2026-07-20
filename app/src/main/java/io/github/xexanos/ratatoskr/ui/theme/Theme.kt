@@ -34,6 +34,8 @@ private val DarkColorScheme = darkColorScheme(
     surfaceVariant = SurfaceVariantDark,
     onSurfaceVariant = OnSurfaceVariantDark,
     outline = OutlineDark,
+    outlineVariant = OutlineVariantDark,
+    surfaceContainer = SurfaceContainerDark,
 )
 
 private val LightColorScheme = lightColorScheme(
@@ -51,6 +53,8 @@ private val LightColorScheme = lightColorScheme(
     surfaceVariant = SurfaceVariantLight,
     onSurfaceVariant = OnSurfaceVariantLight,
     outline = OutlineLight,
+    outlineVariant = OutlineVariantLight,
+    surfaceContainer = SurfaceContainerLight,
 )
 
 // The app's corner-radius scale - the single source of truth for shapes, so screens use

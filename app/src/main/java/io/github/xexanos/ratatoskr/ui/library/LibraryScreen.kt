@@ -5,8 +5,8 @@
  */
 package io.github.xexanos.ratatoskr.ui.library
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -55,6 +56,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -79,6 +81,8 @@ import io.github.xexanos.ratatoskr.ui.rememberDelayedVisible
 import io.github.xexanos.ratatoskr.ui.text
 import io.github.xexanos.ratatoskr.ui.theme.RatatoskrTheme
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -94,6 +98,10 @@ import kotlin.math.roundToInt
 data class LibraryUiState(
     val loading: Boolean = false,
     val items: List<LibraryItemSummary> = emptyList(),
+    // The continue-listening shelf, most-recently-listened first as the server delivered it.
+    // Empty means "no section" - the UI renders nothing for it. Held (not cleared) across
+    // search reloads, so clearing the search restores the shelf without a refetch.
+    val shelfItems: List<LibraryItemSummary> = emptyList(),
     // Cursor for the page after the ones already in `items`; null once the last page is in.
     val nextCursor: String? = null,
     val loadingMore: Boolean = false,
@@ -128,6 +136,10 @@ class LibraryViewModel(
     // Explicit reload requests (pull-to-refresh, retry-after-error). Buffered so one is kept if
     // it arrives mid-load and coalesced with any others.
     private val refreshRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
+    // Whether the shelf has ever loaded successfully. Distinguishes the first no-query load
+    // (fetch the shelf) from a search being cleared (redisplay the held shelf, no refetch).
+    private var shelfLoaded = false
 
     init {
         // One reload pipeline for the whole screen. Two sources feed it, both funnelled through
@@ -182,19 +194,44 @@ class LibraryViewModel(
             // list and reports via the snackbar rather than wiping to the full-screen error.
             _uiState.value =
                 if (showAsRefresh) _uiState.value.copy(refreshing = false, refreshError = UiError.NoServer)
-                else LibraryUiState(error = UiError.NoServer)
+                else LibraryUiState(error = UiError.NoServer, shelfItems = _uiState.value.shelfItems)
             return
         }
-        _uiState.value = when (val result = client.listLibraryItems(query = query)) {
-            is ApiResult.Success ->
-                LibraryUiState(items = result.data.items, nextCursor = result.data.nextCursor)
-            is ApiResult.Failure ->
-                if (showAsRefresh) {
-                    // A refresh over an existing list failed: keep the list, report via a snackbar.
-                    _uiState.value.copy(refreshing = false, refreshError = UiError.Domain(result.error))
-                } else {
-                    LibraryUiState(error = UiError.Domain(result.error))
+        // The shelf is never fetched while a query is active: search results get the full
+        // screen, and the held shelf reappears on clear WITHOUT a refetch - which is also why
+        // a query-clear reload (query back to null, shelf already loaded) skips it. With no
+        // query it rides along on the first load and on user-triggered reloads, in parallel
+        // with the page; the single loading state waits for both, so the shelf never pops in
+        // after the list.
+        val fetchShelf = query == null && (userTriggered || !shelfLoaded)
+        coroutineScope {
+            val shelfDeferred = if (fetchShelf) async { client.listInProgressItems() } else null
+            val pageResult = client.listLibraryItems(query = query)
+            val shelfItems = when (val shelfResult = shelfDeferred?.await()) {
+                is ApiResult.Success -> {
+                    shelfLoaded = true
+                    shelfResult.data
                 }
+                // Not fetched, or failed: keep whatever is held - stale beats a blanked shelf.
+                // (The visible, retryable shelf-error row from the spec is a follow-up cut;
+                // this tracer covers the happy path, issue #83.)
+                else -> _uiState.value.shelfItems
+            }
+            _uiState.value = when (pageResult) {
+                is ApiResult.Success ->
+                    LibraryUiState(
+                        items = pageResult.data.items,
+                        nextCursor = pageResult.data.nextCursor,
+                        shelfItems = shelfItems,
+                    )
+                is ApiResult.Failure ->
+                    if (showAsRefresh) {
+                        // A refresh over an existing list failed: keep the list, report via a snackbar.
+                        _uiState.value.copy(refreshing = false, refreshError = UiError.Domain(pageResult.error))
+                    } else {
+                        LibraryUiState(error = UiError.Domain(pageResult.error), shelfItems = shelfItems)
+                    }
+            }
         }
     }
 
@@ -301,9 +338,11 @@ private fun LibraryContent(
     onOpenNowPlaying: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
-    Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+    // Horizontal padding sits on the top bar and search field, NOT the whole column: the list
+    // below needs the full width so the shelf's tonal band can run edge to edge.
+    Column(modifier = Modifier.fillMaxSize()) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -341,7 +380,7 @@ private fun LibraryContent(
             },
             singleLine = true,
             shape = MaterialTheme.shapes.large,
-            modifier = Modifier.fillMaxWidth().testTag(UiTestTags.LIBRARY_SEARCH),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).testTag(UiTestTags.LIBRARY_SEARCH),
         )
         when {
             // The delay covers both first load and search: quick responses never flash the
@@ -384,6 +423,10 @@ private fun LibraryContent(
                 LaunchedEffect(nearEnd, state.nextCursor) {
                     if (nearEnd && state.nextCursor != null) onLoadMore()
                 }
+                // The shelf hides the moment the search FIELD is non-blank (not the debounced
+                // query): results get the full screen instantly, and the held shelf comes
+                // straight back when the field is cleared.
+                val shelfVisible = query.isBlank() && state.shelfItems.isNotEmpty()
                 PullToRefreshBox(
                     isRefreshing = state.refreshing,
                     onRefresh = onRefresh,
@@ -392,11 +435,46 @@ private fun LibraryContent(
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        // Row spacing is each row's bottom padding (not spacedBy): the shelf's
+                        // band must also fill the gaps between its rows, and item-owned padding
+                        // keeps the band continuous where an arrangement gap would slice it.
+                        contentPadding = PaddingValues(top = if (shelfVisible) 12.dp else 16.dp, bottom = 24.dp),
                     ) {
-                        items(state.items, key = { it.id }) { item ->
-                            LibraryRow(item, onClick = { onOpenItem(item.id) })
+                        if (shelfVisible) {
+                            // Keys are namespaced per section ("shelf:"/"browse:"): shelf books
+                            // also keep their place in the browse list below (no deduplication),
+                            // so a bare item id could occur twice in one LazyColumn.
+                            item(key = "shelf-header") {
+                                LibrarySectionHeader(
+                                    stringResource(R.string.library_shelf_header),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(MaterialTheme.colorScheme.surfaceContainer),
+                                )
+                            }
+                            items(state.shelfItems, key = { "shelf:${it.id}" }) { item ->
+                                Box(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .background(MaterialTheme.colorScheme.surfaceContainer)
+                                        .padding(horizontal = 16.dp)
+                                        .padding(bottom = 8.dp),
+                                ) {
+                                    LibraryRow(item, onClick = { onOpenItem(item.id) })
+                                }
+                            }
+                            // The hairline that closes the tonal band (screen 03, decision 6).
+                            item(key = "shelf-edge") {
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                            }
+                            item(key = "browse-header") {
+                                LibrarySectionHeader(stringResource(R.string.library_all_books_header))
+                            }
+                        }
+                        items(state.items, key = { "browse:${it.id}" }) { item ->
+                            Box(Modifier.padding(horizontal = 16.dp).padding(bottom = 8.dp)) {
+                                LibraryRow(item, onClick = { onOpenItem(item.id) })
+                            }
                         }
                         if (state.nextCursor != null) {
                             item(key = "load-more") {
@@ -406,7 +484,7 @@ private fun LibraryContent(
                                             .fillMaxWidth()
                                             .heightIn(min = 48.dp)
                                             .clickable(onClick = onLoadMore)
-                                            .padding(vertical = 12.dp),
+                                            .padding(horizontal = 16.dp, vertical = 12.dp),
                                         contentAlignment = Alignment.Center,
                                     ) {
                                         Text(
@@ -449,6 +527,21 @@ private fun EmptyLibrary(query: String) {
         } else {
             stringResource(R.string.library_no_results_body, query)
         },
+    )
+}
+
+// Marked as a heading so the shelf/browse boundary is navigable non-visually, mirroring what
+// the tonal band does for sighted users.
+@Composable
+private fun LibrarySectionHeader(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.secondary,
+        fontWeight = FontWeight.Medium,
+        modifier = modifier
+            .semantics { heading() }
+            .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 6.dp),
     )
 }
 
@@ -530,7 +623,32 @@ private val previewItems = listOf(
     LibraryItemSummary("3", "Dune", "Frank Herbert", 75_600.0, null, null),
 )
 
-@Preview(name = "Library - loaded", widthDp = 360, heightDp = 800)
+// Most-recently-listened first, as the server would deliver it. "The Hobbit" also sits in
+// previewItems: the shelf is a view onto the library, not a partition, so the same book
+// appearing in both sections is the state to preview.
+private val previewShelfItems = listOf(
+    LibraryItemSummary("4", "A Wizard of Earthsea", "Ursula K. Le Guin", 25_200.0, null, Progress(9_100.0, false)),
+    LibraryItemSummary("1", "The Hobbit", "J. R. R. Tolkien", 39_600.0, null, Progress(12_600.0, false)),
+)
+
+@Preview(name = "Library - shelf loaded", widthDp = 360, heightDp = 800)
+@Composable
+internal fun LibraryShelfLoadedPreview() = RatatoskrTheme {
+    Surface {
+        LibraryContent(
+            state = LibraryUiState(items = previewItems, shelfItems = previewShelfItems),
+            query = "",
+            onQueryChange = {},
+            onOpenItem = {},
+            onOpenNowPlaying = {},
+            onOpenSettings = {},
+        )
+    }
+}
+
+// An empty shelf renders no section at all: this must look exactly like the screen before the
+// shelf existed - no headers, no empty band.
+@Preview(name = "Library - loaded, empty shelf", widthDp = 360, heightDp = 800)
 @Composable
 internal fun LibraryLoadedPreview() = RatatoskrTheme {
     Surface {

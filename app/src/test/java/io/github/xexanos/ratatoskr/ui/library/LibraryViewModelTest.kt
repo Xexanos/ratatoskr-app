@@ -49,21 +49,56 @@ class LibraryViewModelTest {
 
     private val receivedQueries = Collections.synchronizedList(mutableListOf<String?>())
 
+    // The `limit` query parameter of every in-progress shelf request, in arrival order. Doubles
+    // as the shelf request log: its size counts shelf fetches, its values must all be null (the
+    // server owns the shelf size; the app never sends a limit).
+    private val receivedShelfLimits = Collections.synchronizedList(mutableListOf<String?>())
+
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
-        server.dispatch { request ->
+        dispatchItems { request ->
             val q = request.requestUrl?.queryParameter("q")
             receivedQueries += q
-            MockResponse().setResponseCode(200)
-                .setHeader("Content-Type", "application/json")
-                .setBody(
-                    WireFixtures.libraryPageJson(items = listOf(WireFixtures.libraryItemSummaryJson(title = q ?: "all"))),
-                )
+            jsonResponse(
+                WireFixtures.libraryPageJson(items = listOf(WireFixtures.libraryItemSummaryJson(title = q ?: "all"))),
+            )
         }
     }
 
     @After fun tearDown() = Dispatchers.resetMain()
+
+    private fun jsonResponse(body: String): MockResponse =
+        MockResponse().setResponseCode(200)
+            .setHeader("Content-Type", "application/json")
+            .setBody(body)
+
+    private fun defaultShelfResponse(): MockResponse =
+        jsonResponse(
+            WireFixtures.inProgressShelfJson(
+                items = listOf(WireFixtures.libraryItemSummaryJson(id = "s1", title = "shelf book")),
+            ),
+        )
+
+    /**
+     * Routes the two library endpoints in one place: shelf requests are logged (their `limit`
+     * param) and answered by [shelf], everything else goes to [items] - so the per-test items
+     * dispatches and their request logs stay untouched by the shelf request the initial load
+     * now also fires.
+     */
+    private fun dispatchItems(
+        shelf: () -> MockResponse = ::defaultShelfResponse,
+        items: (okhttp3.mockwebserver.RecordedRequest) -> MockResponse,
+    ) {
+        server.dispatch { request ->
+            if (request.requestUrl?.encodedPath?.endsWith("/library/in-progress") == true) {
+                receivedShelfLimits += request.requestUrl?.queryParameter("limit")
+                shelf()
+            } else {
+                items(request)
+            }
+        }
+    }
 
     private fun trustedConnectionManager(): ConnectionManager {
         val file = tempFolder.root.resolve("connection_${System.nanoTime()}.preferences_pb")
@@ -141,7 +176,7 @@ class LibraryViewModelTest {
     @Test
     fun `loadMore follows the cursor and appends the next page`() = runTest(dispatcher) {
         val receivedCursors = Collections.synchronizedList(mutableListOf<String?>())
-        server.dispatch { request ->
+        dispatchItems { request ->
             val cursor = request.requestUrl?.queryParameter("cursor")
             receivedCursors += cursor
             val body = if (cursor == null) {
@@ -154,9 +189,7 @@ class LibraryViewModelTest {
                     items = listOf(WireFixtures.libraryItemSummaryJson(id = "i2", title = "page two")),
                 )
             }
-            MockResponse().setResponseCode(200)
-                .setHeader("Content-Type", "application/json")
-                .setBody(body)
+            jsonResponse(body)
         }
         val viewModel = LibraryViewModel(trustedConnectionManager())
         settleState { viewModel.uiState.value.items.isNotEmpty() }
@@ -178,22 +211,20 @@ class LibraryViewModelTest {
     @Test
     fun `a failing next page keeps the list and flags a retryable error`() = runTest(dispatcher) {
         var failNextPage = true
-        server.dispatch { request ->
+        dispatchItems { request ->
             val cursor = request.requestUrl?.queryParameter("cursor")
             if (cursor != null && failNextPage) {
                 MockResponse().setResponseCode(502)
                     .setBody("""{"code":"abs_unreachable","message":"Audiobookshelf down"}""")
             } else {
-                MockResponse().setResponseCode(200)
-                    .setHeader("Content-Type", "application/json")
-                    .setBody(
-                        WireFixtures.libraryPageJson(
-                            items = listOf(
-                                WireFixtures.libraryItemSummaryJson(id = "i-$cursor", title = "page after $cursor"),
-                            ),
-                            nextCursor = if (cursor == null) "c2" else null,
+                jsonResponse(
+                    WireFixtures.libraryPageJson(
+                        items = listOf(
+                            WireFixtures.libraryItemSummaryJson(id = "i-$cursor", title = "page after $cursor"),
                         ),
-                    )
+                        nextCursor = if (cursor == null) "c2" else null,
+                    ),
+                )
             }
         }
         val viewModel = LibraryViewModel(trustedConnectionManager())
@@ -218,21 +249,19 @@ class LibraryViewModelTest {
 
     @Test
     fun `a new query restarts pagination from the first page`() = runTest(dispatcher) {
-        server.dispatch { request ->
+        dispatchItems { request ->
             val cursor = request.requestUrl?.queryParameter("cursor")
             val q = request.requestUrl?.queryParameter("q")
-            MockResponse().setResponseCode(200)
-                .setHeader("Content-Type", "application/json")
-                .setBody(
-                    WireFixtures.libraryPageJson(
-                        items = listOf(
-                            WireFixtures.libraryItemSummaryJson(id = "$q-$cursor", title = q ?: "all"),
-                        ),
-                        // Every page claims a successor, so the cursor is non-null when the
-                        // query changes - the fresh load must not carry it over.
-                        nextCursor = "next-after-$cursor",
+            jsonResponse(
+                WireFixtures.libraryPageJson(
+                    items = listOf(
+                        WireFixtures.libraryItemSummaryJson(id = "$q-$cursor", title = q ?: "all"),
                     ),
-                )
+                    // Every page claims a successor, so the cursor is non-null when the
+                    // query changes - the fresh load must not carry it over.
+                    nextCursor = "next-after-$cursor",
+                ),
+            )
         }
         val viewModel = LibraryViewModel(trustedConnectionManager())
         settleState { viewModel.uiState.value.items.isNotEmpty() }
@@ -253,29 +282,25 @@ class LibraryViewModelTest {
         // structure protects against (unlike the test above, which changes query only after the
         // page has fully landed).
         val pageBlocked = CountDownLatch(1)
-        server.dispatch { request ->
+        dispatchItems { request ->
             val cursor = request.requestUrl?.queryParameter("cursor")
             val q = request.requestUrl?.queryParameter("q")
             receivedQueries += q
             when {
                 cursor != null -> {
                     pageBlocked.await()
-                    MockResponse().setResponseCode(200)
-                        .setHeader("Content-Type", "application/json")
-                        .setBody(
-                            WireFixtures.libraryPageJson(
-                                items = listOf(WireFixtures.libraryItemSummaryJson(id = "stale", title = "stale page")),
-                            ),
-                        )
-                }
-                else -> MockResponse().setResponseCode(200)
-                    .setHeader("Content-Type", "application/json")
-                    .setBody(
+                    jsonResponse(
                         WireFixtures.libraryPageJson(
-                            items = listOf(WireFixtures.libraryItemSummaryJson(id = "${q}-first", title = q ?: "all")),
-                            nextCursor = if (q == null) "c2" else null,
+                            items = listOf(WireFixtures.libraryItemSummaryJson(id = "stale", title = "stale page")),
                         ),
                     )
+                }
+                else -> jsonResponse(
+                    WireFixtures.libraryPageJson(
+                        items = listOf(WireFixtures.libraryItemSummaryJson(id = "${q}-first", title = q ?: "all")),
+                        nextCursor = if (q == null) "c2" else null,
+                    ),
+                )
             }
         }
         val viewModel = LibraryViewModel(trustedConnectionManager())
@@ -318,16 +343,14 @@ class LibraryViewModelTest {
     @Test
     fun `retry after a failed load re-issues the load and clears the error`() = runTest(dispatcher) {
         val failFirst = AtomicBoolean(true)
-        server.dispatch { request ->
+        dispatchItems { request ->
             val q = request.requestUrl?.queryParameter("q")
             receivedQueries += q
             if (failFirst.getAndSet(false)) {
                 MockResponse().setResponseCode(502)
                     .setBody("""{"code":"abs_unreachable","message":"Audiobookshelf down"}""")
             } else {
-                MockResponse().setResponseCode(200)
-                    .setHeader("Content-Type", "application/json")
-                    .setBody(WireFixtures.libraryPageJson(items = listOf(WireFixtures.libraryItemSummaryJson(title = q ?: "all"))))
+                jsonResponse(WireFixtures.libraryPageJson(items = listOf(WireFixtures.libraryItemSummaryJson(title = q ?: "all"))))
             }
         }
         val viewModel = LibraryViewModel(trustedConnectionManager())
@@ -343,16 +366,14 @@ class LibraryViewModelTest {
     @Test
     fun `a failed refresh keeps the list and surfaces a one-shot refreshError`() = runTest(dispatcher) {
         val failNow = AtomicBoolean(false)
-        server.dispatch { request ->
+        dispatchItems { request ->
             val q = request.requestUrl?.queryParameter("q")
             receivedQueries += q
             if (failNow.get()) {
                 MockResponse().setResponseCode(502)
                     .setBody("""{"code":"abs_unreachable","message":"Audiobookshelf down"}""")
             } else {
-                MockResponse().setResponseCode(200)
-                    .setHeader("Content-Type", "application/json")
-                    .setBody(WireFixtures.libraryPageJson(items = listOf(WireFixtures.libraryItemSummaryJson(title = q ?: "all"))))
+                jsonResponse(WireFixtures.libraryPageJson(items = listOf(WireFixtures.libraryItemSummaryJson(title = q ?: "all"))))
             }
         }
         val viewModel = LibraryViewModel(trustedConnectionManager())
@@ -407,8 +428,80 @@ class LibraryViewModelTest {
     }
 
     @Test
+    fun `first load fetches shelf and page in parallel and lands as one loaded state`() = runTest(dispatcher) {
+        // Both responses are held until the test releases them. Both requests arriving while
+        // neither response is out proves the fetches run in parallel (a sequential load would
+        // block the second request behind the first's held response).
+        val responsesBlocked = CountDownLatch(1)
+        dispatchItems(
+            shelf = {
+                responsesBlocked.await()
+                defaultShelfResponse()
+            },
+        ) { request ->
+            receivedQueries += request.requestUrl?.queryParameter("q")
+            responsesBlocked.await()
+            jsonResponse(WireFixtures.libraryPageJson(items = listOf(WireFixtures.libraryItemSummaryJson(title = "all"))))
+        }
+        val viewModel = LibraryViewModel(trustedConnectionManager())
+
+        settleState { receivedQueries.size == 1 && receivedShelfLimits.size == 1 }
+
+        // Neither response has landed: still the single full-screen loading state, and the
+        // shelf request named no limit - the server owns the shelf size.
+        assertTrue(viewModel.uiState.value.loading)
+        assertTrue(viewModel.uiState.value.items.isEmpty())
+        assertEquals(listOf(null), receivedShelfLimits)
+
+        responsesBlocked.countDown()
+        settleState { !viewModel.uiState.value.loading }
+
+        // One loaded state carries both sections - no shelf popping in after the list.
+        assertEquals(listOf("all"), viewModel.uiState.value.items.map { it.title })
+        assertEquals(listOf("shelf book"), viewModel.uiState.value.shelfItems.map { it.title })
+        assertEquals(null, viewModel.uiState.value.error)
+    }
+
+    @Test
+    fun `a successfully empty shelf loads as no shelf items`() = runTest(dispatcher) {
+        dispatchItems(shelf = { jsonResponse(WireFixtures.inProgressShelfJson(items = emptyList())) }) { request ->
+            receivedQueries += request.requestUrl?.queryParameter("q")
+            jsonResponse(WireFixtures.libraryPageJson(items = listOf(WireFixtures.libraryItemSummaryJson(title = "all"))))
+        }
+        val viewModel = LibraryViewModel(trustedConnectionManager())
+
+        settleState { viewModel.uiState.value.items.isNotEmpty() }
+
+        // "Successfully empty" is a loaded state with nothing on the shelf (the UI renders no
+        // section for it), not an error.
+        assertTrue(viewModel.uiState.value.shelfItems.isEmpty())
+        assertEquals(null, viewModel.uiState.value.error)
+    }
+
+    @Test
+    fun `searching never refetches the shelf and clearing the search restores it from held state`() = runTest(dispatcher) {
+        val viewModel = LibraryViewModel(trustedConnectionManager())
+        settleState { viewModel.uiState.value.shelfItems.isNotEmpty() }
+
+        viewModel.search("cat")
+        settleState { viewModel.uiState.value.items.singleOrNull()?.title == "cat" }
+
+        // The search reload asked only for results; the shelf stays held in state (the search
+        // field hides it UI-side) so clearing can bring it back instantly.
+        assertEquals(1, receivedShelfLimits.size)
+        assertEquals(listOf("shelf book"), viewModel.uiState.value.shelfItems.map { it.title })
+
+        viewModel.search("")
+        settleState { receivedQueries.size == 3 && !viewModel.uiState.value.loading }
+
+        // Clearing reloaded the browse list but the shelf came from held state - no refetch.
+        assertEquals(1, receivedShelfLimits.size)
+        assertEquals(listOf("shelf book"), viewModel.uiState.value.shelfItems.map { it.title })
+    }
+
+    @Test
     fun `a failing request surfaces the mapped error`() = runTest(dispatcher) {
-        server.dispatch {
+        dispatchItems {
             MockResponse().setResponseCode(502)
                 .setBody("""{"code":"abs_unreachable","message":"Audiobookshelf down"}""")
         }

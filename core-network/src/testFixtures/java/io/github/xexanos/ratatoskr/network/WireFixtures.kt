@@ -86,6 +86,11 @@ object WireFixtures {
         return """{"items":[${items.joinToString(",")}]$c}"""
     }
 
+    /** A `GET /v1/library/in-progress` response body (a `LibraryItemList` - no cursor). */
+    fun inProgressShelfJson(
+        items: List<String> = listOf(libraryItemSummaryJson()),
+    ): String = """{"items":[${items.joinToString(",")}]}"""
+
     /** Minimal JSON string escaping for interpolated values: backslash and double-quote. */
     private fun esc(value: String): String =
         value.replace("\\", "\\\\").replace("\"", "\\\"")
