@@ -566,6 +566,23 @@ class LibraryViewModelTest {
     }
 
     @Test
+    fun `re-entry while the full-screen error shows does not fetch the shelf`() = runTest(dispatcher) {
+        dispatchLibrary(shelf = ::failedResponse) { failedResponse() }
+        val viewModel = LibraryViewModel(trustedConnectionManager())
+        settleState { viewModel.uiState.value.error != null }
+        viewModel.onScreenEntered() // first composition
+
+        viewModel.onScreenEntered() // re-entry, e.g. back from Settings
+        letPendingWorkLand()
+
+        // The full-screen error's retry refetches everything at once; a shelf-only success
+        // would be invisible behind it and a shelf-only failure must not raise the error row
+        // as a second message.
+        assertEquals(1, receivedShelfLimits.size)
+        assertTrue(!viewModel.uiState.value.shelfError)
+    }
+
+    @Test
     fun `re-entering the screen silently refetches the shelf without touching the list`() = runTest(dispatcher) {
         val shelfFetches = AtomicInteger(0)
         dispatchLibrary(

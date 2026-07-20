@@ -216,18 +216,29 @@ class LibraryViewModel(
      */
     fun refreshShelf() {
         if (query.value != null || _uiState.value.loading || _uiState.value.refreshing) return
+        // While the full-screen error owns the screen, its retry refetches everything at once:
+        // a shelf-only success would be invisible behind it, and a shelf-only failure must not
+        // raise a second message.
+        if (_uiState.value.error != null) return
         shelfRefresh?.cancel()
         shelfRefresh = viewModelScope.launch {
-            when (val result = connectionManager.client()?.listInProgressItems()) {
-                is ApiResult.Success -> {
-                    shelfLoaded = true
-                    _uiState.value = _uiState.value.copy(shelfItems = result.data, shelfError = false)
-                }
-                // Failed, or the server became unconfigured: stale beats error - held rows
-                // stay; the error row appears only when there is nothing to hold on to.
-                else -> _uiState.value = _uiState.value.copy(shelfError = _uiState.value.shelfItems.isEmpty())
-            }
+            val (shelfItems, shelfError) = shelfSlotAfter(connectionManager.client()?.listInProgressItems())
+            _uiState.value = _uiState.value.copy(shelfItems = shelfItems, shelfError = shelfError)
         }
+    }
+
+    /**
+     * The shelf-slot rule applied to one shelf fetch outcome: fresh data fills the slot, a
+     * failure (or an unconfigured server, result null) keeps what is held - stale beats error -
+     * and the error row is raised only when there is nothing held to show instead.
+     */
+    private fun shelfSlotAfter(result: ApiResult<List<LibraryItemSummary>>?): Pair<List<LibraryItemSummary>, Boolean> {
+        if (result is ApiResult.Success) {
+            shelfLoaded = true
+            return result.data to false
+        }
+        val held = _uiState.value.shelfItems
+        return held to held.isEmpty()
     }
 
     private suspend fun load(query: String?, userTriggered: Boolean = false) {
@@ -254,21 +265,18 @@ class LibraryViewModel(
         // with the page; the single loading state waits for both, so the shelf never pops in
         // after the list.
         val fetchShelf = query == null && (userTriggered || !shelfLoaded)
+        // A full reload supersedes any shelf-only refresh still in flight: what this reload
+        // fetches (or carries through) is the newer truth, and a stale shelf-only result
+        // landing late must not overwrite it.
+        shelfRefresh?.cancel()
         coroutineScope {
             val shelfDeferred = if (fetchShelf) async { client.listInProgressItems() } else null
             val pageResult = client.listLibraryItems(query = query)
-            val held = _uiState.value.shelfItems
             val (shelfItems, shelfError) = when (val shelfResult = shelfDeferred?.await()) {
-                is ApiResult.Success -> {
-                    shelfLoaded = true
-                    shelfResult.data to false
-                }
-                // Failed: keep whatever is held - stale beats a blanked shelf. The error row
-                // is raised only when nothing is held, so it can never cover live data.
-                is ApiResult.Failure -> held to held.isEmpty()
                 // Not fetched (search, or query cleared with the shelf already loaded): carry
                 // the slot through unchanged.
-                null -> held to _uiState.value.shelfError
+                null -> _uiState.value.shelfItems to _uiState.value.shelfError
+                else -> shelfSlotAfter(shelfResult)
             }
             _uiState.value = when (pageResult) {
                 is ApiResult.Success ->
