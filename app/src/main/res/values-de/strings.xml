@@ -32,6 +32,8 @@
     <string name="library_no_results_title">Keine Treffer</string>
     <string name="library_empty_body">Hörbücher von deinem Audiobookshelf-Server erscheinen hier.</string>
     <string name="library_no_results_body">Keine Hörbücher passen zu %1$s. Versuche es mit einer kürzeren Suche.</string>
+    <string name="library_shelf_header">Weiterhören</string>
+    <string name="library_all_books_header">Alle Bücher</string>
     <string name="library_finished">Abgeschlossen</string>
     <string name="library_percent">%1$d&#160;%%</string>
     <string name="library_loading_more">Weitere Hörbücher werden geladen</string>

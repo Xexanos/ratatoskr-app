@@ -16,6 +16,7 @@ import io.github.xexanos.ratatoskr.network.domain.Session
 import io.github.xexanos.ratatoskr.network.domain.Speaker
 import io.github.xexanos.ratatoskr.network.generated.model.AuthTokens as GenAuthTokens
 import io.github.xexanos.ratatoskr.network.generated.model.LibraryItem as GenLibraryItem
+import io.github.xexanos.ratatoskr.network.generated.model.LibraryItemList as GenLibraryItemList
 import io.github.xexanos.ratatoskr.network.generated.model.LibraryItemPage as GenLibraryItemPage
 import io.github.xexanos.ratatoskr.network.generated.model.LibraryItemSummary as GenLibraryItemSummary
 import io.github.xexanos.ratatoskr.network.generated.model.PlaybackState as GenPlaybackState
@@ -85,6 +86,13 @@ internal fun GenLibraryItem.toDomain(baseUrl: String): LibraryItem =
 
 internal fun GenLibraryItemPage.toDomain(baseUrl: String): LibraryPage =
     LibraryPage(items = items.map { it.toDomain(baseUrl) }, nextCursor = nextCursor)
+
+/**
+ * The in-progress shelf is a complete, bounded set, not a page - the envelope carries no
+ * cursor, so it unwraps to a plain list of the existing summary model (no new domain type).
+ */
+internal fun GenLibraryItemList.toDomain(baseUrl: String): List<LibraryItemSummary> =
+    items.map { it.toDomain(baseUrl) }
 
 internal fun GenPlaybackState.toDomain(): PlaybackState = when (this) {
     GenPlaybackState.playing -> PlaybackState.PLAYING

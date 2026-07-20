@@ -34,6 +34,8 @@
     <string name="library_no_results_title">No matches</string>
     <string name="library_empty_body">Audiobooks from your Audiobookshelf server will show up here.</string>
     <string name="library_no_results_body">No audiobooks match %1$s. Try a shorter search.</string>
+    <string name="library_shelf_header">Continue listening</string>
+    <string name="library_all_books_header">All books</string>
     <string name="library_finished">Finished</string>
     <string name="library_percent">%1$d%%</string>
     <string name="library_loading_more">Loading more audiobooks</string>

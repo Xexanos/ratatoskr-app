@@ -25,6 +25,10 @@ val OnBackgroundLight = Color(0xFF211A17)
 val SurfaceVariantLight = Color(0xFFF4DED5)
 val OnSurfaceVariantLight = Color(0xFF53433D)
 val OutlineLight = Color(0xFF85736C)
+// Tonal container band (the search bar's container tone in the design doc, used by the
+// continue-listening shelf) and the hairline edge that closes it.
+val SurfaceContainerLight = Color(0xFFF6EAE2)
+val OutlineVariantLight = Color(0xFFE5D2C4)
 
 // Dark
 val CopperPrimaryDark = Color(0xFFFFB4A3)
@@ -39,3 +43,6 @@ val OnBackgroundDark = Color(0xFFF1DFD9)
 val SurfaceVariantDark = Color(0xFF53433D)
 val OnSurfaceVariantDark = Color(0xFFD8C2B9)
 val OutlineDark = Color(0xFFA08D85)
+// See the light-side note: shelf band and its hairline edge.
+val SurfaceContainerDark = Color(0xFF241914)
+val OutlineVariantDark = Color(0xFF3A2A22)

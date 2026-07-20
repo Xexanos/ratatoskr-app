@@ -9,6 +9,7 @@ import io.github.xexanos.ratatoskr.network.domain.ApiResult
 import io.github.xexanos.ratatoskr.network.domain.map
 import io.github.xexanos.ratatoskr.network.domain.AuthSession
 import io.github.xexanos.ratatoskr.network.domain.LibraryItem
+import io.github.xexanos.ratatoskr.network.domain.LibraryItemSummary
 import io.github.xexanos.ratatoskr.network.domain.LibraryPage
 import io.github.xexanos.ratatoskr.network.domain.RatatoskrError
 import io.github.xexanos.ratatoskr.network.domain.Session
@@ -85,6 +86,15 @@ class RatatoskrClient internal constructor(
         cursor: String? = null,
     ): ApiResult<LibraryPage> =
         execute { libraryApi.listLibraryItems(query, limit, cursor) }.map { it.toDomain(baseUrl) }
+
+    /**
+     * The continue-listening shelf: in-progress books, most-recently-listened first. Membership
+     * and order are the server's; the shelf size is its default too - `limit` is deliberately
+     * not sent (the generated default of 25 would silently pin the server's choice, so it is
+     * overridden with null here).
+     */
+    suspend fun listInProgressItems(): ApiResult<List<LibraryItemSummary>> =
+        execute { libraryApi.listInProgressItems(limit = null) }.map { it.toDomain(baseUrl) }
 
     suspend fun getLibraryItem(itemId: String): ApiResult<LibraryItem> =
         execute { libraryApi.getLibraryItem(itemId) }.map { it.toDomain(baseUrl) }

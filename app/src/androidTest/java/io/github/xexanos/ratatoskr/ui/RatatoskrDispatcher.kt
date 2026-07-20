@@ -25,6 +25,9 @@ class RatatoskrDispatcher(
     private val login: () -> MockResponse = { jsonResponse(WireFixtures.authTokensJson()) },
     private val speakers: String = WireFixtures.speakerListJson(),
     private val libraryPage: String = WireFixtures.libraryPageJson(),
+    // Empty by default: the flows' row counts and "first row" taps predate the shelf, and an
+    // empty shelf renders the screen exactly as before it existed.
+    private val inProgressShelf: String = WireFixtures.inProgressShelfJson(items = emptyList()),
     private val sessionDurationSeconds: Double = 600.0,
     /** Optional embedded `LibraryItemSummary` JSON for the session's `item` member. */
     private val sessionItemJson: String? = null,
@@ -60,6 +63,7 @@ class RatatoskrDispatcher(
             // is not part of the happy path; answer defensively.
             path.startsWith("/v1/library/items/") -> MockResponse().setResponseCode(404)
             path == "/v1/library/items" -> jsonResponse(libraryPage)
+            path == "/v1/library/in-progress" -> jsonResponse(inProgressShelf)
             path == "/v1/sessions/current" && request.method == "PUT" -> {
                 ended = false
                 state = "playing"
