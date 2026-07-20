@@ -44,6 +44,15 @@ class RatatoskrClient internal constructor(
     private val playbackApi: PlaybackApi,
     private val tokenStore: TokenAccess,
     private val moshi: Moshi,
+    private val baseUrl: String,
+    /**
+     * OkHttp stack for loading cover images, sharing this client's TLS trust (TOFU pin,
+     * SPEC section 6) and bearer/refresh auth (SPEC section 5) but with its own dispatcher,
+     * so a scroll burst of cover requests can never queue playback commands or the session
+     * poll behind it (OkHttp admission is per-dispatcher, default 5 per host - and covers
+     * share the API's host). Consumed by the app's image loader; closed with [close].
+     */
+    val coversCallFactory: okhttp3.Call.Factory,
     private val closeAction: () -> Unit = {},
 ) {
 
@@ -75,14 +84,14 @@ class RatatoskrClient internal constructor(
         limit: Int? = null,
         cursor: String? = null,
     ): ApiResult<LibraryPage> =
-        execute { libraryApi.listLibraryItems(query, limit, cursor) }.map { it.toDomain() }
+        execute { libraryApi.listLibraryItems(query, limit, cursor) }.map { it.toDomain(baseUrl) }
 
     suspend fun getLibraryItem(itemId: String): ApiResult<LibraryItem> =
-        execute { libraryApi.getLibraryItem(itemId) }.map { it.toDomain() }
+        execute { libraryApi.getLibraryItem(itemId) }.map { it.toDomain(baseUrl) }
 
     suspend fun currentSession(): ApiResult<Session> =
         execute(sessionEndpoint = true) { playbackApi.getCurrentSession() }
-            .adoptingRotatedTokens().map { it.toDomain() }
+            .adoptingRotatedTokens().map { it.toDomain(baseUrl) }
 
     /**
      * Starts playback. The stored refresh token is handed to the server so its sync loop can
@@ -93,7 +102,7 @@ class RatatoskrClient internal constructor(
         val refreshToken = tokenStore.refreshToken()
         return execute {
             playbackApi.startSession(StartSessionRequest(itemId, speakerId, refreshToken))
-        }.adoptingRotatedTokens().map { it.toDomain() }
+        }.adoptingRotatedTokens().map { it.toDomain(baseUrl) }
     }
 
     /**
@@ -113,15 +122,15 @@ class RatatoskrClient internal constructor(
 
     suspend fun pause(): ApiResult<Session> =
         execute(sessionEndpoint = true) { playbackApi.pauseSession() }
-            .adoptingRotatedTokens().map { it.toDomain() }
+            .adoptingRotatedTokens().map { it.toDomain(baseUrl) }
 
     suspend fun resume(): ApiResult<Session> =
         execute(sessionEndpoint = true) { playbackApi.resumeSession() }
-            .adoptingRotatedTokens().map { it.toDomain() }
+            .adoptingRotatedTokens().map { it.toDomain(baseUrl) }
 
     suspend fun seek(positionSeconds: Double): ApiResult<Session> =
         execute(sessionEndpoint = true) { playbackApi.seekSession(SeekRequest(positionSeconds)) }
-            .adoptingRotatedTokens().map { it.toDomain() }
+            .adoptingRotatedTokens().map { it.toDomain(baseUrl) }
 
     // --- token adoption -----------------------------------------------------------------
 

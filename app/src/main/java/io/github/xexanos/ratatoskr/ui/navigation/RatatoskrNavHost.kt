@@ -115,7 +115,9 @@ fun RatatoskrNavHost(container: AppContainer, startDestination: Route) {
 
         composable<Route.Settings> {
             val vm = viewModel<SettingsViewModel>(
-                factory = containerFactory { SettingsViewModel(container.connectionManager) },
+                factory = containerFactory {
+                    SettingsViewModel(container.connectionManager, container.coverImages::clear)
+                },
             )
             SettingsScreen(
                 viewModel = vm,

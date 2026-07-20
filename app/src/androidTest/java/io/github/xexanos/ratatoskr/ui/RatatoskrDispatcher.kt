@@ -38,12 +38,24 @@ class RatatoskrDispatcher(
     // poll after Stop gets 404, not a revived session.
     @Volatile private var ended = false
 
+    /** The last request the cover route served, for asserting auth and the `?h=` bucket. */
+    @Volatile var lastCoverRequest: RecordedRequest? = null
+        private set
+
     override fun dispatch(request: RecordedRequest): MockResponse {
         val path = request.path.orEmpty().substringBefore('?')
         return when {
             path == "/health" -> jsonResponse("""{"reachable":true}""")
             path == "/v1/auth/login" -> login()
             path == "/v1/speakers" -> jsonResponse(speakers)
+            // The cover proxy: real PNG bytes so Coil decodes and renders them.
+            path.startsWith("/v1/library/items/") && path.endsWith("/cover") -> {
+                lastCoverRequest = request
+                MockResponse()
+                    .setResponseCode(200)
+                    .setHeader("Content-Type", "image/png")
+                    .setBody(okio.Buffer().write(COVER_PNG))
+            }
             // A library item tap navigates to the speaker picker, so the item-detail endpoint
             // is not part of the happy path; answer defensively.
             path.startsWith("/v1/library/items/") -> MockResponse().setResponseCode(404)
@@ -84,6 +96,11 @@ class RatatoskrDispatcher(
 
     private companion object {
         val POSITION = Regex(""""positionSeconds"\s*:\s*([0-9.]+)""")
+
+        /** A valid 1x1 PNG - the smallest body Coil can actually decode. */
+        val COVER_PNG: ByteArray = java.util.Base64.getDecoder().decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGM4UWHzHwAGBAJ87l7R9AAAAABJRU5ErkJggg==",
+        )
     }
 }
 

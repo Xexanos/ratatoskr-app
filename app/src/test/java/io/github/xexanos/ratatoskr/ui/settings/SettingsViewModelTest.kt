@@ -60,9 +60,13 @@ class SettingsViewModelTest {
         assertEquals("ab:cd:ef", store.fingerprint())
     }
 
+    // Records cover-cache clears so each test can assert the wipe happened (or did not).
+    private var coverCacheClears = 0
+    private val clearCoverCache: suspend () -> Unit = { coverCacheClears++ }
+
     @Test
     fun `initial state reports no configured server`() = runTest(dispatcher) {
-        val viewModel = SettingsViewModel(connectionManager())
+        val viewModel = SettingsViewModel(connectionManager(), clearCoverCache)
 
         assertNull(viewModel.uiState.value.serverUrl)
     }
@@ -71,7 +75,7 @@ class SettingsViewModelTest {
     fun `initial state reports the trusted server's URL`() = runTest(dispatcher) {
         val store = FakeConnectionStore(baseUrl = "https://ratatoskr.home:8080", fingerprint = "ab:cd:ef")
 
-        val viewModel = SettingsViewModel(connectionManager(store))
+        val viewModel = SettingsViewModel(connectionManager(store), clearCoverCache)
 
         assertEquals("https://ratatoskr.home:8080", viewModel.uiState.value.serverUrl)
     }
@@ -79,7 +83,7 @@ class SettingsViewModelTest {
     @Test
     fun `forgetCertificate drops the fingerprint and flips certForgotten`() = runTest(dispatcher) {
         val store = FakeConnectionStore(baseUrl = "https://ratatoskr.home:8080", fingerprint = "ab:cd:ef")
-        val viewModel = SettingsViewModel(connectionManager(store))
+        val viewModel = SettingsViewModel(connectionManager(store), clearCoverCache)
 
         viewModel.forgetCertificate()
 
@@ -87,17 +91,35 @@ class SettingsViewModelTest {
         assertNull(store.fingerprint())
         // The URL is kept for convenience (re-trust flow); only the fingerprint is forgotten.
         assertEquals("https://ratatoskr.home:8080", store.currentServerConfig()?.baseUrl)
+        // A re-trusted server may be a different one; cached covers of the old library go too.
+        assertEquals(1, coverCacheClears)
     }
 
     @Test
     fun `signOut clears the token store and flips signedOut`() = runTest(dispatcher) {
         val tokens = FakeTokenAccess(accessToken = "a1", refreshToken = "r1")
-        val viewModel = SettingsViewModel(connectionManager(tokenStore = tokens))
+        val viewModel = SettingsViewModel(connectionManager(tokenStore = tokens), clearCoverCache)
 
         viewModel.signOut()
 
         assertTrue(viewModel.uiState.value.signedOut)
         assertNull(tokens.currentAccessTokenBlocking())
+        // A signed-out device keeps no artwork of the library it left.
+        assertEquals(1, coverCacheClears)
+    }
+
+    @Test
+    fun `clearImageCache wipes the cover caches and raises the confirmation flag once`() = runTest(dispatcher) {
+        val viewModel = SettingsViewModel(connectionManager(), clearCoverCache)
+
+        viewModel.clearImageCache()
+
+        assertEquals(1, coverCacheClears)
+        assertTrue(viewModel.uiState.value.imageCacheCleared)
+
+        viewModel.imageCacheClearedShown()
+
+        assertEquals(false, viewModel.uiState.value.imageCacheCleared)
     }
 
     private fun realConnectionStore(): ConnectionStore {

@@ -29,6 +29,8 @@ import io.github.xexanos.ratatoskr.network.WireFixtures
 import io.github.xexanos.ratatoskr.network.testutil.HttpsMockServer
 import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.MockResponse
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -169,6 +171,38 @@ class AppFlowTest {
         connectTrustAndSubmitSignIn()
         compose.awaitText(str(R.string.library_empty_title))
         compose.onAllNodesWithTag(UiTestTags.LIBRARY_ROW).assertCountEquals(0)
+    }
+
+    @Test
+    fun libraryCoversLoadThroughTheAuthenticatedPinnedStack() {
+        // A library item whose coverUrl is origin-relative, as the server sends it since
+        // contract 1.3.x; the dispatcher's cover route serves a real decodable PNG.
+        val dispatcher = RatatoskrDispatcher(
+            libraryPage = WireFixtures.libraryPageJson(
+                items = listOf(WireFixtures.libraryItemSummaryJson(coverUrl = "/v1/library/items/i1/cover")),
+            ),
+        )
+        useDispatcher(dispatcher)
+        connectTrustAndSubmitSignIn()
+        compose.awaitTag(UiTestTags.LIBRARY_ROW)
+
+        // The row rendered -> Coil resolved the row height and issued the cover request
+        // through the covers stack (TOFU-pinned HTTPS against the mock server's certificate).
+        compose.waitUntil(10_000) { dispatcher.lastCoverRequest != null }
+        val request = dispatcher.lastCoverRequest!!
+
+        // The bearer token rode along on the image request (same token the API calls use)...
+        assertEquals("Bearer a1", request.getHeader("Authorization"))
+        // ...and the height arrived quantized to a bucket, not as raw view pixels.
+        val h = request.requestUrl?.queryParameter("h")?.toIntOrNull()
+        assertTrue("expected a bucketed h, got h=$h", h in listOf(128, 256, 512, 1024))
+
+        // The decoded cover replaced the initials tile (the placeholder lives inside the
+        // clickable row's merged semantics, so search the unmerged tree).
+        compose.waitUntil(10_000) {
+            compose.onAllNodesWithTag(UiTestTags.COVER_PLACEHOLDER, useUnmergedTree = true)
+                .fetchSemanticsNodes().isEmpty()
+        }
     }
 
     @Test

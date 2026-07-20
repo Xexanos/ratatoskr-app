@@ -44,6 +44,15 @@ class ConnectionManager(
 
     fun setSessionActive(active: Boolean) = sessionActive.set(active)
 
+    /**
+     * The already-built client, without building one: a lock-free volatile read. Cover-image
+     * loads resolve their Call.Factory through this per request - by the time any cover URL
+     * exists on screen, the library data that carried it was fetched through [client], so the
+     * cache is populated; before that, a null here simply fails the image request into its
+     * placeholder state.
+     */
+    fun peekClient(): RatatoskrClient? = cached?.client
+
     /** Whether a playback session is currently active - gates client-side token refresh (SPEC section 5). */
     fun isSessionActive(): Boolean = sessionActive.get()
 

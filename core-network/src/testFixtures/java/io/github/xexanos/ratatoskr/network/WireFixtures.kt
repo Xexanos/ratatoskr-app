@@ -60,15 +60,21 @@ object WireFixtures {
     fun speakerListJson(vararg speakers: String = arrayOf(speakerJson())): String =
         "[${speakers.joinToString(",")}]"
 
-    /** A single `LibraryItemSummary` wire object (cover/progress omitted - optional). */
+    /**
+     * A single `LibraryItemSummary` wire object (cover/progress omitted by default - both
+     * optional). [coverUrl] is origin-relative on the wire since contract 1.3.x
+     * (e.g. `/v1/library/items/i1/cover`); the client resolves it against its base URL.
+     */
     fun libraryItemSummaryJson(
         id: String = "i1",
         title: String = "The Hobbit",
         author: String? = "J. R. R. Tolkien",
         durationSeconds: Double = 39_600.0,
+        coverUrl: String? = null,
     ): String {
         val a = author?.let { ""","author":"${esc(it)}"""" } ?: ""
-        return """{"id":"${esc(id)}","title":"${esc(title)}"$a,"durationSeconds":$durationSeconds}"""
+        val c = coverUrl?.let { ""","coverUrl":"${esc(it)}"""" } ?: ""
+        return """{"id":"${esc(id)}","title":"${esc(title)}"$a$c,"durationSeconds":$durationSeconds}"""
     }
 
     /** A `GET /v1/library/items` response body (a `LibraryItemPage`). */

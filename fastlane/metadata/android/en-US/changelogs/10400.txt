@@ -1,0 +1,1 @@
+The library and now-playing screens now show real cover art, served scaled by your Ratatoskr server. Books without a cover keep the familiar initials tile, and Settings gains a "Clear image cache" action.

@@ -16,8 +16,8 @@ android {
         targetSdk = 36
         // versionCode = MAJOR * 10000 + MINOR * 100 + PATCH, derived from versionName;
         // releases are v<versionName> git tags (SPEC section 8).
-        versionCode = 10300
-        versionName = "1.3.0"
+        versionCode = 10400
+        versionName = "1.4.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // R8 rules for the instrumented-test APK. Only take effect when the androidTest APK is
@@ -83,6 +83,10 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.kotlinx.serialization.core)
+    // Cover art (SPEC section 12): Coil 3 with the OkHttp fetcher, fed by core-network's
+    // coversCallFactory so image loads share the TOFU trust and bearer/refresh auth.
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.okhttp.mockwebserver)
@@ -98,6 +102,8 @@ dependencies {
     // MockWebServer over HTTPS, reusing the shared HttpsMockServer + wire fixtures.
     androidTestImplementation(testFixtures(project(":core-network")))
     androidTestImplementation(libs.okhttp.mockwebserver)
+    // FakeImageLoaderEngine for the cover-state Compose tests: no network, no flake.
+    androidTestImplementation(libs.coil.test)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

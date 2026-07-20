@@ -112,11 +112,24 @@ object RatatoskrClientFactory {
             .build()
         val mainRetrofit = retrofit(retrofitBase, mainClient, moshi)
 
-        // Each OkHttp stack now owns its own dispatcher thread pool and a connection pool;
-        // release them when the client is replaced so they do not linger until GC (SPEC
-        // section 13).
+        // Cover-image loads share the main client's connection pool (TLS handshakes against a
+        // TOFU-pinned server are not cheap to redo) and its interceptors/authenticator - the
+        // bearer header and the single-flight refresh come along for free - but get their OWN
+        // dispatcher: covers and API calls target the same host, and OkHttp admits only 5
+        // concurrent requests per host per dispatcher, so a scroll burst of cover loads sharing
+        // the main dispatcher would queue play/pause/seek and the session poll behind images.
+        val coversClient = mainClient.newBuilder()
+            .dispatcher(Dispatcher())
+            .build()
+
+        // Each OkHttp stack owns its own dispatcher thread pool. All three clients share ONE
+        // connection pool (auth/main build from the same baseBuilder, covers via newBuilder),
+        // so two of the three evictAll calls are idempotent repeats - kept uniform per client
+        // on purpose, so the cleanup stays correct if any client ever gets its own pool.
+        // Release everything when the client is replaced so it does not linger until GC
+        // (SPEC section 13).
         val closeAction = {
-            for (client in listOf(mainClient, authClient)) {
+            for (client in listOf(mainClient, authClient, coversClient)) {
                 client.dispatcher.executorService.shutdown()
                 client.connectionPool.evictAll()
             }
@@ -129,6 +142,8 @@ object RatatoskrClientFactory {
             playbackApi = mainRetrofit.create(PlaybackApi::class.java),
             tokenStore = tokenStore,
             moshi = moshi,
+            baseUrl = baseUrl,
+            coversCallFactory = coversClient,
             closeAction = closeAction,
         )
     }
