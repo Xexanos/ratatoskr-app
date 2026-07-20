@@ -45,8 +45,16 @@ rounded up from the rendered size and capped at 1024. Surfaces whose rows land i
 bucket share one cached image; nothing ever requests an unquantized or original size.
 _Avoid_: thumbnail size, resolution
 
-**Placeholder tile**:
-The title-initial tile shown where a cover would be - identical while a cover loads and
-when none exists, so a coverless book looks finished, not broken. (Its visual design is
-under review: issue #78.)
-_Avoid_: fallback image, error state (it is deliberately not a distinct state)
+**Loading tile**:
+The bare tonal tile shown while a cover request is in flight - and kept when the request
+fails for reasons other than "no cover" (timeout, server error), because claiming "no
+cover" for a book that has one would be a lie. Quiet by design: distinguishing rows is the
+text column's job, not the tile's.
+_Avoid_: skeleton, shimmer, error state (a failed load is not a distinct visual state)
+
+**No-cover tile**:
+The tinted Ratatoskr knot mark on the tonal tile, shown when a book has no cover - a null
+cover URL or a 404 from the cover proxy. A deliberate "this book has no artwork" mark, the
+same for every coverless book: repeated identical marks read as a pattern, not a bug
+(decided in issue #78, replacing the title-initial tile).
+_Avoid_: placeholder tile (the pre-#78 term), fallback image, initials

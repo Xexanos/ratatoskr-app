@@ -691,7 +691,6 @@ private fun LibraryRow(item: LibraryItemSummary, onClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             CoverImage(
-                title = item.title,
                 coverUrl = item.coverUrl,
                 modifier = Modifier.size(56.dp),
             )

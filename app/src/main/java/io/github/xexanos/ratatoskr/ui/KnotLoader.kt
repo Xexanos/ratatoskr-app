@@ -34,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -43,6 +44,7 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -182,6 +184,27 @@ fun KnotLoader(
             )
         }
     }
+}
+
+/**
+ * The knot frame alone, tinted [color]: the brand mark in its quiet monochrome form - the
+ * no-cover tile of the cover image (ux-design: placeholders, issue #78). Unlike [KnotLoader]
+ * it has no runner, no label, and no size of its own: it fills whatever the [modifier] gives
+ * it (centring in a non-square bound), so callers scale it as a fraction of their tile.
+ */
+@Composable
+fun KnotMark(color: Color, modifier: Modifier = Modifier) {
+    Spacer(
+        modifier.drawWithCache {
+            val side = size.minDimension
+            val geometry = KnotGeometry(side)
+            val dx = (size.width - side) / 2f
+            val dy = (size.height - side) / 2f
+            onDrawBehind {
+                translate(dx, dy) { drawPath(geometry.frame, color) }
+            }
+        },
+    )
 }
 
 /** Parsed, pixel-scaled paths plus a reusable [PathMeasure] for one [sidePx] size. */
