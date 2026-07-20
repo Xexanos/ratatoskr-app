@@ -271,7 +271,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.NowPlayingContent(
     onStop: () -> Unit,
 ) {
     Spacer(Modifier.height(16.dp))
-    CoverArt(title = session.item?.title ?: session.itemId, coverUrl = session.item?.coverUrl)
+    CoverArt(coverUrl = session.item?.coverUrl)
 
     Spacer(Modifier.height(28.dp))
     Text(
@@ -374,14 +374,12 @@ private fun androidx.compose.foundation.layout.ColumnScope.NowPlayingContent(
 }
 
 @Composable
-private fun CoverArt(title: String, coverUrl: String?) {
+private fun CoverArt(coverUrl: String?) {
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         CoverImage(
-            title = title,
             coverUrl = coverUrl,
             modifier = Modifier.size(260.dp),
             shape = MaterialTheme.shapes.extraLarge,
-            initialStyle = MaterialTheme.typography.displayLarge,
             shadowElevation = 8.dp,
             tonalElevation = 2.dp,
         )

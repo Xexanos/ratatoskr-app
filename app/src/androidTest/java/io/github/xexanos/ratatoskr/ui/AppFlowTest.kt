@@ -197,10 +197,10 @@ class AppFlowTest {
         val h = request.requestUrl?.queryParameter("h")?.toIntOrNull()
         assertTrue("expected a bucketed h, got h=$h", h in listOf(128, 256, 512, 1024))
 
-        // The decoded cover replaced the initials tile (the placeholder lives inside the
-        // clickable row's merged semantics, so search the unmerged tree).
+        // The decoded cover replaced the loading tile (the tile lives inside the clickable
+        // row's merged semantics, so search the unmerged tree).
         compose.waitUntil(10_000) {
-            compose.onAllNodesWithTag(UiTestTags.COVER_PLACEHOLDER, useUnmergedTree = true)
+            compose.onAllNodesWithTag(UiTestTags.COVER_LOADING, useUnmergedTree = true)
                 .fetchSemanticsNodes().isEmpty()
         }
     }
