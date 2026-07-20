@@ -122,9 +122,12 @@ object RatatoskrClientFactory {
             .dispatcher(Dispatcher())
             .build()
 
-        // Each OkHttp stack now owns its own dispatcher thread pool; the shared connection pool
-        // (coversClient reuses mainClient's) is evicted once. Release everything when the client
-        // is replaced so it does not linger until GC (SPEC section 13).
+        // Each OkHttp stack owns its own dispatcher thread pool. All three clients share ONE
+        // connection pool (auth/main build from the same baseBuilder, covers via newBuilder),
+        // so two of the three evictAll calls are idempotent repeats - kept uniform per client
+        // on purpose, so the cleanup stays correct if any client ever gets its own pool.
+        // Release everything when the client is replaced so it does not linger until GC
+        // (SPEC section 13).
         val closeAction = {
             for (client in listOf(mainClient, authClient, coversClient)) {
                 client.dispatcher.executorService.shutdown()

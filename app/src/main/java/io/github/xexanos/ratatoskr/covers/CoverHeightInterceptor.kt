@@ -34,10 +34,12 @@ internal class CoverHeightInterceptor : Interceptor {
     }
 
     /**
-     * Only the cover proxy understands `h`; leave any other image URL alone. Matched on the
-     * proxy's path shape rather than a bare `/cover` suffix, so a pass-through absolute URL
-     * from a foreign origin (the wrapper's tolerant-reader case) is not decorated with a
-     * parameter only Ratatoskr defines.
+     * Only the cover proxy understands `h`; leave any other image URL alone. A heuristic on
+     * the proxy's path shape - deliberately host-agnostic, because knowing the server origin
+     * is the wrapper's concern, not this interceptor's. If the server ever returns to sending
+     * absolute URLs (the wrapper's tolerant-reader case), its own covers keep matching; a
+     * foreign URL that happens to share the exact path shape would get one extra query
+     * parameter, which servers ignore.
      */
     private fun isCoverUrl(url: String): Boolean {
         val path = url.substringBefore('?')
