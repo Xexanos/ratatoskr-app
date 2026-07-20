@@ -1,0 +1,1 @@
+Die Bibliothek beginnt jetzt mit einem „Weiterhören“-Regal: deine angefangenen Bücher, zuletzt gehört zuerst, ganz oben. Beim Tippen einer Suche verschwindet das Regal; nach dem Leeren ist es sofort wieder da.

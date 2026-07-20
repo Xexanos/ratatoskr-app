@@ -1,0 +1,1 @@
+The Library now opens with a "Continue listening" shelf: your in-progress books, most recently listened first, right at the top. Typing a search hides the shelf; clearing it brings the shelf straight back.
