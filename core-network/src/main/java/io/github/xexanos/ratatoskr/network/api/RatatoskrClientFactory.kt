@@ -142,7 +142,7 @@ object RatatoskrClientFactory {
             playbackApi = mainRetrofit.create(PlaybackApi::class.java),
             tokenStore = tokenStore,
             moshi = moshi,
-            baseUrl = baseUrl,
+            coverEndpoint = CoverEndpoint(baseUrl),
             coversCallFactory = coversClient,
             closeAction = closeAction,
         )

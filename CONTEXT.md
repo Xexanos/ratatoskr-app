@@ -39,6 +39,14 @@ In the app's domain model: the absolute, bearer-authenticated URL a cover is loa
 On the wire the server sends an origin-relative path; resolving it is the wrapper's job, so
 nothing above the wrapper ever sees a relative value.
 
+**Cover endpoint** (`CoverEndpoint`):
+The wrapper's single owner of cover-URL knowledge: it resolves the origin-relative `coverUrl`
+to an absolute one (bound once to the server origin) and recognises a URL that points at the
+cover proxy (the shape the `?h=` height parameter applies to). Recognition is host- and
+version-agnostic, so the app's cover-image interceptor consumes it without learning the origin.
+The path shape is mirrored from the contract's `GET /library/items/{id}/cover`; a drift-guard
+test keeps them in step.
+
 **Cover bucket**:
 One of the quantized heights {128, 256, 512, 1024} the app requests covers at (`?h=`),
 rounded up from the rendered size and capped at 1024. Surfaces whose rows land in the same

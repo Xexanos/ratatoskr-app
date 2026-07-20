@@ -8,6 +8,7 @@ package io.github.xexanos.ratatoskr.covers
 import coil3.intercept.Interceptor
 import coil3.request.ImageResult
 import coil3.size.Dimension
+import io.github.xexanos.ratatoskr.network.api.CoverEndpoint
 
 /**
  * Appends the bucketed `?h=` parameter to cover requests from the size Coil resolved out of
@@ -24,25 +25,12 @@ internal class CoverHeightInterceptor : Interceptor {
     override suspend fun intercept(chain: Interceptor.Chain): ImageResult {
         val data = chain.request.data
         val height = chain.size.height
-        if (data !is String || !isCoverUrl(data) || height !is Dimension.Pixels) {
+        if (data !is String || !CoverEndpoint.matches(data) || height !is Dimension.Pixels) {
             return chain.proceed()
         }
         val request = chain.request.newBuilder()
             .data(appendCoverHeightParam(data, height.px))
             .build()
         return chain.withRequest(request).proceed()
-    }
-
-    /**
-     * Only the cover proxy understands `h`; leave any other image URL alone. A heuristic on
-     * the proxy's path shape - deliberately host-agnostic, because knowing the server origin
-     * is the wrapper's concern, not this interceptor's. If the server ever returns to sending
-     * absolute URLs (the wrapper's tolerant-reader case), its own covers keep matching; a
-     * foreign URL that happens to share the exact path shape would get one extra query
-     * parameter, which servers ignore.
-     */
-    private fun isCoverUrl(url: String): Boolean {
-        val path = url.substringBefore('?')
-        return path.endsWith("/cover") && path.contains("/library/items/")
     }
 }
