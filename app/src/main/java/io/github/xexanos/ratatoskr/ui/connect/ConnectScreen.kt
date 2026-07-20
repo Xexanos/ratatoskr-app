@@ -189,7 +189,8 @@ private fun ConnectContent(
                 null
             },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
-            shape = MaterialTheme.shapes.large,
+            // 8 dp - the design's text-field radius (ux-design: Shape tokens).
+            shape = MaterialTheme.shapes.small,
             modifier = Modifier.fillMaxWidth().testTag(UiTestTags.CONNECT_SERVER_URL),
         )
         Spacer(Modifier.height(16.dp))
@@ -249,7 +250,7 @@ private fun CertificateCard(
     onCancel: () -> Unit,
 ) {
     Surface(
-        shape = MaterialTheme.shapes.extraLarge,
+        shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 2.dp,
         modifier = Modifier.fillMaxWidth(),

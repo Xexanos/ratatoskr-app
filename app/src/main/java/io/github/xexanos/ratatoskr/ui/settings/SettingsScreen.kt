@@ -160,7 +160,7 @@ private fun SettingsContent(
 
         SectionLabel(stringResource(R.string.settings_section_server))
         Surface(
-            shape = MaterialTheme.shapes.extraLarge,
+            shape = MaterialTheme.shapes.large,
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 1.dp,
             modifier = Modifier.fillMaxWidth(),

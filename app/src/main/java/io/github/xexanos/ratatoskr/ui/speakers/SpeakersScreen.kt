@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Speaker
 import androidx.compose.material.icons.filled.SpeakerGroup
@@ -175,7 +174,7 @@ private fun SpeakersContent(
 @Composable
 private fun SpeakerRow(speaker: Speaker, onClick: () -> Unit) {
     Surface(
-        shape = MaterialTheme.shapes.extraLarge,
+        shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 1.dp,
         modifier = Modifier.fillMaxWidth().testTag(UiTestTags.SPEAKER_ROW).clickable(onClick = onClick),
@@ -186,7 +185,9 @@ private fun SpeakerRow(speaker: Speaker, onClick: () -> Unit) {
         ) {
             Surface(
                 modifier = Modifier.size(48.dp),
-                shape = CircleShape,
+                // 16 dp rounded square, not a circle: content tile, same shape family as the
+                // library rows' covers - circles are reserved for controls (ux-design: Shape tokens).
+                shape = MaterialTheme.shapes.large,
                 color = if (speaker.isGroup) {
                     MaterialTheme.colorScheme.secondaryContainer
                 } else {
