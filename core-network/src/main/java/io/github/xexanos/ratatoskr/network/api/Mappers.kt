@@ -46,53 +46,39 @@ internal fun GenSpeaker.toDomain(): Speaker =
 internal fun GenProgress.toDomain(): Progress =
     Progress(positionSeconds = positionSeconds, isFinished = isFinished)
 
-/**
- * Resolves the contract's `coverUrl` into a loadable absolute URL. Since contract 1.3.x the
- * server sends a path relative to its own origin (e.g. `/v1/library/items/{id}/cover`); the
- * wrapper absorbs that here so the domain model always carries an absolute, bearer-authenticated
- * URL and no UI code needs to know the server origin. An already-absolute value passes through
- * untouched (tolerant reader: contract 1.1.0 documented an absolute URL, a future server could
- * again send one).
- */
-internal fun resolveCoverUrl(coverUrl: String?, baseUrl: String): String? = when {
-    coverUrl == null -> null
-    coverUrl.startsWith("http://") || coverUrl.startsWith("https://") -> coverUrl
-    else -> baseUrl.trimEnd('/') + (if (coverUrl.startsWith("/")) coverUrl else "/$coverUrl")
-}
-
-internal fun GenLibraryItemSummary.toDomain(baseUrl: String): LibraryItemSummary =
+internal fun GenLibraryItemSummary.toDomain(cover: CoverEndpoint): LibraryItemSummary =
     LibraryItemSummary(
         id = id,
         title = title,
         author = author,
         durationSeconds = durationSeconds,
-        coverUrl = resolveCoverUrl(coverUrl, baseUrl),
+        coverUrl = cover.resolve(coverUrl),
         progress = progress?.toDomain(),
     )
 
-internal fun GenLibraryItem.toDomain(baseUrl: String): LibraryItem =
+internal fun GenLibraryItem.toDomain(cover: CoverEndpoint): LibraryItem =
     LibraryItem(
         summary = LibraryItemSummary(
             id = id,
             title = title,
             author = author,
             durationSeconds = durationSeconds,
-            coverUrl = resolveCoverUrl(coverUrl, baseUrl),
+            coverUrl = cover.resolve(coverUrl),
             progress = progress?.toDomain(),
         ),
         description = description,
         narrator = narrator,
     )
 
-internal fun GenLibraryItemPage.toDomain(baseUrl: String): LibraryPage =
-    LibraryPage(items = items.map { it.toDomain(baseUrl) }, nextCursor = nextCursor)
+internal fun GenLibraryItemPage.toDomain(cover: CoverEndpoint): LibraryPage =
+    LibraryPage(items = items.map { it.toDomain(cover) }, nextCursor = nextCursor)
 
 /**
  * The in-progress shelf is a complete, bounded set, not a page - the envelope carries no
  * cursor, so it unwraps to a plain list of the existing summary model (no new domain type).
  */
-internal fun GenLibraryItemList.toDomain(baseUrl: String): List<LibraryItemSummary> =
-    items.map { it.toDomain(baseUrl) }
+internal fun GenLibraryItemList.toDomain(cover: CoverEndpoint): List<LibraryItemSummary> =
+    items.map { it.toDomain(cover) }
 
 internal fun GenPlaybackState.toDomain(): PlaybackState = when (this) {
     GenPlaybackState.playing -> PlaybackState.PLAYING
@@ -102,10 +88,10 @@ internal fun GenPlaybackState.toDomain(): PlaybackState = when (this) {
     GenPlaybackState.finished -> PlaybackState.FINISHED
 }
 
-internal fun GenSession.toDomain(baseUrl: String): Session =
+internal fun GenSession.toDomain(cover: CoverEndpoint): Session =
     Session(
         itemId = itemId,
-        item = item?.toDomain(baseUrl),
+        item = item?.toDomain(cover),
         speakerId = speakerId,
         state = state.toDomain(),
         positionSeconds = positionSeconds,
