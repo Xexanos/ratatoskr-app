@@ -1,0 +1,1 @@
+Visual polish: corner radii now follow the design everywhere. The Now Playing cover is softer and rounder, cards, list rows and speaker icons share one consistent shape, text fields sit tighter, and the library search field is a full pill.
