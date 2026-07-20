@@ -58,8 +58,12 @@ jobs:
       - name: UX guardrails
         run: bash scripts/check-ux.sh
 
-      - name: Lint, assemble debug and run unit tests
-        run: ./gradlew --no-daemon lintDebug testDebugUnitTest assembleDebug :app:assembleRelease
+      - name: Lint, assemble debug and run unit tests (incl. screenshot goldens)
+        # verifyRoborazziDebug depends on testDebugUnitTest and runs it in verify mode: the
+        # generated Compose-preview screenshot tests compare the cover-placeholder tiles against
+        # the committed baselines in app/src/test/screenshots and fail on pixel drift, while all
+        # other unit tests run exactly as before. Regenerate baselines with recordRoborazziDebug.
+        run: ./gradlew --no-daemon lintDebug verifyRoborazziDebug assembleDebug :app:assembleRelease
 
       - name: Run R8 on the minified app + instrumented-test APKs (JVM, no emulator)
         # assembleMinifiedAndroidTest runs R8 on BOTH the minified app APK

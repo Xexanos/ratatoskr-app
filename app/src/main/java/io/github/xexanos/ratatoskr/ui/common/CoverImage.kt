@@ -7,6 +7,7 @@ package io.github.xexanos.ratatoskr.ui.common
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -19,6 +20,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.ImageLoader
@@ -31,6 +33,7 @@ import io.github.xexanos.ratatoskr.ui.KnotMark
 import io.github.xexanos.ratatoskr.ui.UiTestTags
 import io.github.xexanos.ratatoskr.ui.rememberDelayedVisible
 import io.github.xexanos.ratatoskr.ui.theme.LocalReducedMotion
+import io.github.xexanos.ratatoskr.ui.theme.RatatoskrTheme
 
 /**
  * The cover [ImageLoader], provided by the activity from the AppContainer. A CompositionLocal
@@ -108,28 +111,39 @@ fun CoverImage(
 
 @Composable
 private fun LoadingTile(withSpinner: Boolean) {
+    // The spinner earns its place only on genuinely slow loads: the delay keeps normal
+    // scrolling free of flicker, and a failed load passes withSpinner = false - a spinner
+    // that keeps turning over a dead request would claim work that isn't happening.
+    LoadingTileContent(showSpinner = withSpinner && rememberDelayedVisible(active = true))
+}
+
+// The visible layout of the loading tile, split from the delay gate so the previews (and any
+// screenshot golden) can render the spinner-shown state directly - rememberDelayedVisible never
+// elapses in a static render, so a preview of LoadingTile would always be the bare tile.
+@Composable
+private fun LoadingTileContent(showSpinner: Boolean) {
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier.fillMaxSize().testTag(UiTestTags.COVER_LOADING),
     ) {
-        // The spinner earns its place only on genuinely slow loads: the delay keeps normal
-        // scrolling free of flicker, and a failed load passes withSpinner = false - a spinner
-        // that keeps turning over a dead request would claim work that isn't happening.
-        if (withSpinner && rememberDelayedVisible(active = true)) {
-            CircularProgressIndicator(
-                // Proportional on the 56 dp row tile (~20 dp) but capped so the 260 dp
-                // now-playing tile still gets a small spinner, not a 91 dp ring. Cleared
-                // semantics: the tile is decorative (title/author are adjacent text), and the
-                // indicator's built-in progressSemantics would otherwise leak "in progress"
-                // into every row announcement - one announcement, not two (KnotLoader rule).
-                modifier = Modifier
-                    .fillMaxSize(0.35f)
-                    .sizeIn(maxWidth = 40.dp, maxHeight = 40.dp)
-                    .clearAndSetSemantics {},
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
-            )
-        }
+        if (showSpinner) CoverSpinner()
     }
+}
+
+@Composable
+private fun CoverSpinner() {
+    CircularProgressIndicator(
+        // Proportional on the 56 dp row tile (~20 dp) but capped so the 260 dp now-playing tile
+        // still gets a small spinner, not a 91 dp ring. Cleared semantics: the tile is
+        // decorative (title/author are adjacent text), and the indicator's built-in
+        // progressSemantics would otherwise leak "in progress" into every row announcement -
+        // one announcement, not two (KnotLoader rule).
+        modifier = Modifier
+            .fillMaxSize(0.35f)
+            .sizeIn(maxWidth = 40.dp, maxHeight = 40.dp)
+            .clearAndSetSemantics {},
+        color = MaterialTheme.colorScheme.onSecondaryContainer,
+    )
 }
 
 @Composable
@@ -146,3 +160,70 @@ private fun NoCoverTile() {
         )
     }
 }
+
+// --- Previews / screenshot goldens ---------------------------------------------------------
+//
+// Both placeholder tiles at both sizes they ship at - the 56 dp list-row thumbnail and the
+// 260 dp now-playing tile - in light and dark. These render without a server or ImageLoader
+// (the coverUrl != null path needs one; the tiles do not), so Roborazzi turns each @Preview
+// into a screenshot golden (build.gradle.kts: generateComposePreviewRobolectricTests): drift
+// in the knot mark, the spinner size, or the tile tones is caught pixel-for-pixel. The loading
+// previews force the spinner visible via LoadingTileContent - the delayed gate never elapses
+// in a static render.
+
+private const val ROW_TILE_DP = 56 // list-row / shelf thumbnail
+private const val NOW_PLAYING_TILE_DP = 260 // now-playing cover
+
+// The production framing: the tonal Surface CoverImage wraps every tile in, sized to one tile.
+@Composable
+private fun CoverTilePreview(dark: Boolean, sizeDp: Int, content: @Composable () -> Unit) {
+    RatatoskrTheme(darkTheme = dark) {
+        Surface(
+            shape = MaterialTheme.shapes.small,
+            color = MaterialTheme.colorScheme.secondaryContainer,
+            modifier = Modifier.size(sizeDp.dp),
+        ) {
+            content()
+        }
+    }
+}
+
+@Preview(name = "No-cover 56dp light")
+@Composable
+internal fun NoCoverTile56LightPreview() =
+    CoverTilePreview(dark = false, sizeDp = ROW_TILE_DP) { NoCoverTile() }
+
+@Preview(name = "No-cover 56dp dark")
+@Composable
+internal fun NoCoverTile56DarkPreview() =
+    CoverTilePreview(dark = true, sizeDp = ROW_TILE_DP) { NoCoverTile() }
+
+@Preview(name = "No-cover 260dp light")
+@Composable
+internal fun NoCoverTile260LightPreview() =
+    CoverTilePreview(dark = false, sizeDp = NOW_PLAYING_TILE_DP) { NoCoverTile() }
+
+@Preview(name = "No-cover 260dp dark")
+@Composable
+internal fun NoCoverTile260DarkPreview() =
+    CoverTilePreview(dark = true, sizeDp = NOW_PLAYING_TILE_DP) { NoCoverTile() }
+
+@Preview(name = "Loading 56dp light")
+@Composable
+internal fun LoadingTile56LightPreview() =
+    CoverTilePreview(dark = false, sizeDp = ROW_TILE_DP) { LoadingTileContent(showSpinner = true) }
+
+@Preview(name = "Loading 56dp dark")
+@Composable
+internal fun LoadingTile56DarkPreview() =
+    CoverTilePreview(dark = true, sizeDp = ROW_TILE_DP) { LoadingTileContent(showSpinner = true) }
+
+@Preview(name = "Loading 260dp light")
+@Composable
+internal fun LoadingTile260LightPreview() =
+    CoverTilePreview(dark = false, sizeDp = NOW_PLAYING_TILE_DP) { LoadingTileContent(showSpinner = true) }
+
+@Preview(name = "Loading 260dp dark")
+@Composable
+internal fun LoadingTile260DarkPreview() =
+    CoverTilePreview(dark = true, sizeDp = NOW_PLAYING_TILE_DP) { LoadingTileContent(showSpinner = true) }
