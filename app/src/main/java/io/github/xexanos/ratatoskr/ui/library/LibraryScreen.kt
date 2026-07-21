@@ -63,7 +63,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -72,7 +71,6 @@ import io.github.xexanos.ratatoskr.R
 import io.github.xexanos.ratatoskr.data.ConnectionManager
 import io.github.xexanos.ratatoskr.network.domain.ApiResult
 import io.github.xexanos.ratatoskr.network.domain.LibraryItemSummary
-import io.github.xexanos.ratatoskr.network.domain.RatatoskrError
 import io.github.xexanos.ratatoskr.network.domain.Progress
 import io.github.xexanos.ratatoskr.ui.EmptyState
 import io.github.xexanos.ratatoskr.ui.KnotLoader
@@ -81,7 +79,6 @@ import io.github.xexanos.ratatoskr.ui.UiTestTags
 import io.github.xexanos.ratatoskr.ui.common.CoverImage
 import io.github.xexanos.ratatoskr.ui.rememberDelayedVisible
 import io.github.xexanos.ratatoskr.ui.text
-import io.github.xexanos.ratatoskr.ui.theme.RatatoskrTheme
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -401,9 +398,11 @@ fun LibraryScreen(
 // How many rows before the end of the list the next page is requested.
 private const val LOAD_MORE_THRESHOLD = 8
 
+// Internal, not private, so the sibling LibraryScreenPreviews.kt can drive every screen state
+// off a fixed LibraryUiState without a ViewModel or server.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun LibraryContent(
+internal fun LibraryContent(
     state: LibraryUiState,
     query: String,
     onQueryChange: (String) -> Unit,
@@ -744,165 +743,5 @@ private fun ProgressLine(progress: Progress?, durationSeconds: Double) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-    }
-}
-
-// --- Previews (render in Android Studio without a running server) --------------------------
-
-private val previewItems = listOf(
-    LibraryItemSummary("1", "The Hobbit", "J. R. R. Tolkien", 39_600.0, null, Progress(12_600.0, false)),
-    LibraryItemSummary("2", "Project Hail Mary", "Andy Weir", 57_600.0, null, Progress(57_600.0, true)),
-    LibraryItemSummary("3", "Dune", "Frank Herbert", 75_600.0, null, null),
-)
-
-// Most-recently-listened first, as the server would deliver it. "The Hobbit" also sits in
-// previewItems: the shelf is a view onto the library, not a partition, so the same book
-// appearing in both sections is the state to preview.
-private val previewShelfItems = listOf(
-    LibraryItemSummary("4", "A Wizard of Earthsea", "Ursula K. Le Guin", 25_200.0, null, Progress(9_100.0, false)),
-    LibraryItemSummary("1", "The Hobbit", "J. R. R. Tolkien", 39_600.0, null, Progress(12_600.0, false)),
-)
-
-@Preview(name = "Library - shelf loaded", widthDp = 360, heightDp = 800)
-@Composable
-internal fun LibraryShelfLoadedPreview() = RatatoskrTheme {
-    Surface {
-        LibraryContent(
-            state = LibraryUiState(items = previewItems, shelfItems = previewShelfItems),
-            query = "",
-            onQueryChange = {},
-            onOpenItem = {},
-            onOpenNowPlaying = {},
-            onOpenSettings = {},
-        )
-    }
-}
-
-// A non-blank search field hides the shelf and both headers even though the held shelf items
-// are still in state - the visibility rule lives here in previews (spec #80's testing
-// decision), to be picked up by the screenshot goldens (#76).
-@Preview(name = "Library - searching, shelf hidden", widthDp = 360, heightDp = 800)
-@Composable
-internal fun LibrarySearchingShelfHiddenPreview() = RatatoskrTheme {
-    Surface {
-        LibraryContent(
-            state = LibraryUiState(items = previewItems.take(1), shelfItems = previewShelfItems),
-            query = "hobbit",
-            onQueryChange = {},
-            onOpenItem = {},
-            onOpenNowPlaying = {},
-            onOpenSettings = {},
-        )
-    }
-}
-
-// The shelf failed with nothing held while the list works: the slot keeps the tonal band and
-// both section headers, with the tap-to-retry error row where the shelf's books would be.
-// Contrast with LibraryLoadedPreview below - a successfully EMPTY shelf renders no section at
-// all, so "failed" and "empty" can never look the same.
-@Preview(name = "Library - shelf failed", widthDp = 360, heightDp = 800)
-@Composable
-internal fun LibraryShelfErrorPreview() = RatatoskrTheme {
-    Surface {
-        LibraryContent(
-            state = LibraryUiState(items = previewItems, shelfError = true),
-            query = "",
-            onQueryChange = {},
-            onOpenItem = {},
-            onOpenNowPlaying = {},
-            onOpenSettings = {},
-        )
-    }
-}
-
-// An empty shelf renders no section at all: this must look exactly like the screen before the
-// shelf existed - no headers, no empty band.
-@Preview(name = "Library - loaded, empty shelf", widthDp = 360, heightDp = 800)
-@Composable
-internal fun LibraryLoadedPreview() = RatatoskrTheme {
-    Surface {
-        LibraryContent(
-            state = LibraryUiState(items = previewItems),
-            query = "",
-            onQueryChange = {},
-            onOpenItem = {},
-            onOpenNowPlaying = {},
-            onOpenSettings = {},
-        )
-    }
-}
-
-@Preview(name = "Library - empty", widthDp = 360, heightDp = 800)
-@Composable
-internal fun LibraryEmptyPreview() = RatatoskrTheme {
-    Surface {
-        LibraryContent(
-            state = LibraryUiState(items = emptyList()),
-            query = "",
-            onQueryChange = {},
-            onOpenItem = {},
-            onOpenNowPlaying = {},
-            onOpenSettings = {},
-        )
-    }
-}
-
-@Preview(name = "Library - loading more", widthDp = 360, heightDp = 800)
-@Composable
-internal fun LibraryLoadingMorePreview() = RatatoskrTheme {
-    Surface {
-        LibraryContent(
-            state = LibraryUiState(items = previewItems, nextCursor = "c2", loadingMore = true),
-            query = "",
-            onQueryChange = {},
-            onOpenItem = {},
-            onOpenNowPlaying = {},
-            onOpenSettings = {},
-        )
-    }
-}
-
-@Preview(name = "Library - load more failed", widthDp = 360, heightDp = 800)
-@Composable
-internal fun LibraryLoadMoreFailedPreview() = RatatoskrTheme {
-    Surface {
-        LibraryContent(
-            state = LibraryUiState(items = previewItems, nextCursor = "c2", loadMoreError = true),
-            query = "",
-            onQueryChange = {},
-            onOpenItem = {},
-            onOpenNowPlaying = {},
-            onOpenSettings = {},
-        )
-    }
-}
-
-@Preview(name = "Library - loading", widthDp = 360, heightDp = 800)
-@Composable
-internal fun LibraryLoadingPreview() = RatatoskrTheme {
-    Surface {
-        LibraryContent(
-            state = LibraryUiState(loading = true),
-            query = "",
-            onQueryChange = {},
-            onOpenItem = {},
-            onOpenNowPlaying = {},
-            onOpenSettings = {},
-        )
-    }
-}
-
-@Preview(name = "Library - error", widthDp = 360, heightDp = 800)
-@Composable
-internal fun LibraryErrorPreview() = RatatoskrTheme {
-    Surface {
-        LibraryContent(
-            state = LibraryUiState(error = UiError.Domain(RatatoskrError.Upstream(code = null, message = "Audiobookshelf is unreachable."))),
-            query = "",
-            onQueryChange = {},
-            onOpenItem = {},
-            onOpenNowPlaying = {},
-            onOpenSettings = {},
-        )
     }
 }
