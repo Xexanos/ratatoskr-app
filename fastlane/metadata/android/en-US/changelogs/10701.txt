@@ -1,0 +1,1 @@
+Cover art in the library list and the "Continue listening" shelf no longer looks squashed: a cover that isn't square is now shown in full, keeping its proportions, with the tile's background filling the space around it instead of the artwork being cropped or stretched. Square covers still fill their tile as before.
