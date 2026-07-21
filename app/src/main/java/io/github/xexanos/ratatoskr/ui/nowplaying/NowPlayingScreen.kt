@@ -39,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -382,6 +383,9 @@ private fun CoverArt(coverUrl: String?) {
             shape = MaterialTheme.shapes.extraLarge,
             shadowElevation = 8.dp,
             tonalElevation = 2.dp,
+            // The large tile keeps its full-bleed center-crop; letterboxing non-square art is
+            // out of scope here (issue #97), so it opts out of CoverImage's Fit default.
+            contentScale = ContentScale.Crop,
         )
     }
 }
