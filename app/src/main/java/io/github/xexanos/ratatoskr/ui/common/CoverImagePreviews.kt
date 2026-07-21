@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -21,7 +22,12 @@ import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import coil3.ImageLoader
+import coil3.compose.LocalPlatformContext
+import coil3.intercept.Interceptor
+import io.github.xexanos.ratatoskr.ui.LocalImmediateLoading
 import io.github.xexanos.ratatoskr.ui.theme.RatatoskrTheme
+import kotlinx.coroutines.awaitCancellation
 
 // Screenshot goldens for the shared cover tile ([CoverImage]), kept in a sibling file so the
 // production file stays the composable and nothing else. Roborazzi turns each @Preview into a
@@ -30,18 +36,21 @@ import io.github.xexanos.ratatoskr.ui.theme.RatatoskrTheme
 // in the main source set (not test/), because that is what the preview pane and the golden
 // generator both scan.
 //
-// Splitting previews out costs visibility only where a preview must reach inside the composable:
-//  - no cover -> renders the real public entry point, CoverImage(coverUrl = null); the private
-//    NoCoverTile tile stays private (prefer the public seam).
-//  - loading  -> renders LoadingTileContent, which is internal for exactly this - there is no
-//    public way to freeze the spinner-shown state (a stuck loader under Roborazzi's paused clock
-//    shows the bare tile, never the spinner).
-//  - loaded   -> a synthetic bitmap through an Image with the same Surface + ContentScale.Fit; the
-//    production SubcomposeAsyncImage never resolves under the paused clock, so it would only ever
-//    golden the loading tile. This stand-in needs nothing from the production file.
+// Every state is reached through public seams (ADR 0001):
+//  - no cover -> the real public entry point, CoverImage(coverUrl = null).
+//  - loading  -> the real CoverImage with a never-resolving loader through LocalCoverImageLoader,
+//    plus LocalImmediateLoading so the spinner's 500 ms threshold opens in the static frame.
+//  - loaded   -> a synthetic bitmap through an Image with the same Surface + ContentScale.Fit.
+//    This one stays a stand-in: no loader delivers a success state onto the paused-clock frame
+//    (verified against both a fake loader and coil's preview handler, issue #100), so the golden
+//    proves the Fit treatment, not CoverImage's contentScale default.
 
 private const val ROW_TILE_DP = 56 // list-row / shelf cover
 private const val NOW_PLAYING_TILE_DP = 260 // now-playing cover
+
+// A URL whose shape the cover pipeline accepts; the never-resolving loader ensures no request
+// ever completes, so the host is never contacted.
+private const val PREVIEW_COVER_URL = "https://preview.invalid/v1/library/items/preview/cover"
 
 // The production framing: the tonal Surface CoverImage wraps every tile in, sized to one tile.
 @Composable
@@ -65,6 +74,24 @@ private fun NoCoverPreview(dark: Boolean, sizeDp: Int) {
     }
 }
 
+// The loading tile through its real caller: a loader whose every request hangs keeps CoverImage
+// in its loading slot, and LocalImmediateLoading lets the spinner show in the captured frame.
+@Composable
+private fun LoadingPreview(dark: Boolean, sizeDp: Int) {
+    val context = LocalPlatformContext.current
+    val neverLoader = remember {
+        ImageLoader.Builder(context).components { add(Interceptor { awaitCancellation() }) }.build()
+    }
+    RatatoskrTheme(darkTheme = dark) {
+        CompositionLocalProvider(
+            LocalCoverImageLoader provides neverLoader,
+            LocalImmediateLoading provides true,
+        ) {
+            CoverImage(coverUrl = PREVIEW_COVER_URL, modifier = Modifier.size(sizeDp.dp))
+        }
+    }
+}
+
 @Preview(name = "No-cover 56dp light")
 @Composable
 internal fun NoCoverTile56LightPreview() = NoCoverPreview(dark = false, sizeDp = ROW_TILE_DP)
@@ -83,23 +110,19 @@ internal fun NoCoverTile260DarkPreview() = NoCoverPreview(dark = true, sizeDp = 
 
 @Preview(name = "Loading 56dp light")
 @Composable
-internal fun LoadingTile56LightPreview() =
-    CoverTilePreview(dark = false, sizeDp = ROW_TILE_DP) { LoadingTileContent(showSpinner = true) }
+internal fun LoadingTile56LightPreview() = LoadingPreview(dark = false, sizeDp = ROW_TILE_DP)
 
 @Preview(name = "Loading 56dp dark")
 @Composable
-internal fun LoadingTile56DarkPreview() =
-    CoverTilePreview(dark = true, sizeDp = ROW_TILE_DP) { LoadingTileContent(showSpinner = true) }
+internal fun LoadingTile56DarkPreview() = LoadingPreview(dark = true, sizeDp = ROW_TILE_DP)
 
 @Preview(name = "Loading 260dp light")
 @Composable
-internal fun LoadingTile260LightPreview() =
-    CoverTilePreview(dark = false, sizeDp = NOW_PLAYING_TILE_DP) { LoadingTileContent(showSpinner = true) }
+internal fun LoadingTile260LightPreview() = LoadingPreview(dark = false, sizeDp = NOW_PLAYING_TILE_DP)
 
 @Preview(name = "Loading 260dp dark")
 @Composable
-internal fun LoadingTile260DarkPreview() =
-    CoverTilePreview(dark = true, sizeDp = NOW_PLAYING_TILE_DP) { LoadingTileContent(showSpinner = true) }
+internal fun LoadingTile260DarkPreview() = LoadingPreview(dark = true, sizeDp = NOW_PLAYING_TILE_DP)
 
 // A stand-in cover: a solid fill with a centered disc, so any non-uniform scaling shows as an
 // out-of-round disc. The two colors come from the theme (not literals - the UX gate forbids

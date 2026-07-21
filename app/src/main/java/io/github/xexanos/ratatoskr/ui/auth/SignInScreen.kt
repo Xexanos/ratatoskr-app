@@ -42,7 +42,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -50,10 +49,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.xexanos.ratatoskr.R
 import io.github.xexanos.ratatoskr.data.ConnectionManager
 import io.github.xexanos.ratatoskr.network.domain.ApiResult
-import io.github.xexanos.ratatoskr.network.domain.RatatoskrError
 import io.github.xexanos.ratatoskr.ui.UiError
 import io.github.xexanos.ratatoskr.ui.text
-import io.github.xexanos.ratatoskr.ui.theme.RatatoskrTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -90,8 +87,10 @@ class SignInViewModel(
     }
 }
 
+// The stateful host (ADR 0001): owns the ViewModel wiring and the signed-in navigation effect.
+// The navigation graph renders this; previews and goldens render [SignInScreen].
 @Composable
-fun SignInScreen(
+fun SignInScreenHost(
     viewModel: SignInViewModel,
     onSignedIn: () -> Unit,
 ) {
@@ -101,11 +100,12 @@ fun SignInScreen(
         if (state is SignInUiState.Success) onSignedIn()
     }
 
-    SignInContent(state = state, onSignIn = viewModel::signIn)
+    SignInScreen(state = state, onSignIn = viewModel::signIn)
 }
 
+// The screen itself: a pure function of [state], previewable without a ViewModel or server.
 @Composable
-private fun SignInContent(
+fun SignInScreen(
     state: SignInUiState,
     onSignIn: (String, String) -> Unit,
 ) {
@@ -218,22 +218,3 @@ private fun SignInContent(
     }
 }
 
-// --- Previews (render in Android Studio without a running server) --------------------------
-
-@Preview(name = "Sign in - idle", widthDp = 360, heightDp = 800)
-@Composable
-internal fun SignInIdlePreview() = RatatoskrTheme {
-    Surface { SignInContent(SignInUiState.Idle) { _, _ -> } }
-}
-
-@Preview(name = "Sign in - error", widthDp = 360, heightDp = 800)
-@Composable
-internal fun SignInErrorPreview() = RatatoskrTheme {
-    Surface { SignInContent(SignInUiState.Error(UiError.Domain(RatatoskrError.Unauthorized))) { _, _ -> } }
-}
-
-@Preview(name = "Sign in - submitting", widthDp = 360, heightDp = 800)
-@Composable
-private fun SignInSubmittingPreview() = RatatoskrTheme {
-    Surface { SignInContent(SignInUiState.Submitting) { _, _ -> } }
-}

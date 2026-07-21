@@ -7,17 +7,19 @@ package io.github.xexanos.ratatoskr.ui.library
 
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.tooling.preview.Preview
 import io.github.xexanos.ratatoskr.network.domain.LibraryItemSummary
 import io.github.xexanos.ratatoskr.network.domain.Progress
 import io.github.xexanos.ratatoskr.network.domain.RatatoskrError
+import io.github.xexanos.ratatoskr.ui.LocalImmediateLoading
 import io.github.xexanos.ratatoskr.ui.UiError
 import io.github.xexanos.ratatoskr.ui.theme.RatatoskrTheme
 
 // Previews / screenshot goldens for the library screen (render in Android Studio without a running
-// server), kept in a sibling file so LibraryScreen.kt stays the screen. Each drives the internal
-// LibraryContent off a fixed LibraryUiState - no ViewModel, no network - so Roborazzi goldens
-// (build.gradle.kts: generateComposePreviewRobolectricTests) pin every state pixel-for-pixel.
+// server), driving the public [LibraryScreen] off a fixed LibraryUiState - no ViewModel, no
+// network - so Roborazzi goldens (build.gradle.kts: generateComposePreviewRobolectricTests) pin
+// every state pixel-for-pixel (ADR 0001).
 
 private val previewItems = listOf(
     LibraryItemSummary("1", "The Hobbit", "J. R. R. Tolkien", 39_600.0, null, Progress(12_600.0, false)),
@@ -37,7 +39,7 @@ private val previewShelfItems = listOf(
 @Composable
 internal fun LibraryShelfLoadedPreview() = RatatoskrTheme {
     Surface {
-        LibraryContent(
+        LibraryScreen(
             state = LibraryUiState(items = previewItems, shelfItems = previewShelfItems),
             query = "",
             onQueryChange = {},
@@ -55,7 +57,7 @@ internal fun LibraryShelfLoadedPreview() = RatatoskrTheme {
 @Composable
 internal fun LibrarySearchingShelfHiddenPreview() = RatatoskrTheme {
     Surface {
-        LibraryContent(
+        LibraryScreen(
             state = LibraryUiState(items = previewItems.take(1), shelfItems = previewShelfItems),
             query = "hobbit",
             onQueryChange = {},
@@ -74,7 +76,7 @@ internal fun LibrarySearchingShelfHiddenPreview() = RatatoskrTheme {
 @Composable
 internal fun LibraryShelfErrorPreview() = RatatoskrTheme {
     Surface {
-        LibraryContent(
+        LibraryScreen(
             state = LibraryUiState(items = previewItems, shelfError = true),
             query = "",
             onQueryChange = {},
@@ -91,7 +93,7 @@ internal fun LibraryShelfErrorPreview() = RatatoskrTheme {
 @Composable
 internal fun LibraryLoadedPreview() = RatatoskrTheme {
     Surface {
-        LibraryContent(
+        LibraryScreen(
             state = LibraryUiState(items = previewItems),
             query = "",
             onQueryChange = {},
@@ -106,7 +108,7 @@ internal fun LibraryLoadedPreview() = RatatoskrTheme {
 @Composable
 internal fun LibraryEmptyPreview() = RatatoskrTheme {
     Surface {
-        LibraryContent(
+        LibraryScreen(
             state = LibraryUiState(items = emptyList()),
             query = "",
             onQueryChange = {},
@@ -121,7 +123,7 @@ internal fun LibraryEmptyPreview() = RatatoskrTheme {
 @Composable
 internal fun LibraryLoadingMorePreview() = RatatoskrTheme {
     Surface {
-        LibraryContent(
+        LibraryScreen(
             state = LibraryUiState(items = previewItems, nextCursor = "c2", loadingMore = true),
             query = "",
             onQueryChange = {},
@@ -136,7 +138,7 @@ internal fun LibraryLoadingMorePreview() = RatatoskrTheme {
 @Composable
 internal fun LibraryLoadMoreFailedPreview() = RatatoskrTheme {
     Surface {
-        LibraryContent(
+        LibraryScreen(
             state = LibraryUiState(items = previewItems, nextCursor = "c2", loadMoreError = true),
             query = "",
             onQueryChange = {},
@@ -147,18 +149,21 @@ internal fun LibraryLoadMoreFailedPreview() = RatatoskrTheme {
     }
 }
 
+// Opens the 500 ms loading gate (see [LocalImmediateLoading]) so the loader is in the frame.
 @Preview(name = "Library - loading", widthDp = 360, heightDp = 800)
 @Composable
 internal fun LibraryLoadingPreview() = RatatoskrTheme {
-    Surface {
-        LibraryContent(
-            state = LibraryUiState(loading = true),
-            query = "",
-            onQueryChange = {},
-            onOpenItem = {},
-            onOpenNowPlaying = {},
-            onOpenSettings = {},
-        )
+    CompositionLocalProvider(LocalImmediateLoading provides true) {
+        Surface {
+            LibraryScreen(
+                state = LibraryUiState(loading = true),
+                query = "",
+                onQueryChange = {},
+                onOpenItem = {},
+                onOpenNowPlaying = {},
+                onOpenSettings = {},
+            )
+        }
     }
 }
 
@@ -166,7 +171,7 @@ internal fun LibraryLoadingPreview() = RatatoskrTheme {
 @Composable
 internal fun LibraryErrorPreview() = RatatoskrTheme {
     Surface {
-        LibraryContent(
+        LibraryScreen(
             state = LibraryUiState(error = UiError.Domain(RatatoskrError.Upstream(code = null, message = "Audiobookshelf is unreachable."))),
             query = "",
             onQueryChange = {},

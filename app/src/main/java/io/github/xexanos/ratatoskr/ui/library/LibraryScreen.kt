@@ -335,8 +335,12 @@ class LibraryViewModel(
     }
 }
 
+// The stateful host (ADR 0001): owns the ViewModel wiring, the query text (whose restore and
+// re-entry rules live in the effects below), and the refresh-error snackbar (snackbars stay in
+// hosts, ADR 0001). The navigation graph renders this; previews and goldens render
+// [LibraryScreen].
 @Composable
-fun LibraryScreen(
+fun LibraryScreenHost(
     viewModel: LibraryViewModel,
     onOpenItem: (String) -> Unit,
     onOpenNowPlaying: () -> Unit,
@@ -377,7 +381,7 @@ fun LibraryScreen(
     // snackbar in a Box overlay instead - the content is already inset by the outer Scaffold, so a
     // bottom-aligned SnackbarHost clears the navigation bar.
     Box(Modifier.fillMaxSize()) {
-        LibraryContent(
+        LibraryScreen(
             state = state,
             query = query,
             onQueryChange = {
@@ -398,11 +402,12 @@ fun LibraryScreen(
 // How many rows before the end of the list the next page is requested.
 private const val LOAD_MORE_THRESHOLD = 8
 
-// Internal, not private, so the sibling LibraryScreenPreviews.kt can drive every screen state
-// off a fixed LibraryUiState without a ViewModel or server.
+// The screen itself: a pure function of [state] and [query], previewable without a ViewModel or
+// server. [query] is a parameter (not local state) because the search text is preview-relevant:
+// a non-blank query hides the shelf, and that rule is pinned by the goldens.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun LibraryContent(
+fun LibraryScreen(
     state: LibraryUiState,
     query: String,
     onQueryChange: (String) -> Unit,

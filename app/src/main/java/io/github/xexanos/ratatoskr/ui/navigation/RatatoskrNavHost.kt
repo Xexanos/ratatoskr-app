@@ -15,17 +15,17 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import io.github.xexanos.ratatoskr.di.AppContainer
-import io.github.xexanos.ratatoskr.ui.auth.SignInScreen
+import io.github.xexanos.ratatoskr.ui.auth.SignInScreenHost
 import io.github.xexanos.ratatoskr.ui.auth.SignInViewModel
-import io.github.xexanos.ratatoskr.ui.connect.ConnectScreen
+import io.github.xexanos.ratatoskr.ui.connect.ConnectScreenHost
 import io.github.xexanos.ratatoskr.ui.connect.ConnectViewModel
-import io.github.xexanos.ratatoskr.ui.library.LibraryScreen
+import io.github.xexanos.ratatoskr.ui.library.LibraryScreenHost
 import io.github.xexanos.ratatoskr.ui.library.LibraryViewModel
-import io.github.xexanos.ratatoskr.ui.nowplaying.NowPlayingScreen
+import io.github.xexanos.ratatoskr.ui.nowplaying.NowPlayingScreenHost
 import io.github.xexanos.ratatoskr.ui.nowplaying.NowPlayingViewModel
-import io.github.xexanos.ratatoskr.ui.settings.SettingsScreen
+import io.github.xexanos.ratatoskr.ui.settings.SettingsScreenHost
 import io.github.xexanos.ratatoskr.ui.settings.SettingsViewModel
-import io.github.xexanos.ratatoskr.ui.speakers.SpeakersScreen
+import io.github.xexanos.ratatoskr.ui.speakers.SpeakersScreenHost
 import io.github.xexanos.ratatoskr.ui.speakers.SpeakersViewModel
 import kotlinx.serialization.Serializable
 
@@ -62,7 +62,7 @@ fun RatatoskrNavHost(container: AppContainer, startDestination: Route) {
                     )
                 },
             )
-            ConnectScreen(vm) {
+            ConnectScreenHost(vm) {
                 navController.navigate(Route.SignIn) {
                     popUpTo(Route.Connect) { inclusive = true }
                 }
@@ -73,7 +73,7 @@ fun RatatoskrNavHost(container: AppContainer, startDestination: Route) {
             val vm = viewModel<SignInViewModel>(
                 factory = containerFactory { SignInViewModel(container.connectionManager) },
             )
-            SignInScreen(vm) {
+            SignInScreenHost(vm) {
                 navController.navigate(Route.Library) {
                     popUpTo(Route.SignIn) { inclusive = true }
                 }
@@ -84,7 +84,7 @@ fun RatatoskrNavHost(container: AppContainer, startDestination: Route) {
             val vm = viewModel<LibraryViewModel>(
                 factory = containerFactory { LibraryViewModel(container.connectionManager) },
             )
-            LibraryScreen(
+            LibraryScreenHost(
                 viewModel = vm,
                 onOpenItem = { itemId -> navController.navigate(Route.Speakers(itemId)) },
                 onOpenNowPlaying = { navController.navigate(Route.NowPlaying) },
@@ -97,7 +97,7 @@ fun RatatoskrNavHost(container: AppContainer, startDestination: Route) {
             val vm = viewModel<SpeakersViewModel>(
                 factory = containerFactory { SpeakersViewModel(container.connectionManager, itemId) },
             )
-            SpeakersScreen(vm) {
+            SpeakersScreenHost(vm) {
                 navController.navigate(Route.NowPlaying) {
                     popUpTo(Route.Library)
                 }
@@ -108,7 +108,7 @@ fun RatatoskrNavHost(container: AppContainer, startDestination: Route) {
             val vm = viewModel<NowPlayingViewModel>(
                 factory = containerFactory { NowPlayingViewModel(container.connectionManager) },
             )
-            NowPlayingScreen(vm) {
+            NowPlayingScreenHost(vm) {
                 navController.popBackStack(Route.Library, inclusive = false)
             }
         }
@@ -119,7 +119,7 @@ fun RatatoskrNavHost(container: AppContainer, startDestination: Route) {
                     SettingsViewModel(container.connectionManager, container.coverImages::clear)
                 },
             )
-            SettingsScreen(
+            SettingsScreenHost(
                 viewModel = vm,
                 onReTrust = {
                     // Re-trust: return to the connect screen with an empty back stack, so Back

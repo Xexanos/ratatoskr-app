@@ -65,7 +65,7 @@ val LocalCoverImageLoader = staticCompositionLocalOf<ImageLoader> {
  * introduce drifting size constants.
  *
  * [contentScale] is how the artwork sits in the square tile, the one thing that differs by
- * surface (ux-design: cover thumbnails, issue #97). The default [ContentScale.Fit] letterboxes
+ * surface (ux-design: cover fit, issue #97). The default [ContentScale.Fit] letterboxes
  * non-square art onto the tonal surface - fully visible, aspect ratio kept, tonal bands in the
  * unused space - which is what the small list-row and shelf covers want, where a center-crop
  * silently ate a portrait cover's top and bottom. A square cover fills the tile edge to edge
@@ -75,7 +75,7 @@ val LocalCoverImageLoader = staticCompositionLocalOf<ImageLoader> {
 fun CoverImage(
     coverUrl: String?,
     modifier: Modifier = Modifier,
-    // 8 dp - the design's cover-thumbnail radius (ux-design: Shape tokens), shapes.small here.
+    // 8 dp - the design's cover-tile radius (ux-design: Shape tokens), shapes.small here.
     shape: Shape = MaterialTheme.shapes.small,
     shadowElevation: Dp = 0.dp,
     tonalElevation: Dp = 0.dp,
@@ -118,23 +118,14 @@ fun CoverImage(
 private fun LoadingTile(withSpinner: Boolean) {
     // The spinner earns its place only on genuinely slow loads: the delay keeps normal
     // scrolling free of flicker, and a failed load passes withSpinner = false - a spinner
-    // that keeps turning over a dead request would claim work that isn't happening.
-    LoadingTileContent(showSpinner = withSpinner && rememberDelayedVisible(active = true))
-}
-
-// The visible layout of the loading tile, split from the delay gate so the previews (and any
-// screenshot golden) can render the spinner-shown state directly - rememberDelayedVisible never
-// elapses in a static render, so a preview of LoadingTile would always be the bare tile.
-// Internal, not private, for exactly that: the sibling CoverImagePreviews.kt drives it, and no
-// public seam reaches this spinner-forced state (a stuck loader under a paused clock shows the
-// bare tile). The no-cover preview needs no such hook - it goes through CoverImage(null).
-@Composable
-internal fun LoadingTileContent(showSpinner: Boolean) {
+    // that keeps turning over a dead request would claim work that isn't happening. Previews
+    // reach the spinner-shown state through the public CoverImage with a never-resolving
+    // loader plus LocalImmediateLoading (ADR 0001).
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier.fillMaxSize().testTag(UiTestTags.COVER_LOADING),
     ) {
-        if (showSpinner) CoverSpinner()
+        if (withSpinner && rememberDelayedVisible(active = true)) CoverSpinner()
     }
 }
 

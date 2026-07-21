@@ -37,14 +37,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.xexanos.ratatoskr.R
 import io.github.xexanos.ratatoskr.data.ConnectionManager
-import io.github.xexanos.ratatoskr.ui.theme.RatatoskrTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -109,8 +107,11 @@ class SettingsViewModel(
     }
 }
 
+// The stateful host (ADR 0001): owns the ViewModel wiring, the navigation effects, and the
+// cache-cleared snackbar (snackbars stay in hosts, ADR 0001). The navigation graph renders
+// this; previews and goldens render [SettingsScreen].
 @Composable
-fun SettingsScreen(
+fun SettingsScreenHost(
     viewModel: SettingsViewModel,
     onReTrust: () -> Unit,
     onSignedOut: () -> Unit,
@@ -129,7 +130,7 @@ fun SettingsScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        SettingsContent(
+        SettingsScreen(
             state = state,
             onForgetCertificate = viewModel::forgetCertificate,
             onSignOut = viewModel::signOut,
@@ -142,8 +143,9 @@ fun SettingsScreen(
     }
 }
 
+// The screen itself: a pure function of [state], previewable without a ViewModel or server.
 @Composable
-private fun SettingsContent(
+fun SettingsScreen(
     state: SettingsUiState,
     onForgetCertificate: () -> Unit,
     onSignOut: () -> Unit,
@@ -266,30 +268,3 @@ private fun SectionLabel(text: String) {
     )
 }
 
-// --- Previews (render in Android Studio without a running server) --------------------------
-
-@Preview(name = "Settings", widthDp = 360, heightDp = 800)
-@Composable
-internal fun SettingsPreview() = RatatoskrTheme {
-    Surface {
-        SettingsContent(
-            state = SettingsUiState(serverUrl = "https://ratatoskr.home:8080"),
-            onForgetCertificate = {},
-            onSignOut = {},
-            onClearImageCache = {},
-        )
-    }
-}
-
-@Preview(name = "Settings - not configured", widthDp = 360, heightDp = 800)
-@Composable
-private fun SettingsUnconfiguredPreview() = RatatoskrTheme {
-    Surface {
-        SettingsContent(
-            state = SettingsUiState(serverUrl = null),
-            onForgetCertificate = {},
-            onSignOut = {},
-            onClearImageCache = {},
-        )
-    }
-}

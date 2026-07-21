@@ -37,7 +37,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -52,7 +51,6 @@ import io.github.xexanos.ratatoskr.ui.UiTestTags
 import io.github.xexanos.ratatoskr.ui.UiError
 import io.github.xexanos.ratatoskr.ui.rememberDelayedVisible
 import io.github.xexanos.ratatoskr.ui.text
-import io.github.xexanos.ratatoskr.ui.theme.RatatoskrTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -102,8 +100,10 @@ class SpeakersViewModel(
     }
 }
 
+// The stateful host (ADR 0001): owns the ViewModel wiring and the started navigation effect.
+// The navigation graph renders this; previews and goldens render [SpeakersScreen].
 @Composable
-fun SpeakersScreen(
+fun SpeakersScreenHost(
     viewModel: SpeakersViewModel,
     onStarted: () -> Unit,
 ) {
@@ -113,11 +113,12 @@ fun SpeakersScreen(
         if (state.started) onStarted()
     }
 
-    SpeakersContent(state = state, onSelectSpeaker = viewModel::start)
+    SpeakersScreen(state = state, onSelectSpeaker = viewModel::start)
 }
 
+// The screen itself: a pure function of [state], previewable without a ViewModel or server.
 @Composable
-private fun SpeakersContent(
+fun SpeakersScreen(
     state: SpeakersUiState,
     onSelectSpeaker: (String) -> Unit,
 ) {
@@ -230,27 +231,3 @@ private fun SpeakerRow(speaker: Speaker, onClick: () -> Unit) {
     }
 }
 
-// --- Previews (render in Android Studio without a running server) --------------------------
-
-private val previewSpeakers = listOf(
-    Speaker("lr", "Living Room", isGroup = false, members = emptyList()),
-    Speaker("home", "Whole home", isGroup = true, members = listOf("Living Room", "Kitchen", "Study")),
-)
-
-@Preview(name = "Speakers - loaded", widthDp = 360, heightDp = 800)
-@Composable
-internal fun SpeakersLoadedPreview() = RatatoskrTheme {
-    Surface { SpeakersContent(SpeakersUiState(loading = false, speakers = previewSpeakers)) {} }
-}
-
-@Preview(name = "Speakers - empty", widthDp = 360, heightDp = 800)
-@Composable
-internal fun SpeakersEmptyPreview() = RatatoskrTheme {
-    Surface { SpeakersContent(SpeakersUiState(loading = false)) {} }
-}
-
-@Preview(name = "Speakers - loading", widthDp = 360, heightDp = 800)
-@Composable
-internal fun SpeakersLoadingPreview() = RatatoskrTheme {
-    Surface { SpeakersContent(SpeakersUiState(loading = true)) {} }
-}
