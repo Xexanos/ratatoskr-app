@@ -44,7 +44,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
@@ -56,7 +55,6 @@ import androidx.lifecycle.repeatOnLifecycle
 import io.github.xexanos.ratatoskr.R
 import io.github.xexanos.ratatoskr.data.ConnectionManager
 import io.github.xexanos.ratatoskr.network.domain.ApiResult
-import io.github.xexanos.ratatoskr.network.domain.LibraryItemSummary
 import io.github.xexanos.ratatoskr.network.domain.PlaybackState
 import io.github.xexanos.ratatoskr.network.domain.RatatoskrError
 import io.github.xexanos.ratatoskr.network.domain.Session
@@ -66,14 +64,12 @@ import io.github.xexanos.ratatoskr.ui.UiError
 import io.github.xexanos.ratatoskr.ui.UiTestTags
 import io.github.xexanos.ratatoskr.ui.rememberDelayedVisible
 import io.github.xexanos.ratatoskr.ui.text
-import io.github.xexanos.ratatoskr.ui.theme.RatatoskrTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import java.time.OffsetDateTime
 
 private const val POLL_INTERVAL_MS = 5_000L
 
@@ -197,8 +193,11 @@ class NowPlayingViewModel(
     }
 }
 
+// The stateful host (ADR 0001): owns the ViewModel wiring, the RESUMED-scoped polling loop, and
+// the stopped navigation effect. The navigation graph renders this; previews and goldens render
+// [NowPlayingScreen].
 @Composable
-fun NowPlayingScreen(
+fun NowPlayingScreenHost(
     viewModel: NowPlayingViewModel,
     onStopped: () -> Unit,
 ) {
@@ -220,6 +219,27 @@ fun NowPlayingScreen(
         if (state.stopped) onStopped()
     }
 
+    NowPlayingScreen(
+        state = state,
+        onPause = viewModel::pause,
+        onResume = viewModel::resume,
+        onSeek = viewModel::seek,
+        onStop = viewModel::stop,
+    )
+}
+
+// The screen itself: a pure function of [state], previewable without a ViewModel or server. Owns
+// the whole visual - header, loading / nothing-playing / loaded branches - so goldens render the
+// real structure, not a preview-side copy of it (the pre-split scaffold duplicated this layout,
+// and drift in the real screen could never fail its goldens).
+@Composable
+fun NowPlayingScreen(
+    state: NowPlayingUiState,
+    onPause: () -> Unit,
+    onResume: () -> Unit,
+    onSeek: (Double) -> Unit,
+    onStop: () -> Unit,
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -253,10 +273,10 @@ fun NowPlayingScreen(
             else -> NowPlayingContent(
                 session = session,
                 error = state.error,
-                onPause = viewModel::pause,
-                onResume = viewModel::resume,
-                onSeek = viewModel::seek,
-                onStop = viewModel::stop,
+                onPause = onPause,
+                onResume = onResume,
+                onSeek = onSeek,
+                onStop = onStop,
             )
         }
     }
@@ -462,71 +482,3 @@ private fun formatTime(seconds: Double): String {
     return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
 }
 
-// --- Previews (render in Android Studio without a running server) --------------------------
-
-private fun previewSession(state: PlaybackState) = Session(
-    itemId = "1",
-    item = LibraryItemSummary(
-        id = "1",
-        title = "The Hobbit",
-        author = "J. R. R. Tolkien",
-        durationSeconds = 39_600.0,
-        coverUrl = null,
-        progress = null,
-    ),
-    speakerId = "living-room",
-    state = state,
-    positionSeconds = 12_600.0,
-    durationSeconds = 39_600.0,
-    updatedAt = OffsetDateTime.parse("2026-07-04T12:00:00Z"),
-)
-
-@Composable
-private fun NowPlayingPreviewScaffold(
-    session: Session?,
-    error: UiError? = null,
-    loading: Boolean = false,
-) {
-    RatatoskrTheme {
-        Surface {
-            Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp)) {
-                Text(
-                    text = stringResource(R.string.nowplaying_header),
-                    style = MaterialTheme.typography.labelMedium,
-                    letterSpacing = 2.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(8.dp))
-                when {
-                    loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        if (rememberDelayedVisible(loading)) KnotLoader()
-                    }
-                    session == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(
-                            error?.text() ?: stringResource(R.string.nowplaying_nothing_playing),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                        )
-                    }
-                    else -> NowPlayingContent(session, error, {}, {}, {}, {})
-                }
-            }
-        }
-    }
-}
-
-@Preview(name = "Now playing - playing", widthDp = 360, heightDp = 800)
-@Composable
-internal fun NowPlayingPlayingPreview() =
-    NowPlayingPreviewScaffold(previewSession(PlaybackState.PLAYING))
-
-@Preview(name = "Now playing - paused", widthDp = 360, heightDp = 800)
-@Composable
-internal fun NowPlayingPausedPreview() =
-    NowPlayingPreviewScaffold(previewSession(PlaybackState.PAUSED))
-
-@Preview(name = "Now playing - nothing playing", widthDp = 360, heightDp = 800)
-@Composable
-internal fun NowPlayingEmptyPreview() =
-    NowPlayingPreviewScaffold(session = null)

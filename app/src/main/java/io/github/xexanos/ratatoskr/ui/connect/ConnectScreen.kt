@@ -44,7 +44,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.xexanos.ratatoskr.R
 import androidx.lifecycle.ViewModel
@@ -57,12 +56,10 @@ import io.github.xexanos.ratatoskr.network.tls.CertificateInspector
 import io.github.xexanos.ratatoskr.ui.KnotLoader
 import io.github.xexanos.ratatoskr.ui.UiTestTags
 import io.github.xexanos.ratatoskr.ui.rememberDelayedVisible
-import io.github.xexanos.ratatoskr.ui.theme.RatatoskrTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 
 sealed interface ConnectUiState {
@@ -108,8 +105,10 @@ class ConnectViewModel(
     fun reset() { _uiState.value = ConnectUiState.Idle }
 }
 
+// The stateful host (ADR 0001): owns the ViewModel wiring and the trusted navigation effect.
+// The navigation graph renders this; previews and goldens render [ConnectScreen].
 @Composable
-fun ConnectScreen(
+fun ConnectScreenHost(
     viewModel: ConnectViewModel,
     onTrusted: () -> Unit,
 ) {
@@ -119,7 +118,7 @@ fun ConnectScreen(
         if (state is ConnectUiState.Trusted) onTrusted()
     }
 
-    ConnectContent(
+    ConnectScreen(
         state = state,
         onInspect = viewModel::inspect,
         onConfirm = viewModel::confirm,
@@ -127,8 +126,9 @@ fun ConnectScreen(
     )
 }
 
+// The screen itself: a pure function of [state], previewable without a ViewModel or server.
 @Composable
-private fun ConnectContent(
+fun ConnectScreen(
     state: ConnectUiState,
     onInspect: (String) -> Unit,
     onConfirm: (String, String) -> Unit,
@@ -327,31 +327,3 @@ private fun CertField(label: String, value: String) {
     }
 }
 
-// --- Previews (render in Android Studio without a running server) --------------------------
-
-private val previewCert = CertificateInfo(
-    subject = "CN=ratatoskr.home",
-    issuer = "CN=ratatoskr.home",
-    notBefore = OffsetDateTime.parse("2026-01-01T00:00:00Z"),
-    notAfter = OffsetDateTime.parse("2027-01-01T00:00:00Z"),
-    sha256Fingerprint = "ab:cd:ef:12:34:56:78:90:ab:cd:ef:12:34:56:78:90:" +
-        "ab:cd:ef:12:34:56:78:90:ab:cd:ef:12:34:56:78:90",
-)
-
-@Preview(name = "Connect - idle", widthDp = 360, heightDp = 800)
-@Composable
-internal fun ConnectIdlePreview() = RatatoskrTheme {
-    Surface { ConnectContent(ConnectUiState.Idle, {}, { _, _ -> }, {}) }
-}
-
-@Preview(name = "Connect - confirm certificate", widthDp = 360, heightDp = 800)
-@Composable
-internal fun ConnectConfirmPreview() = RatatoskrTheme {
-    Surface { ConnectContent(ConnectUiState.Confirm("https://ratatoskr.home:8080", previewCert), {}, { _, _ -> }, {}) }
-}
-
-@Preview(name = "Connect - error", widthDp = 360, heightDp = 800)
-@Composable
-internal fun ConnectErrorPreview() = RatatoskrTheme {
-    Surface { ConnectContent(ConnectUiState.Error("Could not read the server certificate."), {}, { _, _ -> }, {}) }
-}

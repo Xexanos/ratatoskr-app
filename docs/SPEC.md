@@ -531,6 +531,15 @@ ratatoskr-app/
   UI-state type. The now-playing screen polls `getCurrentSession`, advances the displayed
   position locally between polls, and corrects to the server's value on each response
   (section 3).
+- Each screen package splits its composable in two (ADR 0001): a public, stateless
+  `XScreen(state, ...)` — a pure function of its UI state, and the surface previews,
+  screenshot goldens, and accessibility checks render — and an `XScreenHost(viewModel, ...)`
+  that owns the ViewModel wiring, navigation effects, snackbars, and polling, rendered only
+  by the navigation graph. (`Host`, not `Route`: `Route` is this section's name for the
+  `@Serializable` navigation destination types.) Previews live in sibling `XScreenPreviews.kt`
+  files in the main source set and reach every state through public seams only — where a
+  state hides behind the 500 ms delayed-loading gate, previews open it via the
+  `LocalImmediateLoading` CompositionLocal instead of test-only visibility.
 - Domain models (library item, speaker, session, tokens) live in `core-network`'s wrapper
   layer and are the only types the `app` module sees.
 

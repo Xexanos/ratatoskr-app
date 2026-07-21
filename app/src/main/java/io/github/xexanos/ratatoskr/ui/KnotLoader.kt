@@ -32,6 +32,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
@@ -346,12 +347,24 @@ internal fun KnotLoaderReducedPreview() = RatatoskrTheme {
 }
 
 /**
+ * Opens every [rememberDelayedVisible] gate immediately, so a static render can show a loading
+ * indicator the 500 ms threshold would otherwise hide forever: under a paused composition clock
+ * (screenshot goldens, the preview pane) the delay never elapses, and a golden named "loading"
+ * would silently show no loader at all. Previews and tests provide `true`; production never
+ * touches it, so the shipped threshold behavior is unchanged. The same CompositionLocal-as-seam
+ * idiom as [LocalReducedMotion] and the cover image loader (ADR 0001).
+ */
+val LocalImmediateLoading = staticCompositionLocalOf { false }
+
+/**
  * Shows nothing until [active] has been true for [delayMillis], then stays visible until it goes
  * false again. Gates the (expensive) knot loader behind a short threshold so quick waits never
- * flash it; only genuinely slow waits escalate to the animation.
+ * flash it; only genuinely slow waits escalate to the animation. [LocalImmediateLoading] bypasses
+ * the threshold for static renders.
  */
 @Composable
 fun rememberDelayedVisible(active: Boolean, delayMillis: Long = 500L): Boolean {
+    if (LocalImmediateLoading.current) return active
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(active) {
         if (active) {

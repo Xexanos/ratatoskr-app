@@ -28,9 +28,11 @@ import com.google.android.apps.common.testing.accessibility.framework.integratio
 import io.github.xexanos.ratatoskr.R
 import io.github.xexanos.ratatoskr.ui.auth.SignInErrorPreview
 import io.github.xexanos.ratatoskr.ui.auth.SignInIdlePreview
+import io.github.xexanos.ratatoskr.ui.auth.SignInSubmittingPreview
 import io.github.xexanos.ratatoskr.ui.connect.ConnectConfirmPreview
 import io.github.xexanos.ratatoskr.ui.connect.ConnectErrorPreview
 import io.github.xexanos.ratatoskr.ui.connect.ConnectIdlePreview
+import io.github.xexanos.ratatoskr.ui.connect.ConnectInspectingPreview
 import io.github.xexanos.ratatoskr.ui.library.LibraryEmptyPreview
 import io.github.xexanos.ratatoskr.ui.library.LibraryErrorPreview
 import io.github.xexanos.ratatoskr.ui.library.LibraryLoadedPreview
@@ -38,9 +40,11 @@ import io.github.xexanos.ratatoskr.ui.library.LibraryLoadMoreFailedPreview
 import io.github.xexanos.ratatoskr.ui.library.LibraryLoadingMorePreview
 import io.github.xexanos.ratatoskr.ui.library.LibraryLoadingPreview
 import io.github.xexanos.ratatoskr.ui.nowplaying.NowPlayingEmptyPreview
+import io.github.xexanos.ratatoskr.ui.nowplaying.NowPlayingLoadingPreview
 import io.github.xexanos.ratatoskr.ui.nowplaying.NowPlayingPausedPreview
 import io.github.xexanos.ratatoskr.ui.nowplaying.NowPlayingPlayingPreview
 import io.github.xexanos.ratatoskr.ui.settings.SettingsPreview
+import io.github.xexanos.ratatoskr.ui.settings.SettingsUnconfiguredPreview
 import io.github.xexanos.ratatoskr.ui.speakers.SpeakersEmptyPreview
 import io.github.xexanos.ratatoskr.ui.speakers.SpeakersLoadedPreview
 import io.github.xexanos.ratatoskr.ui.speakers.SpeakersLoadingPreview
@@ -79,13 +83,16 @@ class AccessibilityChecksTest {
 
     /**
      * Same as [runChecks], but for screen states whose loader is gated behind
-     * `rememberDelayedVisible` (a 500ms `delay()`). Compose's idle detection doesn't wait out a
-     * plain coroutine `delay()`, so without advancing the clock the check would run against the
-     * empty box shown before the loader appears - passing vacuously and covering nothing. Pause
-     * auto-advance, step past the gate, then assert the loader is actually present (in either the
-     * animated or reduced-motion form) so this coverage can't silently regress again.
+     * `rememberDelayedVisible` (a 500ms `delay()`). The loading previews force the gate open via
+     * `LocalImmediateLoading`, and this helper still pauses auto-advance, steps past the delay,
+     * and asserts the loader is actually present - so if a preview ever stops providing the
+     * local, the check fails loudly instead of running against the empty pre-loader box and
+     * passing vacuously. A labelled knot is decorative (the label carries the announcement -
+     * KnotLoader's one-announcement rule), so the assert looks for [labelRes] when the screen
+     * gives its loader a label, and for the knot's own description or the generic reduced-motion
+     * label otherwise.
      */
-    private fun runChecksAfterLoaderDelay(content: @Composable () -> Unit) {
+    private fun runChecksAfterLoaderDelay(labelRes: Int? = null, content: @Composable () -> Unit) {
         compose.mainClock.autoAdvance = false
         compose.setContent(content)
         val validator = AccessibilityValidator()
@@ -96,7 +103,7 @@ class AccessibilityChecksTest {
             .onAllNodesWithContentDescription(compose.activity.getString(R.string.knot_loader_description))
             .fetchSemanticsNodes().isNotEmpty()
         val labelShown = compose
-            .onAllNodesWithText(compose.activity.getString(R.string.app_loading))
+            .onAllNodesWithText(compose.activity.getString(labelRes ?: R.string.app_loading))
             .fetchSemanticsNodes().isNotEmpty()
         assertTrue(
             "the delayed knot loader never appeared after advancing past its 500ms gate",
@@ -108,8 +115,11 @@ class AccessibilityChecksTest {
     @Test fun connectIdle() = runChecks { ConnectIdlePreview() }
     @Test fun connectConfirmCertificate() = runChecks { ConnectConfirmPreview() }
     @Test fun connectError() = runChecks { ConnectErrorPreview() }
+    @Test fun connectInspecting() =
+        runChecksAfterLoaderDelay(labelRes = R.string.connect_inspecting) { ConnectInspectingPreview() }
     @Test fun signInIdle() = runChecks { SignInIdlePreview() }
     @Test fun signInError() = runChecks { SignInErrorPreview() }
+    @Test fun signInSubmitting() = runChecks { SignInSubmittingPreview() }
     @Test fun libraryLoaded() = runChecks { LibraryLoadedPreview() }
     @Test fun libraryEmpty() = runChecks { LibraryEmptyPreview() }
     @Test fun libraryLoading() = runChecksAfterLoaderDelay { LibraryLoadingPreview() }
@@ -122,7 +132,9 @@ class AccessibilityChecksTest {
     @Test fun nowPlayingPlaying() = runChecks { NowPlayingPlayingPreview() }
     @Test fun nowPlayingPaused() = runChecks { NowPlayingPausedPreview() }
     @Test fun nowPlayingEmpty() = runChecks { NowPlayingEmptyPreview() }
+    @Test fun nowPlayingLoading() = runChecksAfterLoaderDelay { NowPlayingLoadingPreview() }
     @Test fun settings() = runChecks { SettingsPreview() }
+    @Test fun settingsUnconfigured() = runChecks { SettingsUnconfiguredPreview() }
     @Test fun knotLoader() = runChecks { KnotLoaderPreview() }
     @Test fun knotLoaderReduced() = runChecks { KnotLoaderReducedPreview() }
 
