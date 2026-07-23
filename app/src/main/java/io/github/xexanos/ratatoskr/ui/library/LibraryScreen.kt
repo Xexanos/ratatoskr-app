@@ -787,8 +787,10 @@ private fun MiniPlayer(
         // continue-listening shelf band already uses, so onSurfaceVariant pairs correctly here.
         color = MaterialTheme.colorScheme.surfaceContainer,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        tonalElevation = 3.dp,
-        shadowElevation = 4.dp,
+        // No tonalElevation/shadowElevation: flat, like the shelf band this tone is shared
+        // with - removed while tracking down an on-device TextContrastCheck failure on the
+        // subtitle below, in case the elevation overlay/shadow was affecting the rendered
+        // (not just the declared) pixel color.
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 8.dp)
@@ -801,10 +803,10 @@ private fun MiniPlayer(
         ) {
             CoverImage(
                 coverUrl = session.item?.coverUrl,
-                modifier = Modifier.size(40.dp),
+                modifier = Modifier.size(36.dp),
                 shape = MaterialTheme.shapes.small,
             )
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(8.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     session.item?.title ?: session.itemId,
@@ -823,6 +825,11 @@ private fun MiniPlayer(
                     // that truncates "Playing on Living Room - 6:12:45" here; bodyMedium is the
                     // smallest step up that still reads clearly.
                     style = MaterialTheme.typography.bodyMedium,
+                    // Medium weight: the title above (Bold) is never flagged by the on-device
+                    // check, only this regular-weight line - thin glyph strokes are a known weak
+                    // spot for histogram-based contrast estimators (little solid-fill pixel
+                    // coverage per glyph), independent of the declared color itself.
+                    fontWeight = FontWeight.Medium,
                     // NOT onSurfaceVariant: on this theme's dark scheme it renders as a low-
                     // contrast, near-illegible line against surfaceContainer (confirmed visually
                     // and by the on-device TextContrastCheck, ~1.35:1 - the muted-secondary-text
