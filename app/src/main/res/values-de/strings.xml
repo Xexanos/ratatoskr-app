@@ -25,7 +25,6 @@
 
     <!-- Library -->
     <string name="library_title">Bibliothek</string>
-    <string name="library_now_playing">Aktuelle Wiedergabe</string>
     <string name="library_settings">Einstellungen</string>
     <string name="library_search_placeholder">Hörbücher durchsuchen</string>
     <string name="library_empty_title">Deine Bibliothek ist leer</string>
@@ -41,6 +40,8 @@
     <string name="library_loading_more">Weitere Hörbücher werden geladen</string>
     <string name="library_load_more_failed">Weitere Hörbücher konnten nicht geladen werden. Zum Wiederholen tippen.</string>
     <string name="library_retry">Erneut versuchen</string>
+    <!-- Mini player (issue #101): %1$s Status (Wird wiedergegeben/Pausiert/...), %2$s Lautsprecher, %3$s Position -->
+    <string name="library_miniplayer_subtitle_with_speaker">%1$s auf %2$s - %3$s</string>
 
     <!-- Speakers -->
     <string name="speakers_title">Lautsprecher auswählen</string>

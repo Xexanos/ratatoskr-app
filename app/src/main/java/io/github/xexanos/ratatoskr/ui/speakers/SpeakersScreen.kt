@@ -43,6 +43,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.xexanos.ratatoskr.R
 import io.github.xexanos.ratatoskr.data.ConnectionManager
+import io.github.xexanos.ratatoskr.data.SpeakerManager
 import io.github.xexanos.ratatoskr.network.domain.ApiResult
 import io.github.xexanos.ratatoskr.network.domain.Speaker
 import io.github.xexanos.ratatoskr.ui.EmptyState
@@ -66,6 +67,7 @@ data class SpeakersUiState(
 
 class SpeakersViewModel(
     private val connectionManager: ConnectionManager,
+    private val speakerManager: SpeakerManager,
     private val itemId: String,
 ) : ViewModel() {
 
@@ -74,13 +76,16 @@ class SpeakersViewModel(
 
     init { loadSpeakers() }
 
+    /**
+     * Forces a fresh fetch through the shared [SpeakerManager] rather than reading whatever's
+     * cached - the user is actively picking a speaker here, so a stale name or membership
+     * would be visible and wrong. This also keeps the mini player's cache current as a
+     * side effect (SpeakerManager has no periodic background refresh of its own).
+     */
     private fun loadSpeakers() {
         viewModelScope.launch {
-            val client = connectionManager.client() ?: run {
-                _uiState.value = SpeakersUiState(loading = false, error = UiError.NoServer)
-                return@launch
-            }
-            _uiState.value = when (val result = client.listSpeakers()) {
+            _uiState.value = when (val result = speakerManager.refresh()) {
+                null -> SpeakersUiState(loading = false, error = UiError.NoServer)
                 is ApiResult.Success -> SpeakersUiState(loading = false, speakers = result.data)
                 is ApiResult.Failure -> SpeakersUiState(loading = false, error = UiError.Domain(result.error))
             }

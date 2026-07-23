@@ -10,8 +10,11 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStoreFile
+import androidx.lifecycle.ProcessLifecycleOwner
 import io.github.xexanos.ratatoskr.covers.CoverImages
 import io.github.xexanos.ratatoskr.data.ConnectionManager
+import io.github.xexanos.ratatoskr.data.SessionManager
+import io.github.xexanos.ratatoskr.data.SpeakerManager
 import io.github.xexanos.ratatoskr.network.persist.DataStoreConnectionStore
 import io.github.xexanos.ratatoskr.network.persist.KeystoreCrypto
 import io.github.xexanos.ratatoskr.network.persist.TokenStore
@@ -37,6 +40,14 @@ class AppContainer(context: Context) {
     val certificateInspector = CertificateInspector()
     val connectionManager = ConnectionManager(connectionStore, tokenStore)
     val coverImages = CoverImages(appContext) { connectionManager.peekClient()?.coversCallFactory }
+    val speakerManager = SpeakerManager(connectionManager)
+
+    // Process-wide session polling (decision record, issue #79/#101): bound to app
+    // foreground/background here rather than any one screen, so the poll loop outlives
+    // screen navigation and stops only when the whole app is backgrounded.
+    val sessionManager = SessionManager(connectionManager).also {
+        ProcessLifecycleOwner.get().lifecycle.addObserver(it)
+    }
 
     /**
      * Clears all locally persisted state (trusted server + certificate, auth tokens, cached
@@ -49,5 +60,7 @@ class AppContainer(context: Context) {
         tokenStore.clear()
         connectionManager.invalidate()
         coverImages.clear()
+        sessionManager.reset()
+        speakerManager.reset()
     }
 }

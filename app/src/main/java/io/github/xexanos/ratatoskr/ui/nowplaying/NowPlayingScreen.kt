@@ -46,32 +46,26 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.repeatOnLifecycle
 import io.github.xexanos.ratatoskr.R
-import io.github.xexanos.ratatoskr.data.ConnectionManager
+import io.github.xexanos.ratatoskr.data.SessionManager
 import io.github.xexanos.ratatoskr.network.domain.ApiResult
 import io.github.xexanos.ratatoskr.network.domain.PlaybackState
-import io.github.xexanos.ratatoskr.network.domain.RatatoskrError
 import io.github.xexanos.ratatoskr.network.domain.Session
 import io.github.xexanos.ratatoskr.ui.common.CoverImage
 import io.github.xexanos.ratatoskr.ui.KnotLoader
 import io.github.xexanos.ratatoskr.ui.UiError
 import io.github.xexanos.ratatoskr.ui.UiTestTags
+import io.github.xexanos.ratatoskr.ui.common.formatPlaybackTime
+import io.github.xexanos.ratatoskr.ui.common.rememberTickingPositionSeconds
 import io.github.xexanos.ratatoskr.ui.rememberDelayedVisible
 import io.github.xexanos.ratatoskr.ui.text
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-
-private const val POLL_INTERVAL_MS = 5_000L
 
 data class NowPlayingUiState(
     val loading: Boolean = true,
@@ -80,155 +74,72 @@ data class NowPlayingUiState(
     val stopped: Boolean = false,
 )
 
+/**
+ * A thin adapter over [SessionManager] (decision record, issue #79/#101): the poll loop, the
+ * command-epoch guard, `NoActiveSession` handling, and the `sessionActive` flag all live there
+ * now, shared with the library's mini player. This ViewModel only maps the shared session
+ * state into its own [NowPlayingUiState] and forwards control actions, surfacing failures as
+ * its own inline banner (a failure from the mini player's toggle is a separate concern - a
+ * library snackbar, not this state).
+ */
 class NowPlayingViewModel(
-    private val connectionManager: ConnectionManager,
+    private val sessionManager: SessionManager,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(NowPlayingUiState())
     val uiState: StateFlow<NowPlayingUiState> = _uiState.asStateFlow()
 
-    // Monotonic counter of user control actions (pause/resume/seek). Each control bumps it; a
-    // poll snapshots it and drops its own result if a newer control was issued meanwhile - so a
-    // poll already in flight when the user pauses can't flip the control back to "playing". All
-    // access is on the main dispatcher (viewModelScope), so a plain Int needs no synchronisation.
-    private var commandEpoch = 0
-
-    /**
-     * Fetches the current session once. The screen drives this while it is RESUMED (see
-     * [NowPlayingScreen]) instead of a self-running loop, so polling stops when the app is
-     * backgrounded. It is a no-op once the session has been stopped, so a late in-flight poll
-     * cannot revive a session the user just ended.
-     */
-    suspend fun refresh() {
-        if (_uiState.value.stopped) return
-        val epoch = commandEpoch
-        val client = connectionManager.client() ?: return
-        when (val result = client.currentSession()) {
-            is ApiResult.Success -> applySession(result.data, epoch)
-            is ApiResult.Failure -> {
-                // A control action issued while this poll was in flight takes precedence.
-                if (epoch != commandEpoch || _uiState.value.stopped) return
-                when (result.error) {
-                    is RatatoskrError.NoActiveSession -> {
-                        // The session ended (server relinquished it, or it was stopped elsewhere).
-                        // The server owns token rotation only WHILE a session is active (SPEC
-                        // section 5), so release that flag now - otherwise the client keeps
-                        // suppressing its own
-                        // refresh while it sits here polling 404s, and its access token would
-                        // eventually lapse with no way to renew (mirrors applySession()/stop()).
-                        connectionManager.setSessionActive(false)
-                        // Drop the card AND clear any error, so a banner from a just-prior failure
-                        // (e.g. a 502 while the speaker was dropping out) doesn't stick on the
-                        // now-empty screen. Mirrors the stale-error clear in applySession().
-                        _uiState.value = _uiState.value.copy(loading = false, session = null, error = null)
-                    }
-                    else -> {
-                        result.error.maybeRequireReauth()
-                        _uiState.value = _uiState.value.copy(loading = false, error = UiError.Domain(result.error))
-                    }
-                }
+    init {
+        viewModelScope.launch {
+            sessionManager.state.collect { snapshot ->
+                _uiState.value = _uiState.value.copy(
+                    loading = snapshot.loading,
+                    session = snapshot.session,
+                    error = snapshot.error?.let { UiError.Domain(it) },
+                )
             }
         }
     }
 
-    private fun applySession(session: Session, epoch: Int) {
-        // A poll or control response that completes after stop() must not revive the ended
-        // session: the `stopped` guard in refresh() only covers the start of the call, not the
-        // apply after the network await, and stop() has already navigated away.
-        if (_uiState.value.stopped) return
-        // Drop a result the user's latest control action has already superseded (e.g. a poll
-        // that was in flight when the user paused), so it can't revert the just-set state.
-        if (epoch != commandEpoch) return
-        // The server owns token rotation while a session is active (SPEC section 5).
-        val active = session.state in ACTIVE_STATES
-        connectionManager.setSessionActive(active)
-        // Clear a stale error on a successful response so a transient poll failure doesn't
-        // leave a sticky banner once the stream is healthy again. `stopped` is preserved by the
-        // guard above; a fresh control action also clears the error up front.
-        _uiState.value = _uiState.value.copy(loading = false, session = session, error = null)
-    }
-
-    fun pause() = control { it.pause() }
-    fun resume() = control { it.resume() }
-    fun seek(positionSeconds: Double) = control { it.seek(positionSeconds) }
+    fun pause() = control { sessionManager.pause() }
+    fun resume() = control { sessionManager.resume() }
+    fun seek(positionSeconds: Double) = control { sessionManager.seek(positionSeconds) }
 
     fun stop() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(error = null)
-            val client = connectionManager.client() ?: return@launch
-            when (val result = client.stopSession()) {
-                is ApiResult.Success -> {
-                    connectionManager.setSessionActive(false)
-                    _uiState.value = _uiState.value.copy(stopped = true)
-                }
-                is ApiResult.Failure -> {
-                    result.error.maybeRequireReauth()
-                    _uiState.value = _uiState.value.copy(error = UiError.Domain(result.error))
-                }
+            when (val result = sessionManager.stop()) {
+                null -> {} // superseded by a newer action - do nothing
+                is ApiResult.Success -> _uiState.value = _uiState.value.copy(stopped = true)
+                is ApiResult.Failure -> _uiState.value = _uiState.value.copy(error = UiError.Domain(result.error))
             }
         }
     }
 
-    private fun control(action: suspend (io.github.xexanos.ratatoskr.network.api.RatatoskrClient) -> ApiResult<Session>) {
-        val epoch = ++commandEpoch
+    private fun control(action: suspend () -> ApiResult<Session>?) {
         viewModelScope.launch {
             // Clear a stale error when the user starts a new action, so a later successful poll
             // is not what makes the old message disappear.
             _uiState.value = _uiState.value.copy(error = null)
-            val client = connectionManager.client() ?: return@launch
-            when (val result = action(client)) {
-                is ApiResult.Success -> applySession(result.data, epoch)
-                // Only surface this action's error if a newer control hasn't superseded it.
-                is ApiResult.Failure ->
-                    if (epoch == commandEpoch) {
-                        result.error.maybeRequireReauth()
-                        _uiState.value = _uiState.value.copy(error = UiError.Domain(result.error))
-                    }
+            when (val result = action()) {
+                // A superseded action (null) or a success both need no local update here: the
+                // shared sessionManager.state collector above already reflects any real change.
+                null, is ApiResult.Success -> {}
+                is ApiResult.Failure -> _uiState.value = _uiState.value.copy(error = UiError.Domain(result.error))
             }
         }
     }
-
-    /**
-     * An [RatatoskrError.Unauthorized] surfacing here is a token lapse the app cannot silently
-     * recover from during an active session (SPEC section 5). Hand it to the connection manager,
-     * which discards the stranded tokens and routes the user back to sign-in. Any other error is
-     * left to the caller to show in the card/banner.
-     */
-    private suspend fun RatatoskrError.maybeRequireReauth() {
-        if (this is RatatoskrError.Unauthorized) connectionManager.requireReauth()
-    }
-
-    override fun onCleared() {
-        super.onCleared()
-        connectionManager.setSessionActive(false)
-    }
-
-    private companion object {
-        val ACTIVE_STATES = setOf(PlaybackState.PLAYING, PlaybackState.PAUSED, PlaybackState.BUFFERING)
-    }
 }
 
-// The stateful host (ADR 0001): owns the ViewModel wiring, the RESUMED-scoped polling loop, and
-// the stopped navigation effect. The navigation graph renders this; previews and goldens render
-// [NowPlayingScreen].
+// The stateful host (ADR 0001): owns the ViewModel wiring and the stopped navigation effect.
+// Polling itself is process-wide (SessionManager, ADR 0002), not driven by this screen anymore.
+// The navigation graph renders this; previews and goldens render [NowPlayingScreen].
 @Composable
 fun NowPlayingScreenHost(
     viewModel: NowPlayingViewModel,
     onStopped: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val lifecycleOwner = LocalLifecycleOwner.current
-
-    LaunchedEffect(lifecycleOwner) {
-        // Poll only while the screen is RESUMED; a backgrounded app stops hitting the server
-        // (and stops holding the session active).
-        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-            while (isActive) {
-                viewModel.refresh()
-                delay(POLL_INTERVAL_MS)
-            }
-        }
-    }
 
     LaunchedEffect(state.stopped) {
         if (state.stopped) onStopped()
@@ -336,14 +247,18 @@ private fun androidx.compose.foundation.layout.ColumnScope.NowPlayingContent(
     // Push transport controls into the thumb zone (bottom third).
     Spacer(Modifier.weight(1f))
 
+    // Ticking, not the raw polled position (decision record, issue #79/#101): creeps forward
+    // once a second while playing instead of jumping in 5s poll steps, shared with the mini
+    // player so both surfaces tell the same story.
+    val tickingPosition = rememberTickingPositionSeconds(session)
     var dragging by remember { mutableStateOf(false) }
-    var sliderPosition by remember { mutableFloatStateOf(session.positionSeconds.toFloat()) }
-    // Keyed on the server position only (not `dragging`): follow the server while the user
-    // isn't dragging, but do NOT re-run the instant a drag is released - otherwise it would
-    // snap the thumb back to the last polled value before the seek round-trips. After release
-    // it resumes following on the next poll (by which time the seek has normally landed).
-    LaunchedEffect(session.positionSeconds) {
-        if (!dragging) sliderPosition = session.positionSeconds.toFloat()
+    var sliderPosition by remember { mutableFloatStateOf(tickingPosition.toFloat()) }
+    // Keyed on the ticking position (not `dragging`): follow it while the user isn't dragging,
+    // but do NOT re-run the instant a drag is released - otherwise it would snap the thumb back
+    // to the last ticked value before the seek round-trips. After release it resumes following
+    // on the next tick (by which time the seek has normally landed).
+    LaunchedEffect(tickingPosition) {
+        if (!dragging) sliderPosition = tickingPosition.toFloat()
     }
     val duration = session.durationSeconds.toFloat().coerceAtLeast(1f)
     Slider(
@@ -457,7 +372,7 @@ private fun StateChip(state: PlaybackState) {
 @Composable
 private fun TimeLabel(seconds: Double, color: androidx.compose.ui.graphics.Color) {
     Text(
-        text = formatTime(seconds),
+        text = formatPlaybackTime(seconds),
         style = MaterialTheme.typography.labelLarge,
         fontFamily = FontFamily.Monospace,
         color = color,
@@ -489,11 +404,4 @@ private fun CircleControl(
     }
 }
 
-private fun formatTime(seconds: Double): String {
-    val total = seconds.toLong().coerceAtLeast(0)
-    val h = total / 3600
-    val m = (total % 3600) / 60
-    val s = total % 60
-    return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
-}
 

@@ -11,14 +11,17 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import io.github.xexanos.ratatoskr.data.ConnectionManager
+import io.github.xexanos.ratatoskr.data.SpeakerManager
 import io.github.xexanos.ratatoskr.network.FakeTokenAccess
 import io.github.xexanos.ratatoskr.network.WireFixtures
 import io.github.xexanos.ratatoskr.network.domain.RatatoskrError
 import io.github.xexanos.ratatoskr.network.persist.DataStoreConnectionStore
 import io.github.xexanos.ratatoskr.network.testutil.HttpsMockServer
 import io.github.xexanos.ratatoskr.ui.UiError
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -42,8 +45,22 @@ class SpeakersViewModelTest {
 
     private val dispatcher = UnconfinedTestDispatcher()
 
+    // SpeakersViewModel's viewModelScope outlives the test unless cancelled explicitly (same
+    // leak class already fixed for LibraryViewModelTest/NowPlayingViewModelTest, ADR 0002): a
+    // still-uncancelled scope whose in-flight call outlives this test's HttpsMockServer rule
+    // teardown can throw once the connection is torn out from under it, and that uncaught
+    // exception surfaces on whichever test's runTest happens to go next, since
+    // kotlinx-coroutines-test's Dispatchers.Main is a shared, mutable indirection.
+    private val createdViewModels = mutableListOf<SpeakersViewModel>()
+
     @Before fun setUp() = Dispatchers.setMain(dispatcher)
-    @After fun tearDown() = Dispatchers.resetMain()
+
+    @After
+    fun tearDown() {
+        createdViewModels.forEach { it.viewModelScope.cancel() }
+        dispatcher.scheduler.advanceUntilIdle()
+        Dispatchers.resetMain()
+    }
 
     private fun jsonResponse(body: String, code: Int = 200) =
         MockResponse().setResponseCode(code).setHeader("Content-Type", "application/json").setBody(body)
@@ -64,6 +81,9 @@ class SpeakersViewModelTest {
         return ConnectionManager(DataStoreConnectionStore(dataStore), FakeTokenAccess())
     }
 
+    private fun speakersViewModel(connectionManager: ConnectionManager, itemId: String = "i1"): SpeakersViewModel =
+        SpeakersViewModel(connectionManager, SpeakerManager(connectionManager), itemId).also { createdViewModels += it }
+
     // loadSpeakers()/start() only launch on viewModelScope and return immediately; the actual
     // HTTP call runs on OkHttp's real thread pool independent of the Main test dispatcher, so
     // the result lands asynchronously in real wall-clock time. Poll instead of asserting the
@@ -80,7 +100,7 @@ class SpeakersViewModelTest {
     fun `initial load fetches the speaker list`() = runTest(dispatcher) {
         server.dispatch { jsonResponse(WireFixtures.speakerListJson()) }
 
-        val viewModel = SpeakersViewModel(trustedConnectionManager(), itemId = "i1")
+        val viewModel = speakersViewModel(trustedConnectionManager())
         waitUntil { !viewModel.uiState.value.loading }
 
         val state = viewModel.uiState.value
@@ -90,7 +110,7 @@ class SpeakersViewModelTest {
 
     @Test
     fun `no configured server surfaces a specific error`() = runTest(dispatcher) {
-        val viewModel = SpeakersViewModel(unconfiguredConnectionManager(), itemId = "i1")
+        val viewModel = speakersViewModel(unconfiguredConnectionManager())
         waitUntil { !viewModel.uiState.value.loading }
 
         val state = viewModel.uiState.value
@@ -104,7 +124,7 @@ class SpeakersViewModelTest {
             MockResponse().setResponseCode(401).setBody("""{"code":"unauthorized","message":"no"}""")
         }
 
-        val viewModel = SpeakersViewModel(trustedConnectionManager(), itemId = "i1")
+        val viewModel = speakersViewModel(trustedConnectionManager())
         waitUntil { !viewModel.uiState.value.loading }
 
         assertEquals(UiError.Domain(RatatoskrError.Unauthorized), viewModel.uiState.value.error)
@@ -120,7 +140,7 @@ class SpeakersViewModelTest {
                 else -> MockResponse().setResponseCode(404)
             }
         }
-        val viewModel = SpeakersViewModel(trustedConnectionManager(), itemId = "i1")
+        val viewModel = speakersViewModel(trustedConnectionManager())
         waitUntil { !viewModel.uiState.value.loading }
 
         viewModel.start("s1")
@@ -143,7 +163,7 @@ class SpeakersViewModelTest {
                 else -> MockResponse().setResponseCode(404)
             }
         }
-        val viewModel = SpeakersViewModel(trustedConnectionManager(), itemId = "i1")
+        val viewModel = speakersViewModel(trustedConnectionManager())
         waitUntil { !viewModel.uiState.value.loading }
 
         viewModel.start("s1")
@@ -153,5 +173,28 @@ class SpeakersViewModelTest {
         assertFalse(state.starting)
         assertFalse(state.started)
         assertEquals("Audiobookshelf down", ((state.error as UiError.Domain).error as RatatoskrError.Upstream).message)
+    }
+
+    @Test
+    fun `loading the screen forces a fresh fetch instead of an already-cached name`() = runTest(dispatcher) {
+        val renamed = java.util.concurrent.atomic.AtomicBoolean(false)
+        server.dispatch {
+            if (!renamed.get()) {
+                jsonResponse(WireFixtures.speakerListJson(WireFixtures.speakerJson(id = "s1", name = "Living Room")))
+            } else {
+                jsonResponse(WireFixtures.speakerListJson(WireFixtures.speakerJson(id = "s1", name = "Family Room")))
+            }
+        }
+        val connectionManager = trustedConnectionManager()
+        val speakerManager = SpeakerManager(connectionManager)
+        runBlocking { speakerManager.nameFor("s1") } // pre-populate the shared cache with the old name
+        renamed.set(true)
+
+        val viewModel = SpeakersViewModel(connectionManager, speakerManager, itemId = "i1").also { createdViewModels += it }
+        waitUntil { !viewModel.uiState.value.loading }
+
+        // The screen shows the renamed speaker, not the stale cached one - loadSpeakers() forced
+        // a refresh() rather than reading speakerManager's existing cache.
+        assertEquals("Family Room", viewModel.uiState.value.speakers.single().name)
     }
 }

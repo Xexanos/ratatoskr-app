@@ -42,8 +42,8 @@ android {
         targetSdk = 36
         // versionCode = MAJOR * 10000 + MINOR * 100 + PATCH, derived from versionName;
         // releases are v<versionName> git tags (SPEC section 8).
-        versionCode = 10702
-        versionName = "1.7.2"
+        versionCode = 10800
+        versionName = "1.8.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // R8 rules for the instrumented-test APK. Only take effect when the androidTest APK is
@@ -118,6 +118,9 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    // ProcessLifecycleOwner (decision record, issue #79/#101): binds SessionManager's poll
+    // loop to app foreground/background instead of any one screen.
+    implementation(libs.androidx.lifecycle.process)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.kotlinx.serialization.core)
     // Cover art (SPEC section 12): Coil 3 with the OkHttp fetcher, fed by core-network's
