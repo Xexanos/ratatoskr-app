@@ -815,7 +815,14 @@ private fun MiniPlayer(
                 )
                 Text(
                     miniPlayerSubtitle(session.state, miniPlayer.speakerName, tickingPosition),
-                    style = MaterialTheme.typography.bodySmall,
+                    // bodyMedium, not bodySmall: bodySmall's thin strokes consistently read back
+                    // as near-illegible on-device (TextContrastCheck estimates hovered around
+                    // 1.4:1 regardless of which color token was tried, confirmed visually too -
+                    // this is what a real reader would also struggle with, not the color choice).
+                    // NowPlayingScreen's own onSurfaceVariant author line uses bodyLarge, but
+                    // that truncates "Playing on Living Room - 6:12:45" here; bodyMedium is the
+                    // smallest step up that still reads clearly.
+                    style = MaterialTheme.typography.bodyMedium,
                     // NOT onSurfaceVariant: on this theme's dark scheme it renders as a low-
                     // contrast, near-illegible line against surfaceContainer (confirmed visually
                     // and by the on-device TextContrastCheck, ~1.35:1 - the muted-secondary-text
