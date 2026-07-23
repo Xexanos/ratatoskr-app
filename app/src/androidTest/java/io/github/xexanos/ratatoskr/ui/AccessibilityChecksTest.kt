@@ -9,6 +9,7 @@ import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -73,10 +74,25 @@ class AccessibilityChecksTest {
     @get:Rule
     val compose = createAndroidComposeRule<ComponentActivity>()
 
+    /**
+     * Insets the preview content away from the system bars, mirroring production: MainActivity's
+     * Scaffold (under enableEdgeToEdge) keeps all content out from under the bars via
+     * innerPadding, but this bare test activity has no Scaffold - and with targetSdk 35+,
+     * edge-to-edge is enforced, so the window draws behind the navigation bar. Without this
+     * padding, bottom-docked content (the library's mini player) renders UNDER the nav bar and
+     * ATF's screenshot-based TextContrastCheck samples the bar's pixels instead of the app's:
+     * its estimated colors stayed byte-identical across five different text-styling changes
+     * while the reported bounds tracked every layout edit - the give-away that the sampled
+     * pixels weren't the element's own ("may be obscured by other on-screen content").
+     */
+    private fun insetLikeProduction(content: @Composable () -> Unit): @Composable () -> Unit = {
+        Box(Modifier.safeDrawingPadding()) { content() }
+    }
+
     // Stricter than the default (which only fails on ERROR-severity results): WARNING
     // also catches contrast findings, which is where most of the real issues showed up.
     private fun runChecks(content: @Composable () -> Unit) {
-        compose.setContent(content)
+        compose.setContent(insetLikeProduction(content))
         val validator = AccessibilityValidator()
             .setThrowExceptionFor(AccessibilityCheckResult.AccessibilityCheckResultType.WARNING)
         compose.enableAccessibilityChecks(validator)
@@ -96,7 +112,7 @@ class AccessibilityChecksTest {
      */
     private fun runChecksAfterLoaderDelay(labelRes: Int? = null, content: @Composable () -> Unit) {
         compose.mainClock.autoAdvance = false
-        compose.setContent(content)
+        compose.setContent(insetLikeProduction(content))
         val validator = AccessibilityValidator()
             .setThrowExceptionFor(AccessibilityCheckResult.AccessibilityCheckResultType.WARNING)
         compose.enableAccessibilityChecks(validator)
