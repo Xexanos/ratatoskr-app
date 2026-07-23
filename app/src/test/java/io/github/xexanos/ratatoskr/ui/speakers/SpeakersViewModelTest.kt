@@ -18,8 +18,10 @@ import io.github.xexanos.ratatoskr.network.domain.RatatoskrError
 import io.github.xexanos.ratatoskr.network.persist.DataStoreConnectionStore
 import io.github.xexanos.ratatoskr.network.testutil.HttpsMockServer
 import io.github.xexanos.ratatoskr.ui.UiError
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -43,8 +45,22 @@ class SpeakersViewModelTest {
 
     private val dispatcher = UnconfinedTestDispatcher()
 
+    // SpeakersViewModel's viewModelScope outlives the test unless cancelled explicitly (same
+    // leak class already fixed for LibraryViewModelTest/NowPlayingViewModelTest, ADR 0002): a
+    // still-uncancelled scope whose in-flight call outlives this test's HttpsMockServer rule
+    // teardown can throw once the connection is torn out from under it, and that uncaught
+    // exception surfaces on whichever test's runTest happens to go next, since
+    // kotlinx-coroutines-test's Dispatchers.Main is a shared, mutable indirection.
+    private val createdViewModels = mutableListOf<SpeakersViewModel>()
+
     @Before fun setUp() = Dispatchers.setMain(dispatcher)
-    @After fun tearDown() = Dispatchers.resetMain()
+
+    @After
+    fun tearDown() {
+        createdViewModels.forEach { it.viewModelScope.cancel() }
+        dispatcher.scheduler.advanceUntilIdle()
+        Dispatchers.resetMain()
+    }
 
     private fun jsonResponse(body: String, code: Int = 200) =
         MockResponse().setResponseCode(code).setHeader("Content-Type", "application/json").setBody(body)
@@ -66,7 +82,7 @@ class SpeakersViewModelTest {
     }
 
     private fun speakersViewModel(connectionManager: ConnectionManager, itemId: String = "i1"): SpeakersViewModel =
-        SpeakersViewModel(connectionManager, SpeakerManager(connectionManager), itemId)
+        SpeakersViewModel(connectionManager, SpeakerManager(connectionManager), itemId).also { createdViewModels += it }
 
     // loadSpeakers()/start() only launch on viewModelScope and return immediately; the actual
     // HTTP call runs on OkHttp's real thread pool independent of the Main test dispatcher, so
@@ -174,7 +190,7 @@ class SpeakersViewModelTest {
         runBlocking { speakerManager.nameFor("s1") } // pre-populate the shared cache with the old name
         renamed.set(true)
 
-        val viewModel = SpeakersViewModel(connectionManager, speakerManager, itemId = "i1")
+        val viewModel = SpeakersViewModel(connectionManager, speakerManager, itemId = "i1").also { createdViewModels += it }
         waitUntil { !viewModel.uiState.value.loading }
 
         // The screen shows the renamed speaker, not the stale cached one - loadSpeakers() forced
