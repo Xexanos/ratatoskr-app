@@ -780,7 +780,13 @@ private fun MiniPlayer(
     val tickingPosition = rememberTickingPositionSeconds(session)
     Surface(
         shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        // NOT surfaceContainerHigh: this theme only customizes surface/surfaceVariant/
+        // surfaceContainer (Theme.kt) - surfaceContainerHigh falls back to the M3 baseline
+        // scheme, which pairs badly with this app's custom onSurfaceVariant (a real
+        // TextContrastCheck failure, 1.35:1). surfaceContainer is the same customized tone the
+        // continue-listening shelf band already uses, so onSurfaceVariant pairs correctly here.
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
         tonalElevation = 3.dp,
         shadowElevation = 4.dp,
         modifier = Modifier

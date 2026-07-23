@@ -61,6 +61,11 @@ class NowPlayingViewModelTest {
     @After
     fun tearDown() {
         createdViewModels.forEach { it.viewModelScope.cancel() }
+        // cancel() only marks the collector's Job; the actual cancellation runs on mainThread,
+        // so submit an empty task and block for it - on this single-threaded executor that
+        // drains everything queued before it (including the cancellation) before resetMain()
+        // detaches Main, the same rationale as LibraryViewModelTest's advanceUntilIdle().
+        runBlocking(mainThread) {}
         Dispatchers.resetMain()
         mainThread.close()
     }

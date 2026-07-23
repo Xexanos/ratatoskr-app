@@ -83,6 +83,11 @@ class LibraryViewModelTest {
     @After
     fun tearDown() {
         createdViewModels.forEach { it.viewModelScope.cancel() }
+        // cancel() only marks the collector's Job; it doesn't itself run on this thread, so it
+        // needs this test's own dispatcher pumped once more before resetMain() detaches it -
+        // otherwise the cancellation can still be "pending" when Main is torn down, and a later
+        // test's UncaughtExceptionsBeforeTest attributes the failure to whatever runs next.
+        dispatcher.scheduler.advanceUntilIdle()
         Dispatchers.resetMain()
     }
 
