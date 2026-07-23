@@ -871,7 +871,9 @@ private fun miniPlayerSubtitle(state: PlaybackState, speakerName: String?, posit
     return if (speakerName != null) {
         stringResource(R.string.library_miniplayer_subtitle_with_speaker, stateLabel, speakerName, position)
     } else {
-        stringResource(R.string.library_miniplayer_subtitle, stateLabel, position)
+        // No translatable word in "state - position" - built directly, same as formatPlaybackTime's
+        // separator, rather than a strings.xml entry that would be identical in every language.
+        "%1\$s - %2\$s".format(stateLabel, position)
     }
 }
 

@@ -42,9 +42,11 @@
     <string name="library_loading_more">Loading more audiobooks</string>
     <string name="library_load_more_failed">Couldn\'t load more audiobooks. Tap to retry.</string>
     <string name="library_retry">Try again</string>
-    <!-- Mini player (issue #101): %1$s state (Playing/Paused/...), %2$s speaker, %3$s position -->
+    <!-- Mini player (issue #101): %1$s state (Playing/Paused/...), %2$s speaker, %3$s position.
+         The no-speaker variant is plain "state - position" with no translatable word in it -
+         built directly in code (formatMiniPlayerSubtitle), the same way formatPlaybackTime's
+         "H:MM:SS" separator is - so it stays out of both strings.xml files. -->
     <string name="library_miniplayer_subtitle_with_speaker">%1$s on %2$s - %3$s</string>
-    <string name="library_miniplayer_subtitle">%1$s - %2$s</string>
 
     <!-- Speakers -->
     <string name="speakers_title">Choose a speaker</string>
