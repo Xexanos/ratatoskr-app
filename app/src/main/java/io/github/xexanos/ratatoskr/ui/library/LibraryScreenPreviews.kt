@@ -38,6 +38,16 @@ private val previewShelfItems = listOf(
     LibraryItemSummary("1", "The Hobbit", "J. R. R. Tolkien", 39_600.0, null, Progress(12_600.0, false)),
 )
 
+// A shelf that does NOT repeat a browse-list book (unlike previewShelfItems above, which
+// deliberately does to demonstrate "the shelf is a view, not a partition"). The mini player
+// previews use this one instead: two rows reading identical speakable text ("The Hobbit,
+// J. R. R. Tolkien, 32%") trips the accessibility checks' DuplicateSpeakableTextCheck, and
+// that relationship isn't what these previews are pinning anyway - LibraryShelfLoadedPreview
+// already covers it.
+private val previewMiniPlayerShelfItems = listOf(
+    LibraryItemSummary("4", "A Wizard of Earthsea", "Ursula K. Le Guin", 25_200.0, null, Progress(9_100.0, false)),
+)
+
 private fun previewSession(state: PlaybackState) = Session(
     itemId = "1",
     item = LibraryItemSummary("1", "The Hobbit", "J. R. R. Tolkien", 39_600.0, null, null),
@@ -204,7 +214,7 @@ internal fun LibraryMiniPlayerPlayingPreview() = RatatoskrTheme {
         LibraryScreen(
             state = LibraryUiState(
                 items = previewItems,
-                shelfItems = previewShelfItems,
+                shelfItems = previewMiniPlayerShelfItems,
                 miniPlayer = MiniPlayerUiState(previewSession(PlaybackState.PLAYING), speakerName = "Living Room"),
             ),
             query = "",
@@ -223,7 +233,7 @@ internal fun LibraryMiniPlayerPausedPreview() = RatatoskrTheme {
         LibraryScreen(
             state = LibraryUiState(
                 items = previewItems,
-                shelfItems = previewShelfItems,
+                shelfItems = previewMiniPlayerShelfItems,
                 miniPlayer = MiniPlayerUiState(previewSession(PlaybackState.PAUSED), speakerName = "Living Room"),
             ),
             query = "",

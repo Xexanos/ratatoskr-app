@@ -43,8 +43,8 @@
     <string name="library_load_more_failed">Couldn\'t load more audiobooks. Tap to retry.</string>
     <string name="library_retry">Try again</string>
     <!-- Mini player (issue #101): %1$s state (Playing/Paused/...), %2$s speaker, %3$s position -->
-    <string name="library_miniplayer_subtitle_with_speaker">%1$s on %2$s · %3$s</string>
-    <string name="library_miniplayer_subtitle">%1$s · %2$s</string>
+    <string name="library_miniplayer_subtitle_with_speaker">%1$s on %2$s - %3$s</string>
+    <string name="library_miniplayer_subtitle">%1$s - %2$s</string>
 
     <!-- Speakers -->
     <string name="speakers_title">Choose a speaker</string>
