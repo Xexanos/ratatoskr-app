@@ -816,7 +816,13 @@ private fun MiniPlayer(
                 Text(
                     miniPlayerSubtitle(session.state, miniPlayer.speakerName, tickingPosition),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    // NOT onSurfaceVariant: on this theme's dark scheme it renders as a low-
+                    // contrast, near-illegible line against surfaceContainer (confirmed visually
+                    // and by the on-device TextContrastCheck, ~1.35:1 - the muted-secondary-text
+                    // convention other screens use doesn't hold up on this specific tonal pair).
+                    // onSurface matches the title above and is the same color the theme already
+                    // guarantees good contrast for.
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
