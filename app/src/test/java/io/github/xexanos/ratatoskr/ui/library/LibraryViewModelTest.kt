@@ -11,15 +11,20 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import io.github.xexanos.ratatoskr.data.ConnectionManager
+import io.github.xexanos.ratatoskr.data.SessionManager
+import io.github.xexanos.ratatoskr.data.SpeakerManager
 import io.github.xexanos.ratatoskr.network.FakeConnectionStore
 import io.github.xexanos.ratatoskr.network.FakeTokenAccess
 import io.github.xexanos.ratatoskr.network.WireFixtures
+import io.github.xexanos.ratatoskr.network.domain.PlaybackState
 import io.github.xexanos.ratatoskr.network.domain.RatatoskrError
 import io.github.xexanos.ratatoskr.network.persist.DataStoreConnectionStore
 import io.github.xexanos.ratatoskr.network.testutil.HttpsMockServer
 import io.github.xexanos.ratatoskr.ui.UiError
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -55,6 +60,14 @@ class LibraryViewModelTest {
     // server owns the shelf size; the app never sends a limit).
     private val receivedShelfLimits = Collections.synchronizedList(mutableListOf<String?>())
 
+    // LibraryViewModel now keeps a permanent sessionManager.state.collect{} subscription alive
+    // in viewModelScope (ADR 0002) - in production that scope dies with the ViewModel when the
+    // framework calls onCleared(), but nothing clears it here, so tearDown cancels it explicitly
+    // before resetMain(): otherwise a leaked collector can still be resumed after Main is unset
+    // (or reset to a later test's dispatcher) and throw on whichever test runs next, since
+    // kotlinx-coroutines-test's Dispatchers.Main is a shared, mutable indirection.
+    private val createdViewModels = mutableListOf<LibraryViewModel>()
+
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
@@ -67,7 +80,11 @@ class LibraryViewModelTest {
         }
     }
 
-    @After fun tearDown() = Dispatchers.resetMain()
+    @After
+    fun tearDown() {
+        createdViewModels.forEach { it.viewModelScope.cancel() }
+        Dispatchers.resetMain()
+    }
 
     private fun jsonResponse(body: String): MockResponse =
         MockResponse().setResponseCode(200)
@@ -101,6 +118,36 @@ class LibraryViewModelTest {
         }
     }
 
+    /**
+     * Like [dispatchLibrary], plus the session (`sessions/current*`) and speakers endpoints the
+     * mini player and the shelf-staleness edge (issue #52/#101) exercise. [session] handles GET
+     * (poll), and POST/DELETE sub-paths (pause/resume/seek/stop) by inspecting the request itself
+     * (same style as [io.github.xexanos.ratatoskr.ui.nowplaying.NowPlayingViewModelTest]).
+     */
+    private fun dispatchLibrarySessionAndSpeakers(
+        shelf: () -> MockResponse = ::defaultShelfResponse,
+        items: (okhttp3.mockwebserver.RecordedRequest) -> MockResponse = {
+            jsonResponse(WireFixtures.libraryPageJson(items = listOf(WireFixtures.libraryItemSummaryJson(title = "all"))))
+        },
+        session: (okhttp3.mockwebserver.RecordedRequest) -> MockResponse,
+        speakers: () -> MockResponse = {
+            jsonResponse(WireFixtures.speakerListJson(WireFixtures.speakerJson(id = "s1", name = "Living Room")))
+        },
+    ) {
+        server.dispatch { request ->
+            val path = request.requestUrl?.encodedPath.orEmpty()
+            when {
+                path.endsWith("/library/in-progress") -> {
+                    receivedShelfLimits += request.requestUrl?.queryParameter("limit")
+                    shelf()
+                }
+                path.contains("/sessions/current") -> session(request)
+                path.endsWith("/speakers") -> speakers()
+                else -> items(request)
+            }
+        }
+    }
+
     private fun trustedConnectionManager(): ConnectionManager {
         val file = tempFolder.root.resolve("connection_${System.nanoTime()}.preferences_pb")
         // A real dispatcher, not the shared virtual `dispatcher`: this store is seeded via
@@ -112,6 +159,16 @@ class LibraryViewModelTest {
         runBlocking { store.saveTrustedServer(server.baseUrl, server.fingerprint) }
         return ConnectionManager(store, FakeTokenAccess())
     }
+
+    /** Builds a [LibraryViewModel] with its own [SessionManager]/[SpeakerManager] over the given
+     * (or a freshly trusted) [ConnectionManager] - most tests don't care about session/speaker
+     * wiring at all, so this keeps their call sites unchanged from before those params existed. */
+    private fun libraryViewModel(
+        connectionManager: ConnectionManager = trustedConnectionManager(),
+        sessionManager: SessionManager = SessionManager(connectionManager),
+        speakerManager: SpeakerManager = SpeakerManager(connectionManager),
+    ): LibraryViewModel =
+        LibraryViewModel(connectionManager, sessionManager, speakerManager).also { createdViewModels += it }
 
     // The debounce delay is virtual (driven by dispatcher.scheduler), but the actual HTTP round
     // trip once debounce elapses is real (OkHttp's own thread pool) - and its result only gets
@@ -129,7 +186,7 @@ class LibraryViewModelTest {
 
     @Test
     fun `initial load fetches the full library without a query`() = runTest(dispatcher) {
-        val viewModel = LibraryViewModel(trustedConnectionManager())
+        val viewModel = libraryViewModel()
 
         settleState { viewModel.uiState.value.items.isNotEmpty() }
 
@@ -139,7 +196,7 @@ class LibraryViewModelTest {
 
     @Test
     fun `rapid keystrokes are debounced into a single request for the final query`() = runTest(dispatcher) {
-        val viewModel = LibraryViewModel(trustedConnectionManager())
+        val viewModel = libraryViewModel()
         settleState { viewModel.uiState.value.items.isNotEmpty() } // settle the initial (null) load
 
         viewModel.search("cat")
@@ -161,7 +218,7 @@ class LibraryViewModelTest {
 
     @Test
     fun `clearing the search box reissues the full library load`() = runTest(dispatcher) {
-        val viewModel = LibraryViewModel(trustedConnectionManager())
+        val viewModel = libraryViewModel()
         settleState { viewModel.uiState.value.items.isNotEmpty() }
 
         viewModel.search("cat")
@@ -192,7 +249,7 @@ class LibraryViewModelTest {
             }
             jsonResponse(body)
         }
-        val viewModel = LibraryViewModel(trustedConnectionManager())
+        val viewModel = libraryViewModel()
         settleState { viewModel.uiState.value.items.isNotEmpty() }
         assertEquals("c2", viewModel.uiState.value.nextCursor)
 
@@ -228,7 +285,7 @@ class LibraryViewModelTest {
                 )
             }
         }
-        val viewModel = LibraryViewModel(trustedConnectionManager())
+        val viewModel = libraryViewModel()
         settleState { viewModel.uiState.value.items.isNotEmpty() }
 
         viewModel.loadMore()
@@ -264,7 +321,7 @@ class LibraryViewModelTest {
                 ),
             )
         }
-        val viewModel = LibraryViewModel(trustedConnectionManager())
+        val viewModel = libraryViewModel()
         settleState { viewModel.uiState.value.items.isNotEmpty() }
         viewModel.loadMore()
         settleState { viewModel.uiState.value.items.size == 2 }
@@ -304,7 +361,7 @@ class LibraryViewModelTest {
                 )
             }
         }
-        val viewModel = LibraryViewModel(trustedConnectionManager())
+        val viewModel = libraryViewModel()
         settleState { viewModel.uiState.value.nextCursor == "c2" }
 
         // Kick off the next page and wait until it is actually in flight (request received,
@@ -326,7 +383,7 @@ class LibraryViewModelTest {
 
     @Test
     fun `refresh reloads the current query in place`() = runTest(dispatcher) {
-        val viewModel = LibraryViewModel(trustedConnectionManager())
+        val viewModel = libraryViewModel()
         settleState { viewModel.uiState.value.items.isNotEmpty() } // initial (null) load
 
         viewModel.search("cat")
@@ -354,7 +411,7 @@ class LibraryViewModelTest {
                 jsonResponse(WireFixtures.libraryPageJson(items = listOf(WireFixtures.libraryItemSummaryJson(title = q ?: "all"))))
             }
         }
-        val viewModel = LibraryViewModel(trustedConnectionManager())
+        val viewModel = libraryViewModel()
         settleState { viewModel.uiState.value.error != null }
         assertTrue(viewModel.uiState.value.items.isEmpty())
 
@@ -377,7 +434,7 @@ class LibraryViewModelTest {
                 jsonResponse(WireFixtures.libraryPageJson(items = listOf(WireFixtures.libraryItemSummaryJson(title = q ?: "all"))))
             }
         }
-        val viewModel = LibraryViewModel(trustedConnectionManager())
+        val viewModel = libraryViewModel()
         settleState { viewModel.uiState.value.items.isNotEmpty() }
 
         failNow.set(true)
@@ -398,7 +455,7 @@ class LibraryViewModelTest {
         // In-memory store (FakeConnectionStore) so clearing mid-session is synchronous and avoids
         // the real DataStore's Windows file-rename flakiness. Configured -> load -> clear -> refresh.
         val store = FakeConnectionStore(baseUrl = server.baseUrl, fingerprint = server.fingerprint)
-        val viewModel = LibraryViewModel(ConnectionManager(store, FakeTokenAccess()))
+        val viewModel = libraryViewModel(ConnectionManager(store, FakeTokenAccess()))
         settleState { viewModel.uiState.value.items.isNotEmpty() }
 
         store.clear() // the server becomes unconfigured mid-session
@@ -420,7 +477,7 @@ class LibraryViewModelTest {
                 tempFolder.root.resolve("unconfigured_${System.nanoTime()}.preferences_pb")
             },
         )
-        val viewModel = LibraryViewModel(ConnectionManager(store, FakeTokenAccess()))
+        val viewModel = libraryViewModel(ConnectionManager(store, FakeTokenAccess()))
 
         settleState { viewModel.uiState.value.error != null }
 
@@ -444,7 +501,7 @@ class LibraryViewModelTest {
             responsesBlocked.await()
             jsonResponse(WireFixtures.libraryPageJson(items = listOf(WireFixtures.libraryItemSummaryJson(title = "all"))))
         }
-        val viewModel = LibraryViewModel(trustedConnectionManager())
+        val viewModel = libraryViewModel()
 
         settleState { receivedQueries.size == 1 && receivedShelfLimits.size == 1 }
 
@@ -469,7 +526,7 @@ class LibraryViewModelTest {
             receivedQueries += request.requestUrl?.queryParameter("q")
             jsonResponse(WireFixtures.libraryPageJson(items = listOf(WireFixtures.libraryItemSummaryJson(title = "all"))))
         }
-        val viewModel = LibraryViewModel(trustedConnectionManager())
+        val viewModel = libraryViewModel()
 
         settleState { viewModel.uiState.value.items.isNotEmpty() }
 
@@ -481,7 +538,7 @@ class LibraryViewModelTest {
 
     @Test
     fun `searching never refetches the shelf and clearing the search restores it from held state`() = runTest(dispatcher) {
-        val viewModel = LibraryViewModel(trustedConnectionManager())
+        val viewModel = libraryViewModel()
         settleState { viewModel.uiState.value.shelfItems.isNotEmpty() }
 
         viewModel.search("cat")
@@ -518,7 +575,7 @@ class LibraryViewModelTest {
             receivedQueries += request.requestUrl?.queryParameter("q")
             jsonResponse(WireFixtures.libraryPageJson(items = listOf(WireFixtures.libraryItemSummaryJson(title = "all"))))
         }
-        val viewModel = LibraryViewModel(trustedConnectionManager())
+        val viewModel = libraryViewModel()
 
         settleState { viewModel.uiState.value.items.isNotEmpty() }
 
@@ -536,7 +593,7 @@ class LibraryViewModelTest {
             receivedQueries += request.requestUrl?.queryParameter("q")
             jsonResponse(WireFixtures.libraryPageJson(items = listOf(WireFixtures.libraryItemSummaryJson(title = "all"))))
         }
-        val viewModel = LibraryViewModel(trustedConnectionManager())
+        val viewModel = libraryViewModel()
         settleState { viewModel.uiState.value.shelfError }
         val pageRequestsBefore = receivedQueries.size
 
@@ -554,7 +611,7 @@ class LibraryViewModelTest {
     @Test
     fun `both initial requests failing surface a single full-screen error`() = runTest(dispatcher) {
         dispatchLibrary(shelf = ::failedResponse) { failedResponse() }
-        val viewModel = LibraryViewModel(trustedConnectionManager())
+        val viewModel = libraryViewModel()
 
         settleState { viewModel.uiState.value.error != null }
 
@@ -568,7 +625,7 @@ class LibraryViewModelTest {
     @Test
     fun `re-entry while the full-screen error shows does not fetch the shelf`() = runTest(dispatcher) {
         dispatchLibrary(shelf = ::failedResponse) { failedResponse() }
-        val viewModel = LibraryViewModel(trustedConnectionManager())
+        val viewModel = libraryViewModel()
         settleState { viewModel.uiState.value.error != null }
         viewModel.onScreenEntered() // first composition
 
@@ -605,7 +662,7 @@ class LibraryViewModelTest {
             receivedQueries += request.requestUrl?.queryParameter("q")
             jsonResponse(WireFixtures.libraryPageJson(items = listOf(WireFixtures.libraryItemSummaryJson(title = "all"))))
         }
-        val viewModel = LibraryViewModel(trustedConnectionManager())
+        val viewModel = libraryViewModel()
         settleState { viewModel.uiState.value.shelfItems.isNotEmpty() }
 
         // The screen composing for the first time is NOT a re-entry: the initial load already
@@ -633,7 +690,7 @@ class LibraryViewModelTest {
             receivedQueries += request.requestUrl?.queryParameter("q")
             jsonResponse(WireFixtures.libraryPageJson(items = listOf(WireFixtures.libraryItemSummaryJson(title = "all"))))
         }
-        val viewModel = LibraryViewModel(trustedConnectionManager())
+        val viewModel = libraryViewModel()
         settleState { viewModel.uiState.value.shelfItems.isNotEmpty() }
         viewModel.onScreenEntered() // first composition
 
@@ -650,7 +707,7 @@ class LibraryViewModelTest {
 
     @Test
     fun `pull-to-refresh refetches shelf and list together`() = runTest(dispatcher) {
-        val viewModel = LibraryViewModel(trustedConnectionManager())
+        val viewModel = libraryViewModel()
         settleState { viewModel.uiState.value.shelfItems.isNotEmpty() }
 
         viewModel.refresh()
@@ -663,7 +720,7 @@ class LibraryViewModelTest {
 
     @Test
     fun `no shelf request is made while a search is active`() = runTest(dispatcher) {
-        val viewModel = LibraryViewModel(trustedConnectionManager())
+        val viewModel = libraryViewModel()
         settleState { viewModel.uiState.value.shelfItems.isNotEmpty() }
         viewModel.onScreenEntered() // first composition
 
@@ -687,10 +744,198 @@ class LibraryViewModelTest {
             MockResponse().setResponseCode(502)
                 .setBody("""{"code":"abs_unreachable","message":"Audiobookshelf down"}""")
         }
-        val viewModel = LibraryViewModel(trustedConnectionManager())
+        val viewModel = libraryViewModel()
 
         settleState { viewModel.uiState.value.error != null }
 
         assertEquals("Audiobookshelf down", ((viewModel.uiState.value.error as UiError.Domain).error as RatatoskrError.Upstream).message)
+    }
+
+    // --- Mini player + shelf-staleness edge (decision record, issue #79/#101) -----------------
+
+    @Test
+    fun `the mini player mirrors an active session, resolves its speaker, and hides once it ends`() = runTest(dispatcher) {
+        val sessionEnded = AtomicBoolean(false)
+        dispatchLibrarySessionAndSpeakers(
+            session = {
+                if (sessionEnded.get()) {
+                    MockResponse().setResponseCode(404)
+                        .setBody("""{"code":"no_active_session","message":"Nothing playing"}""")
+                } else {
+                    jsonResponse(WireFixtures.sessionJson(state = "playing"))
+                }
+            },
+        )
+        val connectionManager = trustedConnectionManager()
+        val sessionManager = SessionManager(connectionManager)
+        val viewModel = libraryViewModel(connectionManager, sessionManager)
+        settleState { viewModel.uiState.value.items.isNotEmpty() }
+
+        sessionManager.poll()
+        settleState { viewModel.uiState.value.miniPlayer?.speakerName != null }
+
+        assertEquals(PlaybackState.PLAYING, viewModel.uiState.value.miniPlayer?.session?.state)
+        assertEquals("Living Room", viewModel.uiState.value.miniPlayer?.speakerName)
+
+        sessionEnded.set(true)
+        sessionManager.poll()
+        settleState { viewModel.uiState.value.miniPlayer == null }
+    }
+
+    @Test
+    fun `toggling the mini player pauses a playing session`() = runTest(dispatcher) {
+        dispatchLibrarySessionAndSpeakers(
+            session = { request ->
+                if (request.path.orEmpty().endsWith("/pause")) {
+                    jsonResponse(WireFixtures.sessionJson(state = "paused"))
+                } else {
+                    jsonResponse(WireFixtures.sessionJson(state = "playing"))
+                }
+            },
+        )
+        val connectionManager = trustedConnectionManager()
+        val sessionManager = SessionManager(connectionManager)
+        val viewModel = libraryViewModel(connectionManager, sessionManager)
+        settleState { viewModel.uiState.value.items.isNotEmpty() }
+        sessionManager.poll()
+        settleState { viewModel.uiState.value.miniPlayer?.session?.state == PlaybackState.PLAYING }
+
+        viewModel.toggleMiniPlayerPlayback()
+        settleState { viewModel.uiState.value.miniPlayer?.session?.state == PlaybackState.PAUSED }
+
+        assertEquals(null, viewModel.uiState.value.miniPlayerCommandError)
+    }
+
+    @Test
+    fun `a failed mini player toggle surfaces a one-shot command error`() = runTest(dispatcher) {
+        dispatchLibrarySessionAndSpeakers(
+            session = { request ->
+                if (request.path.orEmpty().endsWith("/pause")) {
+                    MockResponse().setResponseCode(502)
+                        .setBody("""{"code":"upstream_error","message":"Sonos is unavailable"}""")
+                } else {
+                    jsonResponse(WireFixtures.sessionJson(state = "playing"))
+                }
+            },
+        )
+        val connectionManager = trustedConnectionManager()
+        val sessionManager = SessionManager(connectionManager)
+        val viewModel = libraryViewModel(connectionManager, sessionManager)
+        settleState { viewModel.uiState.value.items.isNotEmpty() }
+        sessionManager.poll()
+        settleState { viewModel.uiState.value.miniPlayer != null }
+
+        viewModel.toggleMiniPlayerPlayback()
+        settleState { viewModel.uiState.value.miniPlayerCommandError != null }
+
+        val error = viewModel.uiState.value.miniPlayerCommandError
+        assertEquals(
+            "Sonos is unavailable",
+            ((error as UiError.Domain).error as RatatoskrError.Upstream).message,
+        )
+        // The mini player itself keeps showing the (still playing) session - the failure is
+        // only ever the one-shot snackbar, never a persisted error state on the card.
+        assertEquals(PlaybackState.PLAYING, viewModel.uiState.value.miniPlayer?.session?.state)
+
+        viewModel.clearMiniPlayerCommandError()
+        assertEquals(null, viewModel.uiState.value.miniPlayerCommandError)
+    }
+
+    @Test
+    fun `the active to none edge silently refetches the shelf`() = runTest(dispatcher) {
+        val shelfFetches = AtomicInteger(0)
+        val sessionEnded = AtomicBoolean(false)
+        dispatchLibrarySessionAndSpeakers(
+            shelf = {
+                if (shelfFetches.incrementAndGet() == 1) {
+                    defaultShelfResponse()
+                } else {
+                    jsonResponse(
+                        WireFixtures.inProgressShelfJson(
+                            items = listOf(WireFixtures.libraryItemSummaryJson(id = "s2", title = "just finished")),
+                        ),
+                    )
+                }
+            },
+            session = {
+                if (sessionEnded.get()) {
+                    MockResponse().setResponseCode(404)
+                        .setBody("""{"code":"no_active_session","message":"Nothing playing"}""")
+                } else {
+                    jsonResponse(WireFixtures.sessionJson(state = "playing"))
+                }
+            },
+        )
+        val connectionManager = trustedConnectionManager()
+        val sessionManager = SessionManager(connectionManager)
+        val viewModel = libraryViewModel(connectionManager, sessionManager)
+        settleState { viewModel.uiState.value.shelfItems.isNotEmpty() }
+
+        sessionManager.poll() // none -> active: not a trigger (only active -> none is)
+        settleState { viewModel.uiState.value.miniPlayer != null }
+        assertEquals(1, receivedShelfLimits.size)
+
+        sessionEnded.set(true)
+        sessionManager.poll() // active -> none
+        settleState { viewModel.uiState.value.miniPlayer == null }
+        settleState { viewModel.uiState.value.shelfItems.map { it.title } == listOf("just finished") }
+
+        assertEquals(2, receivedShelfLimits.size)
+        // Silent: no full-screen loading or pull-to-refresh state for this refetch.
+        assertTrue(!viewModel.uiState.value.loading)
+        assertTrue(!viewModel.uiState.value.refreshing)
+    }
+
+    @Test
+    fun `the active to none edge during a search sets shelfStale, consumed when the query clears`() = runTest(dispatcher) {
+        val shelfFetches = AtomicInteger(0)
+        val sessionEnded = AtomicBoolean(false)
+        dispatchLibrarySessionAndSpeakers(
+            shelf = {
+                if (shelfFetches.incrementAndGet() == 1) {
+                    defaultShelfResponse()
+                } else {
+                    jsonResponse(
+                        WireFixtures.inProgressShelfJson(
+                            items = listOf(WireFixtures.libraryItemSummaryJson(id = "s2", title = "just finished")),
+                        ),
+                    )
+                }
+            },
+            items = { request ->
+                val q = request.requestUrl?.queryParameter("q")
+                receivedQueries += q
+                jsonResponse(WireFixtures.libraryPageJson(items = listOf(WireFixtures.libraryItemSummaryJson(title = q ?: "all"))))
+            },
+            session = {
+                if (sessionEnded.get()) {
+                    MockResponse().setResponseCode(404)
+                        .setBody("""{"code":"no_active_session","message":"Nothing playing"}""")
+                } else {
+                    jsonResponse(WireFixtures.sessionJson(state = "playing"))
+                }
+            },
+        )
+        val connectionManager = trustedConnectionManager()
+        val sessionManager = SessionManager(connectionManager)
+        val viewModel = libraryViewModel(connectionManager, sessionManager)
+        settleState { viewModel.uiState.value.shelfItems.isNotEmpty() }
+        sessionManager.poll()
+        settleState { viewModel.uiState.value.miniPlayer != null }
+
+        viewModel.search("cat")
+        settleState { viewModel.uiState.value.items.singleOrNull()?.title == "cat" }
+
+        sessionEnded.set(true)
+        sessionManager.poll() // active -> none fires mid-search: can't refetch the shelf now
+        settleState { viewModel.uiState.value.miniPlayer == null }
+        settleState { viewModel.uiState.value.shelfStale }
+        assertEquals(1, receivedShelfLimits.size)
+
+        viewModel.search("")
+        settleState { viewModel.uiState.value.shelfItems.map { it.title } == listOf("just finished") }
+
+        assertEquals(2, receivedShelfLimits.size)
+        assertTrue(!viewModel.uiState.value.shelfStale)
     }
 }

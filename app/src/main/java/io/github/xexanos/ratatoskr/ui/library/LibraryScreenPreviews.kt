@@ -10,11 +10,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.tooling.preview.Preview
 import io.github.xexanos.ratatoskr.network.domain.LibraryItemSummary
+import io.github.xexanos.ratatoskr.network.domain.PlaybackState
 import io.github.xexanos.ratatoskr.network.domain.Progress
 import io.github.xexanos.ratatoskr.network.domain.RatatoskrError
+import io.github.xexanos.ratatoskr.network.domain.Session
 import io.github.xexanos.ratatoskr.ui.LocalImmediateLoading
 import io.github.xexanos.ratatoskr.ui.UiError
 import io.github.xexanos.ratatoskr.ui.theme.RatatoskrTheme
+import java.time.OffsetDateTime
 
 // Previews / screenshot goldens for the library screen (render in Android Studio without a running
 // server), driving the public [LibraryScreen] off a fixed LibraryUiState - no ViewModel, no
@@ -33,6 +36,16 @@ private val previewItems = listOf(
 private val previewShelfItems = listOf(
     LibraryItemSummary("4", "A Wizard of Earthsea", "Ursula K. Le Guin", 25_200.0, null, Progress(9_100.0, false)),
     LibraryItemSummary("1", "The Hobbit", "J. R. R. Tolkien", 39_600.0, null, Progress(12_600.0, false)),
+)
+
+private fun previewSession(state: PlaybackState) = Session(
+    itemId = "1",
+    item = LibraryItemSummary("1", "The Hobbit", "J. R. R. Tolkien", 39_600.0, null, null),
+    speakerId = "living-room",
+    state = state,
+    positionSeconds = 22_365.0,
+    durationSeconds = 39_600.0,
+    updatedAt = OffsetDateTime.parse("2026-07-23T12:00:00Z"),
 )
 
 @Preview(name = "Library - shelf loaded", widthDp = 360, heightDp = 800)
@@ -173,6 +186,46 @@ internal fun LibraryErrorPreview() = RatatoskrTheme {
     Surface {
         LibraryScreen(
             state = LibraryUiState(error = UiError.Domain(RatatoskrError.Upstream(code = null, message = "Audiobookshelf is unreachable."))),
+            query = "",
+            onQueryChange = {},
+            onOpenItem = {},
+            onOpenNowPlaying = {},
+            onOpenSettings = {},
+        )
+    }
+}
+
+// The docked mini player (decision record, issue #79/#101). "Absent" is already covered by
+// every preview above (miniPlayer defaults to null); these two pin its two visible states.
+@Preview(name = "Library - mini player playing", widthDp = 360, heightDp = 800)
+@Composable
+internal fun LibraryMiniPlayerPlayingPreview() = RatatoskrTheme {
+    Surface {
+        LibraryScreen(
+            state = LibraryUiState(
+                items = previewItems,
+                shelfItems = previewShelfItems,
+                miniPlayer = MiniPlayerUiState(previewSession(PlaybackState.PLAYING), speakerName = "Living Room"),
+            ),
+            query = "",
+            onQueryChange = {},
+            onOpenItem = {},
+            onOpenNowPlaying = {},
+            onOpenSettings = {},
+        )
+    }
+}
+
+@Preview(name = "Library - mini player paused", widthDp = 360, heightDp = 800)
+@Composable
+internal fun LibraryMiniPlayerPausedPreview() = RatatoskrTheme {
+    Surface {
+        LibraryScreen(
+            state = LibraryUiState(
+                items = previewItems,
+                shelfItems = previewShelfItems,
+                miniPlayer = MiniPlayerUiState(previewSession(PlaybackState.PAUSED), speakerName = "Living Room"),
+            ),
             query = "",
             onQueryChange = {},
             onOpenItem = {},

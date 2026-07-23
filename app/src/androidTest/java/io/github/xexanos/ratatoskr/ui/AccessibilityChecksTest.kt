@@ -39,6 +39,8 @@ import io.github.xexanos.ratatoskr.ui.library.LibraryLoadedPreview
 import io.github.xexanos.ratatoskr.ui.library.LibraryLoadMoreFailedPreview
 import io.github.xexanos.ratatoskr.ui.library.LibraryLoadingMorePreview
 import io.github.xexanos.ratatoskr.ui.library.LibraryLoadingPreview
+import io.github.xexanos.ratatoskr.ui.library.LibraryMiniPlayerPausedPreview
+import io.github.xexanos.ratatoskr.ui.library.LibraryMiniPlayerPlayingPreview
 import io.github.xexanos.ratatoskr.ui.nowplaying.NowPlayingEmptyPreview
 import io.github.xexanos.ratatoskr.ui.nowplaying.NowPlayingLoadingPreview
 import io.github.xexanos.ratatoskr.ui.nowplaying.NowPlayingPausedPreview
@@ -126,6 +128,8 @@ class AccessibilityChecksTest {
     @Test fun libraryError() = runChecks { LibraryErrorPreview() }
     @Test fun libraryLoadingMore() = runChecks { LibraryLoadingMorePreview() }
     @Test fun libraryLoadMoreFailed() = runChecks { LibraryLoadMoreFailedPreview() }
+    @Test fun libraryMiniPlayerPlaying() = runChecks { LibraryMiniPlayerPlayingPreview() }
+    @Test fun libraryMiniPlayerPaused() = runChecks { LibraryMiniPlayerPausedPreview() }
     @Test fun speakersLoaded() = runChecks { SpeakersLoadedPreview() }
     @Test fun speakersEmpty() = runChecks { SpeakersEmptyPreview() }
     @Test fun speakersLoading() = runChecksAfterLoaderDelay { SpeakersLoadingPreview() }

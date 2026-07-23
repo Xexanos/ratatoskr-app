@@ -26,6 +26,17 @@ A book with progress present, position > 0 and not finished. Defined by the serv
 app never re-derives shelf membership itself.
 _Avoid_: active, started, listening
 
+### Playback
+
+**Active session**:
+A playback session in state playing, paused, or buffering — the states in which the server
+owns token rotation (SPEC section 5). One definition for every consumer: it gates the
+client's own token refresh and it decides whether the mini player exists. A session seen in
+a stopped or finished tail is already *not* active: the server tears the session down at a
+natural end itself, so the polled truth converges on "no session" within one sync tick.
+_Avoid_: running session, session present, current session (as synonyms for active — a
+session can be present without being active)
+
 ### Covers
 
 **Cover**:

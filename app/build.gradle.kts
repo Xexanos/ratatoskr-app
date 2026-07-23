@@ -118,6 +118,9 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    // ProcessLifecycleOwner (decision record, issue #79/#101): binds SessionManager's poll
+    // loop to app foreground/background instead of any one screen.
+    implementation(libs.androidx.lifecycle.process)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.kotlinx.serialization.core)
     // Cover art (SPEC section 12): Coil 3 with the OkHttp fetcher, fed by core-network's

@@ -25,6 +25,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SearchOff
@@ -69,14 +70,21 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.xexanos.ratatoskr.R
 import io.github.xexanos.ratatoskr.data.ConnectionManager
+import io.github.xexanos.ratatoskr.data.SessionManager
+import io.github.xexanos.ratatoskr.data.SessionSnapshot
+import io.github.xexanos.ratatoskr.data.SpeakerManager
 import io.github.xexanos.ratatoskr.network.domain.ApiResult
 import io.github.xexanos.ratatoskr.network.domain.LibraryItemSummary
+import io.github.xexanos.ratatoskr.network.domain.PlaybackState
 import io.github.xexanos.ratatoskr.network.domain.Progress
+import io.github.xexanos.ratatoskr.network.domain.Session
 import io.github.xexanos.ratatoskr.ui.EmptyState
 import io.github.xexanos.ratatoskr.ui.KnotLoader
 import io.github.xexanos.ratatoskr.ui.UiError
 import io.github.xexanos.ratatoskr.ui.UiTestTags
 import io.github.xexanos.ratatoskr.ui.common.CoverImage
+import io.github.xexanos.ratatoskr.ui.common.formatPlaybackTime
+import io.github.xexanos.ratatoskr.ui.common.rememberTickingPositionSeconds
 import io.github.xexanos.ratatoskr.ui.rememberDelayedVisible
 import io.github.xexanos.ratatoskr.ui.text
 import kotlinx.coroutines.FlowPreview
@@ -95,6 +103,15 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
+/** The docked mini player's content (decision record, issue #79/#101): mirrors [SessionManager]
+ * state whenever a session is active, plus the speaker name resolved separately via
+ * [SpeakerManager] (null until resolved, or if the lookup fails - the mini player just omits
+ * the speaker segment rather than showing an error, per the mini player's no-error-state rule). */
+data class MiniPlayerUiState(
+    val session: Session,
+    val speakerName: String? = null,
+)
+
 data class LibraryUiState(
     val loading: Boolean = false,
     val items: List<LibraryItemSummary> = emptyList(),
@@ -108,6 +125,10 @@ data class LibraryUiState(
     // empty shelf, which renders no section at all: a broken shelf must never look like "no
     // books in progress".
     val shelfError: Boolean = false,
+    // Set when the active -> none edge (see [LibraryViewModel]'s SessionManager subscription)
+    // fires while a search is active - the shelf can't be refetched mid-search, so this is
+    // picked up by the load pipeline's fetchShelf condition once the query clears (issue #52).
+    val shelfStale: Boolean = false,
     // Cursor for the page after the ones already in `items`; null once the last page is in.
     val nextCursor: String? = null,
     val loadingMore: Boolean = false,
@@ -118,6 +139,11 @@ data class LibraryUiState(
     // One-shot error for a refresh that failed while a list was already shown (a snackbar).
     val refreshError: UiError? = null,
     val error: UiError? = null,
+    // Non-null iff a session is active (decision record #4/#5) - the mini player's existence.
+    val miniPlayer: MiniPlayerUiState? = null,
+    // One-shot: a pause/resume issued from the mini player's toggle failed. A library snackbar
+    // with no action - the toggle itself is the retry (decision record #8).
+    val miniPlayerCommandError: UiError? = null,
 )
 
 // A single reload of the library. `userTriggered` distinguishes a pull-to-refresh / retry (which
@@ -127,6 +153,8 @@ private data class Reload(val query: String?, val userTriggered: Boolean)
 @OptIn(FlowPreview::class)
 class LibraryViewModel(
     private val connectionManager: ConnectionManager,
+    private val sessionManager: SessionManager,
+    private val speakerManager: SpeakerManager,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LibraryUiState())
@@ -156,6 +184,10 @@ class LibraryViewModel(
     // instead of racing it for the state write.
     private var shelfRefresh: Job? = null
 
+    // The session's active-ness as of the last SessionManager snapshot, to detect the active ->
+    // none edge (issue #52/#101). Starts false so a cold start (unknown -> none) never triggers.
+    private var previousActive = false
+
     init {
         // One reload pipeline for the whole screen. Two sources feed it, both funnelled through
         // the same collectLatest so a newer reload cancels any in-flight load or page fetch:
@@ -176,6 +208,64 @@ class LibraryViewModel(
                 loadMoreRequests.collect { loadNextPage(reload.query) }
             }
         }
+        // The mini player and the shelf-staleness edge both ride the same shared session state
+        // (decision record, issue #79/#101) - this subscription keeps running for as long as
+        // this ViewModel lives, independent of which screen is currently composed, so a session
+        // ending while the user is on Now Playing/Speakers/Settings still refreshes the shelf.
+        viewModelScope.launch {
+            sessionManager.state.collect { snapshot ->
+                applyMiniPlayer(snapshot)
+                if (previousActive && !snapshot.active) {
+                    if (query.value != null) {
+                        _uiState.value = _uiState.value.copy(shelfStale = true)
+                    } else {
+                        refreshShelf()
+                    }
+                }
+                previousActive = snapshot.active
+            }
+        }
+    }
+
+    /**
+     * Mirrors the shared session state into [LibraryUiState.miniPlayer] - ignoring
+     * [SessionSnapshot.error] entirely (the mini player has no error state: a poll blip keeps
+     * showing the last known session, per decision record #8).
+     * The speaker name resolves asynchronously (a cache hit unless this id is unseen) and is
+     * carried over across ticks for the same speaker so it doesn't flicker back to null.
+     */
+    private fun applyMiniPlayer(snapshot: SessionSnapshot) {
+        val session = snapshot.session
+        if (session == null || !snapshot.active) {
+            _uiState.value = _uiState.value.copy(miniPlayer = null)
+            return
+        }
+        val heldName = _uiState.value.miniPlayer?.takeIf { it.session.speakerId == session.speakerId }?.speakerName
+        _uiState.value = _uiState.value.copy(miniPlayer = MiniPlayerUiState(session, heldName))
+        viewModelScope.launch {
+            val name = speakerManager.nameFor(session.speakerId)
+            _uiState.value = _uiState.value.copy(
+                miniPlayer = _uiState.value.miniPlayer?.takeIf { it.session.speakerId == session.speakerId }
+                    ?.copy(speakerName = name),
+            )
+        }
+    }
+
+    /** The mini player's toggle: pause while playing, resume while paused/buffering. A failure
+     * surfaces as a one-shot library snackbar (no action - the toggle itself is the retry); a
+     * success needs no local update, [sessionManager]'s state already reflects it. */
+    fun toggleMiniPlayerPlayback() {
+        val session = _uiState.value.miniPlayer?.session ?: return
+        viewModelScope.launch {
+            val result = if (session.state == PlaybackState.PLAYING) sessionManager.pause() else sessionManager.resume()
+            if (result is ApiResult.Failure) {
+                _uiState.value = _uiState.value.copy(miniPlayerCommandError = UiError.Domain(result.error))
+            }
+        }
+    }
+
+    fun clearMiniPlayerCommandError() {
+        _uiState.value = _uiState.value.copy(miniPlayerCommandError = null)
     }
 
     fun search(query: String) {
@@ -246,13 +336,28 @@ class LibraryViewModel(
         _uiState.value =
             if (showAsRefresh) _uiState.value.copy(refreshing = true, refreshError = null)
             else _uiState.value.copy(loading = true, error = null)
+        // The mini player and its snackbar are independent of the browse list/shelf reload
+        // below (they ride the shared session state, not this pipeline) - every reconstruction
+        // in this function carries them through unchanged rather than resetting to defaults.
+        val miniPlayer = _uiState.value.miniPlayer
+        val miniPlayerCommandError = _uiState.value.miniPlayerCommandError
+        // A stale shelf (the active -> none edge fired mid-search, issue #52) only matters while
+        // a query is active; a query == null reload either just consumed it below or it was
+        // never set to begin with, so it always lands false here.
+        val nextShelfStale = if (query != null) _uiState.value.shelfStale else false
         val client = connectionManager.client()
         if (client == null) {
             // Same rule as the failure branch below: a refresh over an existing list keeps the
             // list and reports via the snackbar rather than wiping to the full-screen error.
             _uiState.value =
                 if (showAsRefresh) _uiState.value.copy(refreshing = false, refreshError = UiError.NoServer)
-                else LibraryUiState(error = UiError.NoServer, shelfItems = _uiState.value.shelfItems)
+                else LibraryUiState(
+                    error = UiError.NoServer,
+                    shelfItems = _uiState.value.shelfItems,
+                    shelfStale = nextShelfStale,
+                    miniPlayer = miniPlayer,
+                    miniPlayerCommandError = miniPlayerCommandError,
+                )
             return
         }
         // The shelf is never fetched while a query is active: search results get the full
@@ -260,8 +365,10 @@ class LibraryViewModel(
         // a query-clear reload (query back to null, shelf already loaded) skips it. With no
         // query it rides along on the first load and on user-triggered reloads, in parallel
         // with the page; the single loading state waits for both, so the shelf never pops in
-        // after the list.
-        val fetchShelf = query == null && (userTriggered || !shelfLoaded)
+        // after the list. A stale shelf (issue #52) also forces a fetch once the query clears,
+        // even though `shelfLoaded` is already true from before the search started.
+        val consumeStale = query == null && _uiState.value.shelfStale
+        val fetchShelf = query == null && (userTriggered || !shelfLoaded || consumeStale)
         // A full reload supersedes any shelf-only refresh still in flight: what this reload
         // fetches (or carries through) is the newer truth, and a stale shelf-only result
         // landing late must not overwrite it.
@@ -282,6 +389,9 @@ class LibraryViewModel(
                         nextCursor = pageResult.data.nextCursor,
                         shelfItems = shelfItems,
                         shelfError = shelfError,
+                        shelfStale = nextShelfStale,
+                        miniPlayer = miniPlayer,
+                        miniPlayerCommandError = miniPlayerCommandError,
                     )
                 is ApiResult.Failure ->
                     if (showAsRefresh) {
@@ -292,12 +402,19 @@ class LibraryViewModel(
                             refreshError = UiError.Domain(pageResult.error),
                             shelfItems = shelfItems,
                             shelfError = shelfError,
+                            shelfStale = nextShelfStale,
                         )
                     } else {
                         // The full-screen error owns the whole screen (its retry refetches the
                         // shelf too), so the shelf slot's own error row is never raised with it
                         // - one message, even when both requests failed.
-                        LibraryUiState(error = UiError.Domain(pageResult.error), shelfItems = shelfItems)
+                        LibraryUiState(
+                            error = UiError.Domain(pageResult.error),
+                            shelfItems = shelfItems,
+                            shelfStale = nextShelfStale,
+                            miniPlayer = miniPlayer,
+                            miniPlayerCommandError = miniPlayerCommandError,
+                        )
                     }
             }
         }
@@ -376,6 +493,17 @@ fun LibraryScreenHost(
         }
     }
 
+    // A failed mini player pause/resume: a one-shot snackbar with no action - the toggle itself
+    // is the retry (decision record #8), unlike the refresh error above.
+    val miniPlayerCommandError = state.miniPlayerCommandError
+    val miniPlayerCommandErrorText = miniPlayerCommandError?.text()
+    LaunchedEffect(miniPlayerCommandError) {
+        if (miniPlayerCommandErrorText != null) {
+            snackbarHostState.showSnackbar(message = miniPlayerCommandErrorText)
+            viewModel.clearMiniPlayerCommandError()
+        }
+    }
+
     // No nested Scaffold: MainActivity already hosts the single top-level Scaffold under
     // enableEdgeToEdge(), so a second one would compute system-bar insets a second time. Host the
     // snackbar in a Box overlay instead - the content is already inset by the outer Scaffold, so a
@@ -394,6 +522,7 @@ fun LibraryScreenHost(
             onOpenItem = onOpenItem,
             onOpenNowPlaying = onOpenNowPlaying,
             onOpenSettings = onOpenSettings,
+            onToggleMiniPlayer = viewModel::toggleMiniPlayerPlayback,
         )
         SnackbarHost(snackbarHostState, Modifier.align(Alignment.BottomCenter))
     }
@@ -417,6 +546,7 @@ fun LibraryScreen(
     onOpenItem: (String) -> Unit,
     onOpenNowPlaying: () -> Unit,
     onOpenSettings: () -> Unit,
+    onToggleMiniPlayer: () -> Unit = {},
 ) {
     // Horizontal padding sits on the top bar and search field, NOT the whole column: the list
     // below needs the full width so the shelf's tonal band can run edge to edge.
@@ -431,13 +561,9 @@ fun LibraryScreen(
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f),
             )
-            IconButton(onClick = onOpenNowPlaying) {
-                Icon(
-                    Icons.Default.PlayArrow,
-                    contentDescription = stringResource(R.string.library_now_playing),
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-            }
+            // No "Now playing" button here anymore (decision record #7): the docked mini player
+            // below is the entry point while a session is active, and there is deliberately no
+            // path to Now Playing without one (the speaker flow is the other path).
             IconButton(onClick = onOpenSettings) {
                 Icon(
                     Icons.Default.Settings,
@@ -463,7 +589,33 @@ fun LibraryScreen(
             shape = CircleShape,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).testTag(UiTestTags.LIBRARY_SEARCH),
         )
-        when {
+        // Weighted so the docked mini player below (fixed height) gets the remaining space
+        // instead of being pushed off-screen by this fillMaxSize() content (user story 14: the
+        // mini player never scrolls away).
+        Box(Modifier.weight(1f)) {
+            LibraryContent(state, query, onLoadMore, onRefresh, onRetryShelf, onOpenItem)
+        }
+        state.miniPlayer?.let { miniPlayer ->
+            MiniPlayer(
+                miniPlayer = miniPlayer,
+                onToggle = onToggleMiniPlayer,
+                onOpen = onOpenNowPlaying,
+            )
+        }
+    }
+}
+
+@Composable
+private fun LibraryContent(
+    state: LibraryUiState,
+    query: String,
+    onLoadMore: () -> Unit,
+    onRefresh: () -> Unit,
+    onRetryShelf: () -> Unit,
+    onOpenItem: (String) -> Unit,
+) {
+    @OptIn(ExperimentalMaterial3Api::class)
+    when {
             // The delay covers both first load and search: quick responses never flash the
             // loader, only genuinely slow ones escalate to the knot.
             state.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -612,10 +764,94 @@ fun LibraryScreen(
             }
         }
     }
+
+// The docked mini player (ux-design screen 03, decision 5): exists only while the library is
+// showing an active session (state.miniPlayer != null). Cover, title, speaker + ticking
+// position, and a play/pause toggle mirroring the primary Now-playing control; tapping anywhere
+// else on the surface opens Now Playing. No error state of its own - a poll blip keeps showing
+// the last known session (decision record #8); a failed toggle surfaces as the host's snackbar.
+@Composable
+private fun MiniPlayer(
+    miniPlayer: MiniPlayerUiState,
+    onToggle: () -> Unit,
+    onOpen: () -> Unit,
+) {
+    val session = miniPlayer.session
+    val tickingPosition = rememberTickingPositionSeconds(session)
+    Surface(
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        tonalElevation = 3.dp,
+        shadowElevation = 4.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .testTag(UiTestTags.LIBRARY_MINIPLAYER)
+            .clickable(onClick = onOpen),
+    ) {
+        Row(
+            modifier = Modifier.padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CoverImage(
+                coverUrl = session.item?.coverUrl,
+                modifier = Modifier.size(40.dp),
+                shape = MaterialTheme.shapes.small,
+            )
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    session.item?.title ?: session.itemId,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    miniPlayerSubtitle(session.state, miniPlayer.speakerName, tickingPosition),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            val playing = session.state == PlaybackState.PLAYING
+            IconButton(onClick = onToggle) {
+                Icon(
+                    if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    contentDescription = stringResource(
+                        if (playing) R.string.nowplaying_action_pause else R.string.nowplaying_action_play,
+                    ),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun miniPlayerSubtitle(state: PlaybackState, speakerName: String?, positionSeconds: Double): String {
+    val stateLabel = stringResource(
+        when (state) {
+            PlaybackState.PLAYING -> R.string.nowplaying_state_playing
+            PlaybackState.PAUSED -> R.string.nowplaying_state_paused
+            // Unreachable in practice - the mini player only exists for these three states
+            // (decision record #4), but PlaybackState covers the whole contract enum.
+            else -> R.string.nowplaying_state_buffering
+        },
+    )
+    val position = formatPlaybackTime(positionSeconds)
+    return if (speakerName != null) {
+        stringResource(R.string.library_miniplayer_subtitle_with_speaker, stateLabel, speakerName, position)
+    } else {
+        stringResource(R.string.library_miniplayer_subtitle, stateLabel, position)
+    }
 }
 
 @Composable
 private fun EmptyLibrary(query: String) {
+
     EmptyState(
         icon = if (query.isBlank()) Icons.AutoMirrored.Filled.MenuBook else Icons.Default.SearchOff,
         title = stringResource(

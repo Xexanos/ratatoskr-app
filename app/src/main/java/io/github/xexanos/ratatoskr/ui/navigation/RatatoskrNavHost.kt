@@ -99,7 +99,9 @@ fun RatatoskrNavHost(container: AppContainer, startDestination: Route) {
 
         composable<Route.Library> {
             val vm = viewModel<LibraryViewModel>(
-                factory = containerFactory { LibraryViewModel(container.connectionManager) },
+                factory = containerFactory {
+                    LibraryViewModel(container.connectionManager, container.sessionManager, container.speakerManager)
+                },
             )
             LibraryScreenHost(
                 viewModel = vm,
@@ -123,7 +125,7 @@ fun RatatoskrNavHost(container: AppContainer, startDestination: Route) {
 
         composable<Route.NowPlaying> {
             val vm = viewModel<NowPlayingViewModel>(
-                factory = containerFactory { NowPlayingViewModel(container.connectionManager) },
+                factory = containerFactory { NowPlayingViewModel(container.sessionManager) },
             )
             NowPlayingScreenHost(vm) {
                 navController.popBackStack(Route.Library, inclusive = false)

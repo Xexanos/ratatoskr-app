@@ -16,6 +16,7 @@ object UiTestTags {
     const val CONNECT_SERVER_URL = "connect_server_url"
     const val LIBRARY_SEARCH = "library_search"
     const val LIBRARY_ROW = "library_row"
+    const val LIBRARY_MINIPLAYER = "library_miniplayer"
     const val SPEAKER_ROW = "speaker_row"
     const val NOWPLAYING_SEEK = "nowplaying_seek"
     const val COVER_LOADING = "cover_loading"
