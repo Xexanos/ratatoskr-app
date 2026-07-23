@@ -11,6 +11,9 @@ import io.github.xexanos.ratatoskr.network.persist.ConnectionStore
 import io.github.xexanos.ratatoskr.network.persist.TokenAccess
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -42,7 +45,33 @@ class ConnectionManager(
 
     @Volatile private var cached: Cached? = null
 
+    // Set when a call surfaces an Unauthorized the app cannot silently recover from: the access
+    // token lapsed while a session was active, so the poll's getCurrentSession 401'd before the
+    // server could return a rotated pair, and the refresh token the app still holds has been
+    // rotated away - /auth/refresh would only loop (SPEC section 5). The nav host observes this
+    // and routes to the sign-in screen so the user re-enters credentials (SPEC section 5's
+    // irreducible residual), instead of being stranded on a dead-end error whose retry never
+    // recovers. The trusted server and its certificate are kept; only the tokens are cleared.
+    private val _reauthRequired = MutableStateFlow(false)
+    val reauthRequired: StateFlow<Boolean> = _reauthRequired.asStateFlow()
+
     fun setSessionActive(active: Boolean) = sessionActive.set(active)
+
+    /**
+     * Terminal auth failure: stop suppressing refresh, discard the stranded tokens, and signal
+     * the UI to send the user back to sign-in. Idempotent - safe to call from several failing
+     * calls at once. Cleared by [acknowledgeReauth] once the nav host has routed.
+     */
+    suspend fun requireReauth() {
+        sessionActive.set(false)
+        tokenStore.clear()
+        _reauthRequired.value = true
+    }
+
+    /** The nav host calls this after routing to sign-in, so the signal does not re-fire. */
+    fun acknowledgeReauth() {
+        _reauthRequired.value = false
+    }
 
     /**
      * The already-built client, without building one: a lock-free volatile read. Cover-image

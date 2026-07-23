@@ -1,0 +1,1 @@
+A sign-in that expires while a book plays in the background no longer locks you out. The app now clears the stale sign-in and takes you straight to the sign-in screen, keeping your trusted server and certificate, instead of getting stuck on an "expired" message whose Retry does nothing and leaving you to forget the server certificate as the only way back in.
