@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import io.github.xexanos.ratatoskr.network.FakeTokenAccess
 import io.github.xexanos.ratatoskr.network.WireFixtures
+import io.github.xexanos.ratatoskr.network.domain.ApiResult
 import io.github.xexanos.ratatoskr.network.persist.DataStoreConnectionStore
 import io.github.xexanos.ratatoskr.network.testutil.HttpsMockServer
 import kotlinx.coroutines.CoroutineScope
@@ -20,6 +21,7 @@ import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.MockResponse
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -137,5 +139,73 @@ class SpeakerManagerTest {
 
         assertEquals(listOf("Living Room", "Living Room", "Living Room"), results)
         assertEquals(1, requests.get())
+    }
+
+    @Test
+    fun `refresh refetches even when every id is already cached`() = runBlocking {
+        val requests = AtomicInteger(0)
+        server.dispatch {
+            requests.incrementAndGet()
+            jsonResponse(WireFixtures.speakerListJson(WireFixtures.speakerJson(id = "s1", name = "Living Room")))
+        }
+        val manager = SpeakerManager(trustedConnectionManager())
+        manager.nameFor("s1") // populates the cache
+
+        manager.refresh()
+
+        assertEquals(2, requests.get())
+    }
+
+    @Test
+    fun `refresh picks up a renamed speaker`() = runBlocking {
+        val renamed = AtomicInteger(0)
+        server.dispatch {
+            if (renamed.getAndIncrement() == 0) {
+                jsonResponse(WireFixtures.speakerListJson(WireFixtures.speakerJson(id = "s1", name = "Living Room")))
+            } else {
+                jsonResponse(WireFixtures.speakerListJson(WireFixtures.speakerJson(id = "s1", name = "Family Room")))
+            }
+        }
+        val manager = SpeakerManager(trustedConnectionManager())
+        assertEquals("Living Room", manager.nameFor("s1"))
+
+        val result = manager.refresh()
+
+        assertEquals("Family Room", (result as ApiResult.Success).data.single().name)
+        assertEquals("Family Room", manager.nameFor("s1"))
+    }
+
+    @Test
+    fun `refresh returns null when the server is unconfigured`() = runBlocking {
+        val store = DataStoreConnectionStore(
+            PreferenceDataStoreFactory.create(scope = CoroutineScope(Dispatchers.IO)) {
+                tempFolder.root.resolve("unconfigured_${System.nanoTime()}.preferences_pb")
+            },
+        )
+        val manager = SpeakerManager(ConnectionManager(store, FakeTokenAccess()))
+
+        assertNull(manager.refresh())
+    }
+
+    @Test
+    fun `a failed refresh returns the failure and leaves the cache untouched`() = runBlocking {
+        val requests = AtomicInteger(0)
+        server.dispatch {
+            if (requests.getAndIncrement() == 0) {
+                jsonResponse(WireFixtures.speakerListJson(WireFixtures.speakerJson(id = "s1", name = "Living Room")))
+            } else {
+                jsonResponse("""{"code":"abs_unreachable","message":"Audiobookshelf down"}""", code = 502)
+            }
+        }
+        val manager = SpeakerManager(trustedConnectionManager())
+        manager.nameFor("s1") // populates the cache
+
+        val result = manager.refresh()
+
+        assertTrue(result is ApiResult.Failure)
+        // Stale beats error: the previously cached name still resolves (and doesn't cost a
+        // third request, proving the cache was left alone rather than cleared).
+        assertEquals("Living Room", manager.nameFor("s1"))
+        assertEquals(2, requests.get())
     }
 }

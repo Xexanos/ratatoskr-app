@@ -6,22 +6,28 @@
 package io.github.xexanos.ratatoskr.data
 
 import io.github.xexanos.ratatoskr.network.domain.ApiResult
+import io.github.xexanos.ratatoskr.network.domain.Speaker
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
- * Resolves a speaker id to its display name for surfaces that only carry the id (the mini
- * player's "speaker" line; [Session.speakerId][io.github.xexanos.ratatoskr.network.domain.Session]
- * has no embedded name on the wire). Caches the whole list after the first fetch and refetches
- * only on a cache miss - an id not yet seen, or one the server has since renamed/replaced -
- * rather than on every lookup, since the speaker list rarely changes.
+ * The shared cache of the speaker list, so a speaker's name/membership is consistent wherever
+ * it's shown - the mini player's "speaker" line
+ * ([Session.speakerId][io.github.xexanos.ratatoskr.network.domain.Session] has no embedded name
+ * on the wire) and the Speakers screen's own list.
+ *
+ * There is no periodic background refresh: the speaker list rarely changes, so [nameFor]
+ * refetches only on a cache miss (an id not yet seen, or one the server has since
+ * renamed/replaced), and the Speakers screen calls [refresh] to force a fresh fetch each time it
+ * loads - the moment a stale name/membership would actually matter to the user picking a
+ * speaker. That refresh also keeps the mini player's cache current as a side effect.
  */
 class SpeakerManager(private val connectionManager: ConnectionManager) {
 
-    @Volatile private var cache: Map<String, String> = emptyMap()
+    @Volatile private var cache: Map<String, Speaker> = emptyMap()
 
     // Guards refetching so concurrent misses for the same id (or different ids arriving at
-    // once) coalesce into a single listSpeakers() call instead of one per caller.
+    // once), or a miss racing an explicit refresh(), coalesce into a single listSpeakers() call.
     private val refreshMutex = Mutex()
 
     /**
@@ -30,20 +36,31 @@ class SpeakerManager(private val connectionManager: ConnectionManager) {
      * player's own no-error-state decision), or an id the server doesn't recognise.
      */
     suspend fun nameFor(speakerId: String): String? {
-        cache[speakerId]?.let { return it }
-        refetchIfStillMissing(speakerId)
-        return cache[speakerId]
-    }
-
-    private suspend fun refetchIfStillMissing(speakerId: String) {
+        cache[speakerId]?.let { return it.name }
         refreshMutex.withLock {
             // Another caller may have refreshed while this one waited for the lock.
-            if (cache.containsKey(speakerId)) return
-            val client = connectionManager.client() ?: return
-            when (val result = client.listSpeakers()) {
-                is ApiResult.Success -> cache = result.data.associate { it.id to it.name }
-                is ApiResult.Failure -> {}
+            if (!cache.containsKey(speakerId)) fetchAndCache()
+        }
+        return cache[speakerId]?.name
+    }
+
+    /**
+     * Forces a fresh fetch of the whole speaker list, bypassing the cache - for a caller that
+     * wants up-to-date data now (the Speakers screen, on load) rather than whatever's cached.
+     * Returns the fetch result directly so the caller can render its own error state; null means
+     * no server is configured. A failure leaves the existing cache untouched (stale beats error,
+     * the same rule the mini player and the continue-listening shelf follow).
+     */
+    suspend fun refresh(): ApiResult<List<Speaker>>? = refreshMutex.withLock { fetchAndCache() }
+
+    private suspend fun fetchAndCache(): ApiResult<List<Speaker>>? {
+        val client = connectionManager.client() ?: return null
+        return when (val result = client.listSpeakers()) {
+            is ApiResult.Success -> {
+                cache = result.data.associateBy { it.id }
+                result
             }
+            is ApiResult.Failure -> result
         }
     }
 

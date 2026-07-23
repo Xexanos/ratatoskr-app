@@ -54,4 +54,7 @@ without needing a dedicated flag at all.
   underlying command, two different presentations, decided by whoever called it.
 - A related but separate addition, `SpeakerManager` (id -> name cache with refetch-on-miss), was
   needed because the mini player also needs to resolve `Session.speakerId` to a display name, but
-  it does not participate in this ADR's polling/epoch story.
+  it does not participate in this ADR's polling/epoch story. It has no periodic background
+  refresh of its own; the Speakers screen forces a fresh fetch (`SpeakerManager.refresh()`) every
+  time it loads, which is also the moment a stale name or membership would actually be visible -
+  and that refresh keeps the mini player's cache current as a side effect.

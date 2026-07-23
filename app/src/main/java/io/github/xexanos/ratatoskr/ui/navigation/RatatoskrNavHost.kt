@@ -114,7 +114,9 @@ fun RatatoskrNavHost(container: AppContainer, startDestination: Route) {
         composable<Route.Speakers> { backStackEntry ->
             val itemId = backStackEntry.toRoute<Route.Speakers>().itemId
             val vm = viewModel<SpeakersViewModel>(
-                factory = containerFactory { SpeakersViewModel(container.connectionManager, itemId) },
+                factory = containerFactory {
+                    SpeakersViewModel(container.connectionManager, container.speakerManager, itemId)
+                },
             )
             SpeakersScreenHost(vm) {
                 navController.navigate(Route.NowPlaying) {
