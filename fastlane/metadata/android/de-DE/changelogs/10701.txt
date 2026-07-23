@@ -1,0 +1,1 @@
+Cover in der Bibliotheksliste und im „Weiterhören“-Regal wirken nicht mehr gestaucht: Ein Cover, das nicht quadratisch ist, wird jetzt vollständig und proportionsgetreu gezeigt, wobei der Hintergrund der Kachel den Raum darum füllt, statt das Bild zu beschneiden oder zu verzerren. Quadratische Cover füllen ihre Kachel weiterhin wie bisher.

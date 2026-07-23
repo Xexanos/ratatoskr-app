@@ -6,6 +6,9 @@
 package io.github.xexanos.ratatoskr.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.getValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
@@ -50,6 +53,20 @@ private inline fun <reified VM : ViewModel> containerFactory(crossinline create:
 @Composable
 fun RatatoskrNavHost(container: AppContainer, startDestination: Route) {
     val navController = rememberNavController()
+
+    // A terminal auth failure anywhere in the app (a token lapse the network layer cannot
+    // silently recover from, SPEC section 5) sends the user back to sign-in with an empty back
+    // stack, so Back cannot reach the now-unauthenticated screens. The trusted server and its
+    // certificate are kept - only the tokens were cleared - so this lands on sign-in, not connect.
+    val reauthRequired by container.connectionManager.reauthRequired.collectAsStateWithLifecycle()
+    LaunchedEffect(reauthRequired) {
+        if (reauthRequired) {
+            navController.navigate(Route.SignIn) {
+                popUpTo(navController.graph.id) { inclusive = true }
+            }
+            container.connectionManager.acknowledgeReauth()
+        }
+    }
 
     NavHost(navController = navController, startDestination = startDestination) {
         composable<Route.Connect> {

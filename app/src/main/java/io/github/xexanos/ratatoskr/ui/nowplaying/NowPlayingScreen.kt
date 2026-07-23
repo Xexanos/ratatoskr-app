@@ -122,8 +122,10 @@ class NowPlayingViewModel(
                         // now-empty screen. Mirrors the stale-error clear in applySession().
                         _uiState.value = _uiState.value.copy(loading = false, session = null, error = null)
                     }
-                    else ->
+                    else -> {
+                        result.error.maybeRequireReauth()
                         _uiState.value = _uiState.value.copy(loading = false, error = UiError.Domain(result.error))
+                    }
                 }
             }
         }
@@ -159,8 +161,10 @@ class NowPlayingViewModel(
                     connectionManager.setSessionActive(false)
                     _uiState.value = _uiState.value.copy(stopped = true)
                 }
-                is ApiResult.Failure ->
+                is ApiResult.Failure -> {
+                    result.error.maybeRequireReauth()
                     _uiState.value = _uiState.value.copy(error = UiError.Domain(result.error))
+                }
             }
         }
     }
@@ -177,10 +181,21 @@ class NowPlayingViewModel(
                 // Only surface this action's error if a newer control hasn't superseded it.
                 is ApiResult.Failure ->
                     if (epoch == commandEpoch) {
+                        result.error.maybeRequireReauth()
                         _uiState.value = _uiState.value.copy(error = UiError.Domain(result.error))
                     }
             }
         }
+    }
+
+    /**
+     * An [RatatoskrError.Unauthorized] surfacing here is a token lapse the app cannot silently
+     * recover from during an active session (SPEC section 5). Hand it to the connection manager,
+     * which discards the stranded tokens and routes the user back to sign-in. Any other error is
+     * left to the caller to show in the card/banner.
+     */
+    private suspend fun RatatoskrError.maybeRequireReauth() {
+        if (this is RatatoskrError.Unauthorized) connectionManager.requireReauth()
     }
 
     override fun onCleared() {
