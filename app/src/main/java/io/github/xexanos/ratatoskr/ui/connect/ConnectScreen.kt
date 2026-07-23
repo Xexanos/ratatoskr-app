@@ -222,6 +222,8 @@ fun ConnectScreen(
 
             is ConnectUiState.Error -> {
                 Surface(
+                    // Top-level error banner: large per the shape table; the mockup's 12 dp card
+                    // here is the outlier, not this (ux-design: Shape tokens).
                     shape = MaterialTheme.shapes.large,
                     color = MaterialTheme.colorScheme.errorContainer,
                     modifier = Modifier.fillMaxWidth(),
@@ -283,7 +285,9 @@ private fun CertificateCard(
             )
             Spacer(Modifier.height(4.dp))
             Surface(
-                shape = MaterialTheme.shapes.medium,
+                // 8 dp: a read-only monospace data field takes the text-field shape (small),
+                // not its 16 dp card's corner (ux-design: Shape tokens).
+                shape = MaterialTheme.shapes.small,
                 color = MaterialTheme.colorScheme.surfaceVariant,
                 modifier = Modifier.fillMaxWidth(),
             ) {

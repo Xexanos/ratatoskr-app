@@ -568,12 +568,13 @@
     </div>
 
     <p class="token-sub">Shape</p>
-    <p style="max-width:640px; color:#4A3C33; margin:0 0 16px;">The radii are Material&nbsp;3’s default shape scale — the theme defines <b>no overrides</b>, so the token column below is what code references. The dp values are listed for review convenience only. <code>medium</code> (12&thinsp;dp) has no assigned surface in this table, and a few surfaces still await a radius decision (error banners, the certificate fingerprint block, the settings server icon) — tracked in issue #89.</p>
+    <p style="max-width:640px; color:#4A3C33; margin:0 0 16px;">The radii are Material&nbsp;3’s default shape scale — the theme defines <b>no overrides</b>, so the token column below is what code references. The dp values are listed for review convenience only. Two rules settle the surfaces the scale alone doesn't: a <b>nested surface sits tighter</b> than its container — the in-list shelf-error row drops to <code>medium</code> against a top-level error banner's <code>large</code>, while the read-only fingerprint block takes the text-field <code>small</code> inside its <code>large</code> card — and <b>content tiles are rounded squares</b>, a circle reserved for controls (issue #89).</p>
     <div class="table-scroll">
       <table class="tokens">
         <tr><th>Token</th><th>Radius</th><th>Used for</th></tr>
-        <tr><td><code>small</code></td><td><code>8 dp</code></td><td>Text fields, cover thumbnails</td></tr>
-        <tr><td><code>large</code></td><td><code>16 dp</code></td><td>Cards (certificate, mini player, settings), list rows (library, speakers), speaker icons</td></tr>
+        <tr><td><code>small</code></td><td><code>8 dp</code></td><td>Text fields, cover thumbnails, certificate fingerprint block</td></tr>
+        <tr><td><code>medium</code></td><td><code>12 dp</code></td><td>Inline shelf-error row (nested in the continue-listening shelf)</td></tr>
+        <tr><td><code>large</code></td><td><code>16 dp</code></td><td>Cards (certificate, mini player, settings), list rows (library, speakers), content icon tiles (speaker, server), top-level error banners (sign-in, connect)</td></tr>
         <tr><td><code>extraLarge</code></td><td><code>28 dp</code></td><td>Now-playing cover, dialogs</td></tr>
         <tr><td><code>full</code></td><td>pill</td><td>Buttons, search field, chips — the app’s friendly base shape</td></tr>
       </table>

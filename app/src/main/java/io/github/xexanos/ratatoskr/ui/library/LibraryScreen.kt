@@ -914,6 +914,8 @@ private fun LibrarySectionHeader(text: String, modifier: Modifier = Modifier) {
 @Composable
 private fun ShelfErrorRow(onRetry: () -> Unit) {
     Surface(
+        // 12 dp: a nested, in-list error row sits a step tighter than the top-level error
+        // banners (sign-in, connect) at 16 dp (ux-design: Shape tokens).
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.errorContainer,
         modifier = Modifier.fillMaxWidth().clickable(onClick = onRetry),

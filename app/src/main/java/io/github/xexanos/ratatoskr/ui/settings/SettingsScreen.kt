@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Delete
@@ -173,7 +172,9 @@ fun SettingsScreen(
             ) {
                 Surface(
                     modifier = Modifier.size(40.dp),
-                    shape = CircleShape,
+                    // Content tile like the speaker tile: 16 dp rounded square, not a control's
+                    // circle (ux-design: Shape tokens).
+                    shape = MaterialTheme.shapes.large,
                     color = MaterialTheme.colorScheme.secondaryContainer,
                 ) {
                     Box(contentAlignment = Alignment.Center) {
