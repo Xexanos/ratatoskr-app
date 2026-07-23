@@ -1,1 +1,1 @@
-Bibliothek und Now-Playing zeigen jetzt echte Cover, passend skaliert vom Ratatoskr-Server. Bücher ohne Cover behalten die vertraute Initialen-Kachel, und die Einstellungen erhalten die Aktion „Bilder-Cache leeren".
+Bibliothek und Now-Playing zeigen jetzt echte Cover, passend skaliert vom Ratatoskr-Server. Bücher ohne Cover behalten die vertraute Initialen-Kachel, und die Einstellungen erhalten die Aktion „Bilder-Cache leeren“.

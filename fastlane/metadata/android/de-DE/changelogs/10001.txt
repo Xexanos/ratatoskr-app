@@ -1,0 +1,1 @@
+Behebt eine veraltete Fehlermeldung, die nach dem Ende der Wiedergabe im Wiedergabe-Bildschirm zurückbleiben konnte.
