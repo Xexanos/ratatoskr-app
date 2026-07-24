@@ -187,9 +187,19 @@ class SessionManager(private val connectionManager: ConnectionManager) : Default
      * token has typically rotated away too. Hand it to the connection manager, which discards
      * the stranded tokens and signals the nav host to route back to sign-in. Any other error is
      * left to the caller (poll()/stop()/control()'s caller) to show in its own card/banner.
+     *
+     * Gated on an active session (issue #108): the process-wide poll runs during the
+     * unauthenticated window too - a server is trusted so the client is non-null, but no one has
+     * signed in yet - and there a 401 is the ordinary "not logged in" state, not a rotated-away
+     * token. Only a lapse *while a session is active* is the irreducible residual reauth exists
+     * for; escalating an unauthenticated-window 401 would clear the just-stored tokens and bounce
+     * the app off the Library right after sign-in. When no session is active the client's own
+     * refresh path is not suppressed, so an ordinary 401 recovers there instead.
      */
     private suspend fun RatatoskrError.maybeRequireReauth() {
-        if (this is RatatoskrError.Unauthorized) connectionManager.requireReauth()
+        if (this is RatatoskrError.Unauthorized && connectionManager.isSessionActive()) {
+            connectionManager.requireReauth()
+        }
     }
 
     private fun applySession(session: Session, epoch: Int) {
