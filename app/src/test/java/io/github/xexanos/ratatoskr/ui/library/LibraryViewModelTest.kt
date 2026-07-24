@@ -24,7 +24,7 @@ import io.github.xexanos.ratatoskr.ui.UiError
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -82,12 +82,25 @@ class LibraryViewModelTest {
 
     @After
     fun tearDown() {
-        createdViewModels.forEach { it.viewModelScope.cancel() }
-        // cancel() only marks the collector's Job; it doesn't itself run on this thread, so it
-        // needs this test's own dispatcher pumped once more before resetMain() detaches it -
-        // otherwise the cancellation can still be "pending" when Main is torn down, and a later
-        // test's UncaughtExceptionsBeforeTest attributes the failure to whatever runs next.
-        dispatcher.scheduler.advanceUntilIdle()
+        // cancel() only MARKS each scope's Job; the cancellation itself - and the
+        // CancellationException resuming whatever real work (an OkHttp round trip, a DataStore
+        // write) a collector is parked on - still has to run, and it resumes on Main (this
+        // virtual dispatcher). A bare advanceUntilIdle() drains only what is queued at that
+        // instant: a request still in flight completes later, on its own OkHttp thread, and then
+        // dispatches its continuation onto a Main that resetMain() has already detached - which
+        // throws, uncaught, and a later test's UncaughtExceptionsBeforeTest inherits it (the
+        // failure this class has hit on its first test). So drain the virtual queue and let the
+        // real threads make progress in lockstep (the same alternation as settleState) until
+        // every cancelled scope has actually COMPLETED - only then detach Main.
+        val jobs = createdViewModels.map { it.viewModelScope.coroutineContext[Job]!! }
+        jobs.forEach { it.cancel() }
+        val deadline = System.currentTimeMillis() + 10_000
+        while (jobs.any { !it.isCompleted }) {
+            dispatcher.scheduler.advanceUntilIdle()
+            if (jobs.all { it.isCompleted }) break
+            check(System.currentTimeMillis() < deadline) { "viewModelScope did not settle in teardown" }
+            Thread.sleep(10)
+        }
         Dispatchers.resetMain()
     }
 
