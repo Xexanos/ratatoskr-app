@@ -186,7 +186,6 @@ fun SignInScreen(
 
         if (state is SignInUiState.Error) {
             Surface(
-                // Top-level error banner: large per the shape table (ux-design: Shape tokens).
                 shape = MaterialTheme.shapes.large,
                 color = MaterialTheme.colorScheme.errorContainer,
                 modifier = Modifier.fillMaxWidth(),

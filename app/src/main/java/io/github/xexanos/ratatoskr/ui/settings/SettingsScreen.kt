@@ -172,8 +172,6 @@ fun SettingsScreen(
             ) {
                 Surface(
                     modifier = Modifier.size(40.dp),
-                    // Content tile like the speaker tile: 16 dp rounded square, not a control's
-                    // circle (ux-design: Shape tokens).
                     shape = MaterialTheme.shapes.large,
                     color = MaterialTheme.colorScheme.secondaryContainer,
                 ) {
