@@ -1,0 +1,1 @@
+Corner rounding is now consistent across a few remaining surfaces: error messages on the sign-in and connect screens, the certificate fingerprint block, and the server icon in Settings. The fingerprint block sits a little tighter inside its card, and the server icon is now a rounded square like the speaker tiles rather than a circle.
