@@ -30,6 +30,7 @@ import okhttp3.mockwebserver.MockResponse
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -300,5 +301,26 @@ class SessionManagerTest {
         // the sign-in screen - so the user re-enters credentials instead of forgetting the cert.
         assertTrue(connectionManager.reauthRequired.value)
         assertNull(connectionManager.tokenStore.authSession())
+    }
+
+    @Test
+    fun `a 401 poll with no active session does not force reauth`() = runBlocking {
+        // Issue #108: the process-wide poll runs during the unauthenticated window too - a server
+        // is trusted so client() is non-null, but no session has ever been active (the user is on
+        // Connect/Sign-in, or has just signed in and holds fresh tokens without playback yet). The
+        // negative counterpart to `a 401 while a session is active ...` above: here the 401 must
+        // NOT escalate to reauth (see maybeRequireReauth's gate).
+        server.dispatch { jsonResponse("""{"code":"unauthorized","message":"token expired"}""", code = 401) }
+        val connectionManager =
+            trustedConnectionManager(FakeTokenAccess("fresh-access", "fresh-refresh", AuthUser("7", "alex")))
+        val manager = SessionManager(connectionManager)
+
+        manager.poll() // 401 while no session was ever active
+
+        assertEquals(RatatoskrError.Unauthorized, manager.state.value.error)
+        assertFalse(connectionManager.isSessionActive())
+        // The freshly-stored tokens must survive and no re-auth must be signalled.
+        assertFalse(connectionManager.reauthRequired.value)
+        assertNotNull(connectionManager.tokenStore.authSession())
     }
 }
