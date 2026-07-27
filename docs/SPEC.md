@@ -28,14 +28,14 @@ Sonos knowledge. It sends commands and shows state.
 - Connect to a Ratatoskr server by URL, establishing trust in its certificate
   (see section 6).
 - Sign in with Audiobookshelf credentials via the server, and stay signed in across app
-  restarts using the stored refresh token.
+  restarts using the stored credential (section 5).
 - Browse and search the library (the server's per-user projection).
 - List the Sonos speakers and groups the server discovered, and pick one.
 - Start a book on the chosen speaker; it resumes from the stored position automatically.
 - A now-playing view with play/pause, seek (absolute position within the book), and stop,
   showing the current position and duration.
 - Reflect that there is exactly one active session at a time (server section 8).
-- Sign out (clear stored tokens).
+- Sign out (revoke server-side and clear the stored credential).
 
 ### Explicitly out of scope for v1
 - Playing audio on the phone itself. The app is a remote; audio is server-to-speaker only.
@@ -81,52 +81,51 @@ Sonos knowledge. It sends commands and shows state.
 
 ## 5. Authentication
 
-Auth is per-user and backed by Audiobookshelf, proxied through Ratatoskr (server section 8).
+Auth is per-user and backed by Audiobookshelf, proxied through Ratatoskr — but the app's
+credential is **Ratatoskr-issued**: the server is the sole holder of Audiobookshelf
+tokens, and the app never sees them. Decided in the server's
+[ADR-0001](https://github.com/Xexanos/ratatoskr-server/blob/main/docs/adr/0001-client-auth-ratatoskr-native-sessions.md)
+(mirrored in server SPEC section 8). This section describes the target model for
+contract 2.0.0 under `/v2`; the previous shared-token model (contract 1.1.0–1.4.x,
+including the entire refresh-token rotation-adoption protocol this section used to
+specify) stays implemented against the frozen `/v1` surface until the `/v2` migration
+lands, and its specification lives in the server contract's 1.4.0 tag.
+
+The guarantee this model gives the user: **signed in until explicit sign-out** — server
+restarts and arbitrarily long pauses never force a re-login.
 
 - Sign-in collects the Audiobookshelf username and password and posts them to
-  `POST /v1/auth/login`. The server returns an access token, a refresh token, and the
-  identified user. The password is never stored.
-- The access token is sent as a bearer token on every request. It is short-lived; when it
-  is rejected, exchange the refresh token via `POST /v1/auth/refresh` and retry once. A
-  single-flight guard must prevent concurrent refreshes from racing.
-- Tokens are stored encrypted at rest (Android Keystore-backed storage, for example
-  EncryptedSharedPreferences or DataStore with a Keystore key), never in plain preferences
-  or logs.
-- Sign-out clears the stored tokens.
+  `POST /v2/auth/login`. The server returns an opaque **Ratatoskr token** and the
+  identified user. The password is never stored; Audiobookshelf access/refresh tokens
+  never reach the app.
+- The Ratatoskr token is sent as a bearer token on every request. It does not expire and
+  is never rotated — there is no refresh endpoint, no proactive renewal, no token
+  lifecycle on the app side at all.
+- The token is stored encrypted at rest (Android Keystore-backed storage), never in plain
+  preferences or logs — same bar as before, now for one value instead of two.
+- **401 handling** (the whole protocol): on a 401 whose error body carries
+  `code: "UPSTREAM_SESSION_LOST"`, the server's Audiobookshelf session for this device has
+  died (rare — e.g. the server was separated from Audiobookshelf for longer than the
+  refresh window); show a targeted re-login prompt ("your media-server sign-in expired").
+  Server URL, certificate trust, and username survive; re-login issues a fresh token. Any
+  other 401 means the device is signed out (e.g. revoked server-side) — return to sign-in.
+- Sign-out calls `POST /v2/auth/logout` (best-effort — the call is idempotent and a 204 is
+  guaranteed even if Audiobookshelf is unreachable; an unreachable *server* still clears
+  locally) and clears the stored token. The server revokes the token immediately and kills
+  this device's Audiobookshelf session; other devices are untouched.
 
-### Refresh-token rotation (contract 1.1.0)
+### Migration from `/v1` (one-time re-login)
 
-Audiobookshelf rotates the refresh token on every use, and the server holds the listening
-user's tokens in memory for the active session (server section 8 and section 14). The app
-and the server must not both consume the same refresh token independently. This is resolved
-in contract 1.1.0 and mirrors the server's section 8; the app's obligations:
-
-- The `Session` schema carries an optional `rotatedTokens` object (`accessToken` +
-  `refreshToken`, both or neither). It is present only when the server has rotated the
-  caller's tokens since the last `Session` it returned; the app must adopt the pair
-  immediately, discard the previous one, and send the new access token on its next request.
-  Because every playback response (`getCurrentSession`, `startSession`, `pauseSession`,
-  `resumeSession`, `seekSession`) returns a `Session`, rotated tokens reach the app through
-  the polling it does anyway. The app must tolerate the fields being absent (an older server
-  never sends them).
-- While a session is active, the app never calls `POST /v1/auth/refresh` on its own. It
-  hands its refresh token to the server in `startSession` and from then on only adopts
-  tokens arriving in `Session` responses (including the 200 body from `stopSession`, below).
-  The server confirms delivery by *adoption*: it keeps including `rotatedTokens` until the
-  app authenticates with the new access token, so a dropped or half-read response cannot
-  strand the app.
-- A 401 on a non-session call during an active session first triggers an immediate
-  `getCurrentSession` to pick up a rotated pair; only if none is offered does the app fall
-  back to a regular `/auth/refresh`. This re-fetch is guaranteed to authenticate because
-  Audiobookshelf access tokens are stateless (validated by signature and expiry only) and
-  the app's current one stays valid until its own expiry even after rotation - the server
-  refreshes proactively, before that expiry, precisely to leave this window open.
-- `stopSession` returns 200 with a final `Session` (instead of 204) when a rotated pair is
-  still pending, so the app adopts it as the session ends; the app treats any 2xx from
-  `stopSession` as success and adopts `rotatedTokens` if the body carries it. The one
-  irreducible residual - the single stop response that carries the final pair being lost in
-  transit - is recovered by asking the user to sign in again; the app must not loop
-  `/auth/refresh` on a token the server has already rotated away.
+- The `/v2` app is `/v2`-only — no `/v1` fallback, no dual-stack; the rotation-adoption
+  logic and its test matrix are deleted, not kept dormant.
+- On first start after the update, stored Audiobookshelf tokens are discarded and the user
+  authenticates once with their password ("this update requires a one-time re-login").
+  Server URL, certificate fingerprint, and username survive.
+- Rollout order is server first, then app, enforced softly: a 404 against `/v2` routes
+  shows a targeted "please update your server" prompt (the graceful-degradation direction
+  of section 4). The old app keeps working against the frozen `/v1` surface until its
+  sunset, after which `/v1` answers 410 `UPGRADE_REQUIRED` — which the old app surfaces as
+  its generic sign-in failure.
 
 ## 6. Server connection and certificate trust
 
@@ -174,12 +173,14 @@ certificate cannot be pinned at build time.
 ## 7. User-provided configuration
 
 The app stores, per install: the server URL, the confirmed server-certificate fingerprint,
-and the auth tokens (encrypted). It does not store the Audiobookshelf password. A settings
-screen exposes the server URL, a re-trust/forget action for the certificate, and sign-out.
+the Ratatoskr auth token (encrypted; under `/v1`, until the section-5 migration, the ABS
+access/refresh pair), and the display username. It does not store the Audiobookshelf
+password. A settings screen exposes the server URL, a re-trust/forget action for the
+certificate, and sign-out.
 
 Backups are disabled (`android:allowBackup="false"`, no backup/data-extraction rules).
 Everything the app stores is either per-install by design (the certificate trust decision
-belongs to the device that confirmed it) or useless after a restore anyway: the tokens are
+belongs to the device that confirmed it) or useless after a restore anyway: the token is
 encrypted with an Android-Keystore key that never leaves the device, so a restored blob
 cannot be decrypted on new hardware and would only force a re-login. Disabling backup makes
 that explicit — a restored or transferred install starts clean at the connect screen — and
