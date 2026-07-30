@@ -1,0 +1,68 @@
+# Contract pin guard. The Kotlin client is generated at build time from the contract submodule
+# (core-network's openApiGenerate reads contract/ratatoskr-server/contract/openapi.yaml), so the
+# submodule pin decides which server contract this app is built against. This guard fixes what that
+# pin is allowed to be: a contract-<x.y.z> release tag of the server repo — a frozen, versioned
+# contract surface — and nothing else. Not a loose branch commit (a moving, unversioned target), and
+# in particular not a v<x.y.z> tag, which is the server's *image release* (a deployment artifact), a
+# different tag family entirely. That last mix-up is not hypothetical: this app was pinned at the
+# v1.4.0 image commit, not contract-1.4.0, until it was corrected.
+#
+# It does NOT choose or bump the version — which contract the app targets stays a human decision,
+# made as part of the feature that needs it. This only rejects a pin that is not a contract tag.
+#
+# Deliberately its own workflow with no paths-ignore, so it ALWAYS reports and is safe to make a
+# required status check. Runs on push to main too: a valid pin is a property of the branch, not only
+# of a proposed change, so an admin-bypass merge that lands a bad pin still turns the commit red.
+
+name: Contract pin guard
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contract-pin-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract-pin:
+    name: Contract submodule pinned to a contract-* tag
+    runs-on: ubuntu-latest
+    steps:
+      # No submodule checkout needed: the guard reads the recorded gitlink from the superproject tree
+      # and resolves it against the server's tags over the network.
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: The contract submodule must point at a contract-<x.y.z> tag of the server repo
+        run: |
+          set -euo pipefail
+          path="contract/ratatoskr-server"
+
+          url="$(git config -f .gitmodules "submodule.${path}.url")"
+          pin="$(git ls-tree HEAD "$path" | awk '$2 == "commit" { print $3 }')"
+          if [ -z "$pin" ]; then
+            echo "::error::could not read the gitlink for ${path} from HEAD"
+            exit 1
+          fi
+          echo "Submodule ${path} is pinned at ${pin} (server: ${url})."
+
+          # Map every contract-* tag to the commit it names. ls-remote prints a tag-object line and,
+          # for annotated tags, a peeled "<commit>\trefs/tags/...^{}" line — prefer the peeled commit.
+          matches="$(git ls-remote --tags "$url" 'contract-*' | awk -v pin="$pin" '
+            {
+              ref = $2
+              if (ref ~ /\^\{\}$/) { sub(/\^\{\}$/, "", ref); commit[ref] = $1 }
+              else if (!(ref in commit)) { commit[ref] = $1 }
+            }
+            END { for (r in commit) if (commit[r] == pin) { sub(/^refs\/tags\//, "", r); print r } }
+          ')"
+
+          if [ -n "$matches" ]; then
+            echo "OK: pin matches contract tag(s): $(echo "$matches" | tr '\n' ' ')"
+            exit 0
+          fi
+          echo "::error file=.gitmodules::${path} is pinned at ${pin}, which is not a contract-<x.y.z> release tag of ${url}. Pin it to a contract tag — 'git -C ${path} fetch --tags && git -C ${path} checkout contract-<x.y.z>', then commit the submodule — not a branch commit or a v<x.y.z> image-release tag."
+          exit 1
