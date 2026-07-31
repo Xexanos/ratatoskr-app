@@ -103,12 +103,15 @@ restarts and arbitrarily long pauses never force a re-login.
   lifecycle on the app side at all.
 - The token is stored encrypted at rest (Android Keystore-backed storage), never in plain
   preferences or logs — same bar as before, now for one value instead of two.
-- **401 handling** (the whole protocol): on a 401 whose error body carries
-  `code: "UPSTREAM_SESSION_LOST"`, the server's Audiobookshelf session for this device has
-  died (rare — e.g. the server was separated from Audiobookshelf for longer than the
-  refresh window); show a targeted re-login prompt ("your media-server sign-in expired").
-  Server URL, certificate trust, and username survive; re-login issues a fresh token. Any
-  other 401 means the device is signed out (e.g. revoked server-side) — return to sign-in.
+- **401 handling** (one path, not two): any 401 means the stored credential no longer works
+  against this server — whether the server's Audiobookshelf session for this device has died
+  (`code: "UPSTREAM_SESSION_LOST"`, rare — e.g. the server was separated from Audiobookshelf
+  for longer than the refresh window) or the token was revoked server-side. The recovery is
+  identical in both cases: the app discards the token and returns the user to the **sign-in
+  screen, pre-filled** — server URL, certificate trust, and username all survive, only the
+  password is blank. This is not a dedicated screen, just the sign-in screen with an
+  explanatory notice; the `code` varies only that notice's copy ("your media-server sign-in
+  expired" vs a session ended elsewhere), never the behaviour. Re-login issues a fresh token.
 - Sign-out calls `POST /v2/auth/logout` (best-effort — the call is idempotent and a 204 is
   guaranteed even if Audiobookshelf is unreachable; an unreachable *server* still clears
   locally) and clears the stored token. The server revokes the token immediately and kills
@@ -121,11 +124,14 @@ restarts and arbitrarily long pauses never force a re-login.
 - On first start after the update, stored Audiobookshelf tokens are discarded and the user
   authenticates once with their password ("this update requires a one-time re-login").
   Server URL, certificate fingerprint, and username survive.
-- Rollout order is server first, then app, enforced softly: a 404 against `/v2` routes
-  shows a targeted "please update your server" prompt (the graceful-degradation direction
-  of section 4). The old app keeps working against the frozen `/v1` surface until its
-  sunset, after which `/v1` answers 410 `UPGRADE_REQUIRED` — which the old app surfaces as
-  its generic sign-in failure.
+- Rollout order is server first, then app, enforced softly: a 404 against `/v2` routes (a
+  server too old to speak `/v2` answers with a bare 404 — no contract error body, so the
+  guidance is entirely client-side) shows a targeted "please update your server" prompt (the
+  graceful-degradation direction of section 4), and for a user who cannot update the server
+  right now it also offers the fallback of installing an earlier, `/v1`-capable version of
+  the app (phrased generically, no hardcoded version number). The old app keeps working
+  against the frozen `/v1` surface until its sunset, after which `/v1` answers 410
+  `UPGRADE_REQUIRED` — which the old app surfaces as its generic sign-in failure.
 
 ## 6. Server connection and certificate trust
 
@@ -342,9 +348,9 @@ across the assembled user flow. Any overlap between them is deliberately thin.
 ### 1. Unit tests (JVM)
 
 Pure logic with the platform pieces faked. JVM (`testDebugUnitTest`), no device, fast; most
-tests live here. In place: the auth/token logic (bearer attachment, refresh-on-401,
-single-flight guard, secure-storage read/write with the platform faked) and the mapping
-between generated contract types and the domain/UI models (including unknown-field tolerance).
+tests live here. In place: the auth/token logic (bearer attachment, 401 handling by `code`,
+secure-storage read/write with the platform faked) and the mapping between generated contract
+types and the domain/UI models (including unknown-field tolerance).
 
 ### 2. Component tests (instrumented)
 
@@ -369,10 +375,9 @@ its own Moshi stayed green. Driving the real factory closes that gap. In place
   covered (the platform chain fails, so the pin decides). The publicly-trusted-cert branch of
   the section-6 trade-off (platform validates, pin is skipped) is not reachable from a
   self-signed `MockWebServer` — a documented gap, not a covered case;
-- bearer attachment and the 401 → refresh → retry flow, including single-flight under
-  concurrent 401s (which caught a real dispatcher deadlock — see `RatatoskrClientFactory`);
-- session-token rotation adopted end-to-end, and the `stopSession` 200-with-body vs 204 paths
-  (section 5), against the real Keystore-backed token store;
+- bearer attachment, and 401 handling — every 401 discards the token and lands on the
+  pre-filled sign-in, the response `code` selecting only the notice copy (section 5) —
+  against the real Keystore-backed token store;
 - error mapping (401 / 404 / 502 / 500 / TLS failure) to the right `RatatoskrError`.
 
 ### 3. Integration tests (instrumented, whole-app UI)
@@ -387,7 +392,7 @@ alternates (an unreachable server at connect, a sign-in failure, an empty librar
 
 This layer asserts **user-visible outcomes and flow**, and deliberately does *not* re-assert
 the wire-level mechanics the component layer already owns (enum fallback, error taxonomy,
-token-rotation precision, concurrency). The thin, healthy overlap — a matching pin connects, a
+401-`code` handling). The thin, healthy overlap — a matching pin connects, a
 normal session renders — is checked from each layer's own angle.
 
 ### 4. End-to-end tests
@@ -463,7 +468,7 @@ Decided with the implementing agent. Rationale in brief, so it is not re-litigat
 - **Cover images:** Coil 3 (`coil-compose` + `coil-network-okhttp`). Apache-2.0 with no
   Google or proprietary dependencies (F-Droid-safe, section 8); accepts an OkHttp
   `Call.Factory`, which is exactly the hook for core-network's covers stack (TOFU trust and
-  bearer/refresh auth shared with the API client, but a separate dispatcher so image bursts
+  bearer auth shared with the API client, but a separate dispatcher so image bursts
   never queue playback commands) - no generated code touched; multiplatform-ready, matching
   the KMP door kept open below. One app-lifetime `ImageLoader` owned by the AppContainer and
   provided to the UI via a CompositionLocal (tests inject coil-test's FakeImageLoaderEngine).
@@ -510,11 +515,10 @@ ratatoskr-app/
     │                        #   DTOs to domain models (resolving the origin-relative
     │                        #   coverUrl to an absolute URL), absorbs contract changes in
     │                        #   one place, tolerant to unknown fields; also the
-    │                        #   bearer/refresh interceptors, the single-flight,
-    │                        #   session-aware refresh guard (section 5), and the covers
+    │                        #   bearer interceptor (section 5) and the covers
     │                        #   Call.Factory (shared trust/auth, own dispatcher) the app's
     │                        #   image loader consumes
-    ├── domain/              #   domain models (library item, speaker, session, tokens) and
+    ├── domain/              #   domain models (library item, speaker, session, the Ratatoskr token) and
     │                        #   the ApiResult type — the only server-derived types the app
     │                        #   module sees (the covers Call.Factory above is the one
     │                        #   deliberate OkHttp-typed exception, for the image loader)
@@ -541,7 +545,7 @@ ratatoskr-app/
   files in the main source set and reach every state through public seams only — where a
   state hides behind the 500 ms delayed-loading gate, previews open it via the
   `LocalImmediateLoading` CompositionLocal instead of test-only visibility.
-- Domain models (library item, speaker, session, tokens) live in `core-network`'s wrapper
+- Domain models (library item, speaker, session, the Ratatoskr token) live in `core-network`'s wrapper
   layer and are the only types the `app` module sees.
 
 ## 14. Planned features (post-v1)
