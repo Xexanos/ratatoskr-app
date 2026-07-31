@@ -22,7 +22,6 @@ import io.github.xexanos.ratatoskr.network.generated.model.LoginRequest
 import io.github.xexanos.ratatoskr.network.generated.model.SeekRequest
 import io.github.xexanos.ratatoskr.network.generated.model.StartSessionRequest
 import io.github.xexanos.ratatoskr.network.generated.model.Error as GenError
-import io.github.xexanos.ratatoskr.network.generated.model.Session as GenSession
 import io.github.xexanos.ratatoskr.network.persist.TokenAccess
 import com.squareup.moshi.Moshi
 import retrofit2.Response
@@ -48,18 +47,14 @@ class RatatoskrClient internal constructor(
     private val coverEndpoint: CoverEndpoint,
     /**
      * OkHttp stack for loading cover images, sharing this client's TLS trust (TOFU pin,
-     * SPEC section 6) and bearer/refresh auth (SPEC section 5) but with its own dispatcher,
-     * so a scroll burst of cover requests can never queue playback commands or the session
-     * poll behind it (OkHttp admission is per-dispatcher, default 5 per host - and covers
-     * share the API's host). Consumed by the app's image loader; closed with [close].
+     * SPEC section 6) and bearer auth (SPEC section 5) but with its own dispatcher, so a scroll
+     * burst of cover requests can never queue playback commands or the session poll behind it
+     * (OkHttp admission is per-dispatcher, default 5 per host - and covers share the API's host).
+     * Consumed by the app's image loader; closed with [close].
      */
     val coversCallFactory: okhttp3.Call.Factory,
     private val closeAction: () -> Unit = {},
 ) {
-
-    // The /v1 refresh-token rotation-adoption protocol (SPEC section 5), behind one seam the /v2
-    // cutover deletes. Every session-returning call routes its result through it.
-    private val rotation = SessionRotationAdoption(tokenStore)
 
     /**
      * Releases the underlying OkHttp resources (dispatcher threads and pooled sockets). Call
@@ -104,48 +99,35 @@ class RatatoskrClient internal constructor(
         execute { libraryApi.getLibraryItem(itemId) }.map { it.toDomain(coverEndpoint) }
 
     suspend fun currentSession(): ApiResult<Session> =
-        rotation.adopt(execute(sessionEndpoint = true) { playbackApi.getCurrentSession() })
+        execute(sessionEndpoint = true) { playbackApi.getCurrentSession() }
             .map { it.toDomain(coverEndpoint) }
 
     /**
-     * Starts playback. The stored refresh token is handed to the server so its sync loop can
-     * renew the access token during long unattended playback (SPEC section 5 / contract
-     * StartSessionRequest.refreshToken).
+     * Starts playback. On /v2 the server owns the whole session lifecycle from its own stored
+     * Audiobookshelf credential (ADR-0001), so the request carries only what to play and where.
      */
-    suspend fun startSession(itemId: String, speakerId: String): ApiResult<Session> {
-        val refreshToken = rotation.refreshTokenForHandoff()
-        return rotation.adopt(
-            execute { playbackApi.startSession(StartSessionRequest(itemId, speakerId, refreshToken)) },
-        ).map { it.toDomain(coverEndpoint) }
-    }
+    suspend fun startSession(itemId: String, speakerId: String): ApiResult<Session> =
+        execute { playbackApi.startSession(StartSessionRequest(itemId, speakerId)) }
+            .map { it.toDomain(coverEndpoint) }
 
-    /**
-     * Stops playback. The contract returns 204 normally, or 200 with a final [GenSession]
-     * carrying a still-pending rotated token pair (SPEC section 5); either counts as success.
-     * Any pair in a 200 body is adopted before the session ends, since the server discards its
-     * in-memory tokens on stop and cannot redeliver them.
-     */
+    /** Stops playback. The contract returns 204 on success, so an empty body still counts. */
     suspend fun stopSession(): ApiResult<Unit> =
         when (val result = executeNullable(sessionEndpoint = true) { playbackApi.stopSession() }) {
-            is ApiResult.Success -> {
-                rotation.adopt(result.data)
-                ApiResult.Success(Unit)
-            }
+            is ApiResult.Success -> ApiResult.Success(Unit)
             is ApiResult.Failure -> result
         }
 
     suspend fun pause(): ApiResult<Session> =
-        rotation.adopt(execute(sessionEndpoint = true) { playbackApi.pauseSession() })
+        execute(sessionEndpoint = true) { playbackApi.pauseSession() }
             .map { it.toDomain(coverEndpoint) }
 
     suspend fun resume(): ApiResult<Session> =
-        rotation.adopt(execute(sessionEndpoint = true) { playbackApi.resumeSession() })
+        execute(sessionEndpoint = true) { playbackApi.resumeSession() }
             .map { it.toDomain(coverEndpoint) }
 
     suspend fun seek(positionSeconds: Double): ApiResult<Session> =
-        rotation.adopt(
-            execute(sessionEndpoint = true) { playbackApi.seekSession(SeekRequest(positionSeconds)) },
-        ).map { it.toDomain(coverEndpoint) }
+        execute(sessionEndpoint = true) { playbackApi.seekSession(SeekRequest(positionSeconds)) }
+            .map { it.toDomain(coverEndpoint) }
 
     // --- error handling -----------------------------------------------------------------
 

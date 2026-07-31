@@ -46,8 +46,8 @@ class CoverHeightInterceptorTest {
     @Test
     fun `appends the bucketed h to a cover url`() {
         assertEquals(
-            "https://srv/v1/library/items/42/cover?h=256",
-            dataReaching("https://srv/v1/library/items/42/cover", 168),
+            "https://srv/v2/library/items/42/cover?h=256",
+            dataReaching("https://srv/v2/library/items/42/cover", 168),
         )
     }
 

@@ -76,8 +76,8 @@ data class NowPlayingUiState(
 
 /**
  * A thin adapter over [SessionManager] (decision record, issue #79/#101): the poll loop, the
- * command-epoch guard, `NoActiveSession` handling, and the `sessionActive` flag all live there
- * now, shared with the library's mini player. This ViewModel only maps the shared session
+ * command-epoch guard, and `NoActiveSession` handling all live there now, shared with the
+ * library's mini player. This ViewModel only maps the shared session
  * state into its own [NowPlayingUiState] and forwards control actions, surfacing failures as
  * its own inline banner (a failure from the mini player's toggle is a separate concern - a
  * library snackbar, not this state).

@@ -21,16 +21,16 @@ class CoverEndpointTest {
     @Test
     fun `relative coverUrl resolves against the base url`() {
         assertEquals(
-            "https://ratatoskr.home:8080/v1/library/items/42/cover",
-            endpoint.resolve("/v1/library/items/42/cover"),
+            "https://ratatoskr.home:8080/v2/library/items/42/cover",
+            endpoint.resolve("/v2/library/items/42/cover"),
         )
     }
 
     @Test
     fun `trailing slash on the base url does not double the separator`() {
         assertEquals(
-            "https://ratatoskr.home:8080/v1/library/items/42/cover",
-            CoverEndpoint("https://ratatoskr.home:8080/").resolve("/v1/library/items/42/cover"),
+            "https://ratatoskr.home:8080/v2/library/items/42/cover",
+            CoverEndpoint("https://ratatoskr.home:8080/").resolve("/v2/library/items/42/cover"),
         )
     }
 
@@ -53,12 +53,12 @@ class CoverEndpointTest {
 
     @Test
     fun `matches the canonical cover path`() {
-        assertTrue(CoverEndpoint.matches("https://ratatoskr.home:8080/v1/library/items/42/cover"))
+        assertTrue(CoverEndpoint.matches("https://ratatoskr.home:8080/v2/library/items/42/cover"))
     }
 
     @Test
     fun `matches with a query string present`() {
-        assertTrue(CoverEndpoint.matches("https://ratatoskr.home:8080/v1/library/items/42/cover?h=256"))
+        assertTrue(CoverEndpoint.matches("https://ratatoskr.home:8080/v2/library/items/42/cover?h=256"))
     }
 
     @Test

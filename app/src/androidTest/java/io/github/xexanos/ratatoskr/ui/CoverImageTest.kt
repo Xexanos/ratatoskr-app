@@ -47,7 +47,7 @@ class CoverImageTest {
     @get:Rule val compose = createComposeRule()
 
     private val context: Context = ApplicationProvider.getApplicationContext()
-    private val coverUrl = "https://server.example/v1/library/items/i1/cover"
+    private val coverUrl = "https://server.example/v2/library/items/i1/cover"
 
     private fun setCover(loader: ImageLoader, url: String?) {
         compose.setContent {

@@ -57,7 +57,7 @@ class HttpsMockServer : ExternalResource() {
         "00:11:22:33:44:55:66:77:88:99:aa:bb:cc:dd:ee:ff:" +
             "00:11:22:33:44:55:66:77:88:99:aa:bb:cc:dd:ee:ff"
 
-    /** Base URL WITHOUT the `/v1/` suffix - the factory appends it. Valid once the rule ran. */
+    /** Base URL WITHOUT the `/v2/` suffix - the factory appends it. Valid once the rule ran. */
     val baseUrl: String get() = server.url("/").toString().trimEnd('/')
 
     /** Registers a client to be closed when the test ends, and returns it. */
