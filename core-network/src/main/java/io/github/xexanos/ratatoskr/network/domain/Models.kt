@@ -33,10 +33,9 @@ data class AuthUser(
     val username: String,
 )
 
-/** The token pair plus the authenticated user, as returned by login/refresh. */
+/** The opaque Ratatoskr token plus the authenticated user, as returned by /v2 login (SPEC section 5). */
 data class AuthSession(
-    val accessToken: String,
-    val refreshToken: String,
+    val token: String,
     val user: AuthUser,
 )
 
@@ -46,9 +45,8 @@ data class AuthSession(
  * [value] never leaves core-network - its constructor and field are `internal`, so no
  * cross-module caller can read or forge it.
  *
- * On the /v1 contract this projects the stored token pair to the bearer the client sends; the
- * /v2 cutover makes it the one stored Ratatoskr token, with no change on the app side. It is
- * the stable, credential-shaped seam the cutover swaps behind (SPEC section 5).
+ * It carries the one stored Ratatoskr token the client sends as its bearer: a non-expiring,
+ * server-issued credential with no lifecycle on the app side (SPEC section 5).
  */
 @JvmInline
 value class Credential internal constructor(internal val value: String)

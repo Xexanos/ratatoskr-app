@@ -11,13 +11,11 @@ import io.github.xexanos.ratatoskr.network.generated.api.SpeakersApi
 import io.github.xexanos.ratatoskr.network.generated.api.SystemApi
 import io.github.xexanos.ratatoskr.network.generated.infrastructure.Serializer
 import io.github.xexanos.ratatoskr.network.generated.model.PlaybackState
-import io.github.xexanos.ratatoskr.network.generated.model.RefreshRequest
 import io.github.xexanos.ratatoskr.network.persist.TokenAccess
 import io.github.xexanos.ratatoskr.network.tls.PinnedHostnameVerifier
 import io.github.xexanos.ratatoskr.network.tls.PinnedTrustManager
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.adapters.EnumJsonAdapter
-import kotlinx.coroutines.runBlocking
 import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -43,8 +41,8 @@ internal fun ratatoskrMoshi(): Moshi =
 
 /**
  * Assembles a [RatatoskrClient] for one server: an OkHttp stack with the trust-on-first-use
- * trust manager (SPEC section 6) and the bearer/refresh auth (SPEC section 5), plus a
- * Retrofit bound to the generated APIs.
+ * trust manager (SPEC section 6) and the bearer auth (SPEC section 5), plus a Retrofit bound to
+ * the generated APIs.
  *
  * Rebuild the client whenever the server URL or the confirmed fingerprint changes.
  */
@@ -54,7 +52,6 @@ object RatatoskrClientFactory {
         baseUrl: String,
         fingerprint: String?,
         tokenStore: TokenAccess,
-        sessionActive: () -> Boolean = { false },
     ): RatatoskrClient {
         val trustManager = PinnedTrustManager(fingerprint)
         val sslSocketFactory = PinnedTrustManager.socketFactory(trustManager)
@@ -79,57 +76,40 @@ object RatatoskrClientFactory {
             .readTimeout(30, TimeUnit.SECONDS)
             .addInterceptor(logging)
 
-        val retrofitBase = "${baseUrl.trimEnd('/')}/v1/"
+        val retrofitBase = "${baseUrl.trimEnd('/')}/v2/"
 
         // Shared across both Retrofit instances so response bodies get the unknown-enum
         // fallback (an unrecognised PlaybackState degrades to STOPPED instead of failing the
         // whole response, SPEC section 4). The plain Serializer.moshi would throw.
         val moshi = ratatoskrMoshi()
 
-        // A client without bearer/authenticator, used only for login and refresh so a refresh
-        // never recurses through the authenticator. It gets its OWN dispatcher: a refresh is
-        // issued from inside the main client's authenticator while the original request still
-        // occupies a dispatcher slot, so sharing one dispatcher deadlocks once concurrent 401s
-        // fill maxRequestsPerHost (5 by default) - the refresh can never get a slot, and the
-        // requests waiting on it never free theirs. A separate dispatcher keeps refresh
-        // admission independent of the requests it unblocks.
-        val authClient = baseBuilder
-            .dispatcher(Dispatcher())
-            .build()
-        val authSystemApi = retrofit(retrofitBase, authClient, moshi).create(SystemApi::class.java)
-
-        val refresher = TokenRefresher { refreshToken ->
-            runBlocking {
-                val response = authSystemApi.refresh(RefreshRequest(refreshToken))
-                if (response.isSuccessful) response.body()?.toDomain() else null
-            }
-        }
-
+        // One authenticated client. The Ratatoskr token is opaque and non-expiring, so there is
+        // no refresh path and no authenticator: the bearer interceptor attaches the stored token
+        // (skipping the unauthenticated /auth/ endpoints), and a 401 is surfaced to the wrapper
+        // as a terminal signal rather than triggering a silent retry (SPEC section 5).
         val mainClient = baseBuilder
             .dispatcher(Dispatcher())
             .addInterceptor(BearerAuthInterceptor(tokenStore))
-            .authenticator(TokenRefreshAuthenticator(tokenStore, refresher, sessionActive))
             .build()
         val mainRetrofit = retrofit(retrofitBase, mainClient, moshi)
 
         // Cover-image loads share the main client's connection pool (TLS handshakes against a
-        // TOFU-pinned server are not cheap to redo) and its interceptors/authenticator - the
-        // bearer header and the single-flight refresh come along for free - but get their OWN
-        // dispatcher: covers and API calls target the same host, and OkHttp admits only 5
-        // concurrent requests per host per dispatcher, so a scroll burst of cover loads sharing
-        // the main dispatcher would queue play/pause/seek and the session poll behind images.
+        // TOFU-pinned server are not cheap to redo) and its bearer interceptor - the bearer
+        // header comes along for free - but get their OWN dispatcher: covers and API calls
+        // target the same host, and OkHttp admits only 5 concurrent requests per host per
+        // dispatcher, so a scroll burst of cover loads sharing the main dispatcher would queue
+        // play/pause/seek and the session poll behind images.
         val coversClient = mainClient.newBuilder()
             .dispatcher(Dispatcher())
             .build()
 
-        // Each OkHttp stack owns its own dispatcher thread pool. All three clients share ONE
-        // connection pool (auth/main build from the same baseBuilder, covers via newBuilder),
-        // so two of the three evictAll calls are idempotent repeats - kept uniform per client
-        // on purpose, so the cleanup stays correct if any client ever gets its own pool.
-        // Release everything when the client is replaced so it does not linger until GC
-        // (SPEC section 13).
+        // Each OkHttp stack owns its own dispatcher thread pool. Both clients share ONE
+        // connection pool (covers is built from mainClient via newBuilder), so one of the two
+        // evictAll calls is an idempotent repeat - kept uniform per client on purpose, so the
+        // cleanup stays correct if either client ever gets its own pool. Release everything when
+        // the client is replaced so it does not linger until GC (SPEC section 13).
         val closeAction = {
-            for (client in listOf(mainClient, authClient, coversClient)) {
+            for (client in listOf(mainClient, coversClient)) {
                 client.dispatcher.executorService.shutdown()
                 client.connectionPool.evictAll()
             }

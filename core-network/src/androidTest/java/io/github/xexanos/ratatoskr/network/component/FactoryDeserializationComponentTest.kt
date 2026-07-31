@@ -33,7 +33,7 @@ class FactoryDeserializationComponentTest {
     @get:Rule val https = HttpsMockServer()
 
     private fun client(): RatatoskrClient =
-        https.track(RatatoskrClientFactory.create(https.baseUrl, https.fingerprint, FakeTokenAccess("a0", "r0")))
+        https.track(RatatoskrClientFactory.create(https.baseUrl, https.fingerprint, FakeTokenAccess(token = "t0")))
 
     @Test
     fun unknownPlaybackStateDegradesToStoppedThroughTheFactoryConverter() = runBlocking {

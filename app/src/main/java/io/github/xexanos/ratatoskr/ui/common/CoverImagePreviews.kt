@@ -50,7 +50,7 @@ private const val NOW_PLAYING_TILE_DP = 260 // now-playing cover
 
 // A URL whose shape the cover pipeline accepts; the never-resolving loader ensures no request
 // ever completes, so the host is never contacted.
-private const val PREVIEW_COVER_URL = "https://preview.invalid/v1/library/items/preview/cover"
+private const val PREVIEW_COVER_URL = "https://preview.invalid/v2/library/items/preview/cover"
 
 // The production framing: the tonal Surface CoverImage wraps every tile in, sized to one tile.
 @Composable

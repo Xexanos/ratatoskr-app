@@ -97,13 +97,13 @@ class SettingsViewModelTest {
 
     @Test
     fun `signOut clears the token store and flips signedOut`() = runTest(dispatcher) {
-        val tokens = FakeTokenAccess(accessToken = "a1", refreshToken = "r1")
+        val tokens = FakeTokenAccess(token = "t1")
         val viewModel = SettingsViewModel(connectionManager(tokenStore = tokens), clearCoverCache)
 
         viewModel.signOut()
 
         assertTrue(viewModel.uiState.value.signedOut)
-        assertNull(tokens.currentAccessTokenBlocking())
+        assertNull(tokens.currentTokenBlocking())
         // A signed-out device keeps no artwork of the library it left.
         assertEquals(1, coverCacheClears)
     }

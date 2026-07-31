@@ -92,7 +92,7 @@ class SignInViewModelTest {
 
     @Test
     fun `a successful login moves to Success`() = runTest(dispatcher) {
-        server.enqueueJson(WireFixtures.authTokensJson())
+        server.enqueueJson(WireFixtures.authSessionJson())
         val viewModel = SignInViewModel(trustedConnectionManager())
 
         viewModel.signIn("alex", "secret")

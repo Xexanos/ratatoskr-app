@@ -14,7 +14,7 @@ import io.github.xexanos.ratatoskr.network.domain.PlaybackState
 import io.github.xexanos.ratatoskr.network.domain.Progress
 import io.github.xexanos.ratatoskr.network.domain.Session
 import io.github.xexanos.ratatoskr.network.domain.Speaker
-import io.github.xexanos.ratatoskr.network.generated.model.AuthTokens as GenAuthTokens
+import io.github.xexanos.ratatoskr.network.generated.model.AuthSession as GenAuthSession
 import io.github.xexanos.ratatoskr.network.generated.model.LibraryItem as GenLibraryItem
 import io.github.xexanos.ratatoskr.network.generated.model.LibraryItemList as GenLibraryItemList
 import io.github.xexanos.ratatoskr.network.generated.model.LibraryItemPage as GenLibraryItemPage
@@ -28,10 +28,9 @@ import io.github.xexanos.ratatoskr.network.generated.model.Speaker as GenSpeaker
  * The single place where generated contract types become domain models (SPEC section 13).
  * A contract field change is absorbed here, so the UI never depends on the generated code.
  */
-internal fun GenAuthTokens.toDomain(): AuthSession =
+internal fun GenAuthSession.toDomain(): AuthSession =
     AuthSession(
-        accessToken = accessToken,
-        refreshToken = refreshToken,
+        token = token,
         user = AuthUser(id = user.id, username = user.username),
     )
 

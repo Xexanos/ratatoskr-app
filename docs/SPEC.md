@@ -432,7 +432,8 @@ the JVM assembly gate cannot see — is caught before merge, not only post-merge
   book that resumes at the right spot, pause/resume/seek/stop, and see the reached position
   reflected in Audiobookshelf afterward.
 - The session survives closing and reopening the app (it is re-fetched from the server).
-- The app stays signed in across restarts and refreshes its access token transparently.
+- The app stays signed in across restarts: its non-expiring Ratatoskr token is stored
+  encrypted and replayed as-is, with no token lifecycle on the app side (section 5).
 - Builds from source with only free-software dependencies; README and this spec match what
   was built.
 

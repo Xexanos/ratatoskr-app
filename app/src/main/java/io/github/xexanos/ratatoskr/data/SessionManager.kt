@@ -26,9 +26,9 @@ import kotlinx.coroutines.launch
 
 private const val POLL_INTERVAL_MS = 5_000L
 
-// One definition of "active" for every consumer (CONTEXT.md "Active session"): gates both the
-// client's own token-refresh suppression and the mini player's existence (decision record,
-// issue #79/#101 #4). A session in a stopped/finished tail is already not active.
+// One definition of "active" for every consumer (CONTEXT.md "Active session"): gates the mini
+// player's existence and the reauth escalation below (decision record, issue #79/#101 #4). A
+// session in a stopped/finished tail is already not active.
 private val ACTIVE_STATES = setOf(PlaybackState.PLAYING, PlaybackState.PAUSED, PlaybackState.BUFFERING)
 
 data class SessionSnapshot(
@@ -45,9 +45,8 @@ data class SessionSnapshot(
 /**
  * The single, process-wide owner of playback session truth (decision record, issue #79/#101):
  * the poll loop, the transport commands (pause/resume/seek/stop), the command-epoch guard
- * against poll/command races, `NoActiveSession` handling, and the `sessionActive`
- * token-rotation flag - the only writer of that flag (SPEC section 5). ViewModels are thin
- * adapters over [state]; they never poll or hold this logic themselves.
+ * against poll/command races, and `NoActiveSession` handling. ViewModels are thin adapters over
+ * [state]; they never poll or hold this logic themselves.
  *
  * Bound to [androidx.lifecycle.ProcessLifecycleOwner] by the app-level wiring so polling
  * follows app foreground/background, not any one screen. [poll] itself is a plain suspend
@@ -69,10 +68,9 @@ class SessionManager(private val connectionManager: ConnectionManager) : Default
 
     /**
      * One poll tick: fetches the current session and applies it, or - on `NoActiveSession` -
-     * clears it and releases the token-rotation flag (the session ended: the server
-     * relinquished it, or it was stopped elsewhere). Any other failure keeps the last known
-     * session and only records the error for consumers that want to show it - a transient poll
-     * blip must never blank a live session.
+     * clears it (the session ended: the server relinquished it, or it was stopped elsewhere).
+     * Any other failure keeps the last known session and only records the error for consumers
+     * that want to show it - a transient poll blip must never blank a live session.
      */
     suspend fun poll() {
         val epoch = commandEpoch
@@ -84,7 +82,6 @@ class SessionManager(private val connectionManager: ConnectionManager) : Default
                 if (epoch != commandEpoch) return
                 when (result.error) {
                     is RatatoskrError.NoActiveSession -> {
-                        connectionManager.setSessionActive(false)
                         _state.value = _state.value.copy(loading = false, session = null, error = null)
                     }
                     else -> {
@@ -140,7 +137,6 @@ class SessionManager(private val connectionManager: ConnectionManager) : Default
         return when (val result = client.stopSession()) {
             is ApiResult.Success -> {
                 if (epoch == commandEpoch) {
-                    connectionManager.setSessionActive(false)
                     _state.value = _state.value.copy(loading = false, session = null, error = null)
                 }
                 ApiResult.Success(Unit)
@@ -181,23 +177,22 @@ class SessionManager(private val connectionManager: ConnectionManager) : Default
     }
 
     /**
-     * A terminal [RatatoskrError.Unauthorized] is a token lapse the app cannot silently recover
-     * from during an active session (SPEC section 5): the access token expired while polling
-     * suppressed the client's own refresh, and by the time the failure surfaces here the refresh
-     * token has typically rotated away too. Hand it to the connection manager, which discards
-     * the stranded tokens and signals the nav host to route back to sign-in. Any other error is
-     * left to the caller (poll()/stop()/control()'s caller) to show in its own card/banner.
+     * A terminal [RatatoskrError.Unauthorized] is a dead credential the app cannot recover from
+     * (SPEC section 5): the stored Ratatoskr token no longer works and there is no refresh to
+     * fall back on. Hand it to the connection manager, which discards the stranded token and
+     * signals the nav host to route back to sign-in. Any other error is left to the caller
+     * (poll()/stop()/control()'s caller) to show in its own card/banner.
      *
      * Gated on an active session (issue #108): the process-wide poll runs during the
      * unauthenticated window too - a server is trusted so the client is non-null, but no one has
-     * signed in yet - and there a 401 is the ordinary "not logged in" state, not a rotated-away
-     * token. Only a lapse *while a session is active* is the irreducible residual reauth exists
-     * for; escalating an unauthenticated-window 401 would clear the just-stored tokens and bounce
-     * the app off the Library right after sign-in. When no session is active the client's own
-     * refresh path is not suppressed, so an ordinary 401 recovers there instead.
+     * signed in yet - and there a 401 is the ordinary "not signed in" state, not a dead
+     * credential. Escalating an unauthenticated-window 401 would clear the just-stored token and
+     * bounce the app off the Library right after sign-in, so only a 401 raised *while a session
+     * is active* is treated as terminal here. The active state is read from [state], the manager's
+     * own view of playback, so the escalation needs no flag on the connection manager.
      */
     private suspend fun RatatoskrError.maybeRequireReauth() {
-        if (this is RatatoskrError.Unauthorized && connectionManager.isSessionActive()) {
+        if (this is RatatoskrError.Unauthorized && _state.value.active) {
             connectionManager.requireReauth()
         }
     }
@@ -206,8 +201,6 @@ class SessionManager(private val connectionManager: ConnectionManager) : Default
         // Drop a result an intervening control action has already superseded (e.g. a poll, or
         // an older command, that was in flight when a newer one landed).
         if (epoch != commandEpoch) return
-        // The server owns token rotation while a session is active (SPEC section 5).
-        connectionManager.setSessionActive(session.state in ACTIVE_STATES)
         _state.value = _state.value.copy(loading = false, session = session, error = null)
     }
 }

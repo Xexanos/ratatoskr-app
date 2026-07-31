@@ -15,14 +15,14 @@ import okhttp3.mockwebserver.RecordedRequest
  * flow. Path + method based (not enqueue) because a UI flow issues many requests in an order
  * the test does not control (the now-playing screen also polls). It serves the root
  * `GET /health` the connect screen's [io.github.xexanos.ratatoskr.network.tls.CertificateInspector]
- * probes, plus the `/v1/` endpoints, and tracks playback `state`/`position` so pause/resume/
+ * probes, plus the `/v2/` endpoints, and tracks playback `state`/`position` so pause/resume/
  * seek produce a realistic session on the next poll.
  *
  * Response bodies come from the shared [WireFixtures]; [login] is injectable so a test can make
  * sign-in fail.
  */
 class RatatoskrDispatcher(
-    private val login: () -> MockResponse = { jsonResponse(WireFixtures.authTokensJson()) },
+    private val login: () -> MockResponse = { jsonResponse(WireFixtures.authSessionJson()) },
     private val speakers: String = WireFixtures.speakerListJson(),
     private val libraryPage: String = WireFixtures.libraryPageJson(),
     // Empty by default: the flows' row counts and "first row" taps predate the shelf, and an
@@ -49,10 +49,10 @@ class RatatoskrDispatcher(
         val path = request.path.orEmpty().substringBefore('?')
         return when {
             path == "/health" -> jsonResponse("""{"reachable":true}""")
-            path == "/v1/auth/login" -> login()
-            path == "/v1/speakers" -> jsonResponse(speakers)
+            path == "/v2/auth/login" -> login()
+            path == "/v2/speakers" -> jsonResponse(speakers)
             // The cover proxy: real PNG bytes so Coil decodes and renders them.
-            path.startsWith("/v1/library/items/") && path.endsWith("/cover") -> {
+            path.startsWith("/v2/library/items/") && path.endsWith("/cover") -> {
                 lastCoverRequest = request
                 MockResponse()
                     .setResponseCode(200)
@@ -61,21 +61,21 @@ class RatatoskrDispatcher(
             }
             // A library item tap navigates to the speaker picker, so the item-detail endpoint
             // is not part of the happy path; answer defensively.
-            path.startsWith("/v1/library/items/") -> MockResponse().setResponseCode(404)
-            path == "/v1/library/items" -> jsonResponse(libraryPage)
-            path == "/v1/library/in-progress" -> jsonResponse(inProgressShelf)
-            path == "/v1/sessions/current" && request.method == "PUT" -> {
+            path.startsWith("/v2/library/items/") -> MockResponse().setResponseCode(404)
+            path == "/v2/library/items" -> jsonResponse(libraryPage)
+            path == "/v2/library/in-progress" -> jsonResponse(inProgressShelf)
+            path == "/v2/sessions/current" && request.method == "PUT" -> {
                 ended = false
                 state = "playing"
                 jsonResponse(session())
             }
-            path == "/v1/sessions/current" && request.method == "GET" ->
+            path == "/v2/sessions/current" && request.method == "GET" ->
                 if (ended) {
                     jsonResponse("""{"code":"no_active_session","message":"Nothing playing"}""", code = 404)
                 } else {
                     jsonResponse(session())
                 }
-            path == "/v1/sessions/current" && request.method == "DELETE" -> {
+            path == "/v2/sessions/current" && request.method == "DELETE" -> {
                 ended = true
                 MockResponse().setResponseCode(204)
             }
