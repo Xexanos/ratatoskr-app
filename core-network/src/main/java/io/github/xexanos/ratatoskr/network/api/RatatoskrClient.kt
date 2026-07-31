@@ -57,6 +57,10 @@ class RatatoskrClient internal constructor(
     private val closeAction: () -> Unit = {},
 ) {
 
+    // The /v1 refresh-token rotation-adoption protocol (SPEC section 5), behind one seam the /v2
+    // cutover deletes. Every session-returning call routes its result through it.
+    private val rotation = SessionRotationAdoption(tokenStore)
+
     /**
      * Releases the underlying OkHttp resources (dispatcher threads and pooled sockets). Call
      * when this client is replaced - the owner does so on a server/certificate change - so the
@@ -100,8 +104,8 @@ class RatatoskrClient internal constructor(
         execute { libraryApi.getLibraryItem(itemId) }.map { it.toDomain(coverEndpoint) }
 
     suspend fun currentSession(): ApiResult<Session> =
-        execute(sessionEndpoint = true) { playbackApi.getCurrentSession() }
-            .adoptingRotatedTokens().map { it.toDomain(coverEndpoint) }
+        rotation.adopt(execute(sessionEndpoint = true) { playbackApi.getCurrentSession() })
+            .map { it.toDomain(coverEndpoint) }
 
     /**
      * Starts playback. The stored refresh token is handed to the server so its sync loop can
@@ -109,10 +113,10 @@ class RatatoskrClient internal constructor(
      * StartSessionRequest.refreshToken).
      */
     suspend fun startSession(itemId: String, speakerId: String): ApiResult<Session> {
-        val refreshToken = tokenStore.refreshToken()
-        return execute {
-            playbackApi.startSession(StartSessionRequest(itemId, speakerId, refreshToken))
-        }.adoptingRotatedTokens().map { it.toDomain(coverEndpoint) }
+        val refreshToken = rotation.refreshTokenForHandoff()
+        return rotation.adopt(
+            execute { playbackApi.startSession(StartSessionRequest(itemId, speakerId, refreshToken)) },
+        ).map { it.toDomain(coverEndpoint) }
     }
 
     /**
@@ -124,40 +128,24 @@ class RatatoskrClient internal constructor(
     suspend fun stopSession(): ApiResult<Unit> =
         when (val result = executeNullable(sessionEndpoint = true) { playbackApi.stopSession() }) {
             is ApiResult.Success -> {
-                result.data?.adoptRotatedTokens()
+                rotation.adopt(result.data)
                 ApiResult.Success(Unit)
             }
             is ApiResult.Failure -> result
         }
 
     suspend fun pause(): ApiResult<Session> =
-        execute(sessionEndpoint = true) { playbackApi.pauseSession() }
-            .adoptingRotatedTokens().map { it.toDomain(coverEndpoint) }
+        rotation.adopt(execute(sessionEndpoint = true) { playbackApi.pauseSession() })
+            .map { it.toDomain(coverEndpoint) }
 
     suspend fun resume(): ApiResult<Session> =
-        execute(sessionEndpoint = true) { playbackApi.resumeSession() }
-            .adoptingRotatedTokens().map { it.toDomain(coverEndpoint) }
+        rotation.adopt(execute(sessionEndpoint = true) { playbackApi.resumeSession() })
+            .map { it.toDomain(coverEndpoint) }
 
     suspend fun seek(positionSeconds: Double): ApiResult<Session> =
-        execute(sessionEndpoint = true) { playbackApi.seekSession(SeekRequest(positionSeconds)) }
-            .adoptingRotatedTokens().map { it.toDomain(coverEndpoint) }
-
-    // --- token adoption -----------------------------------------------------------------
-
-    /**
-     * Adopts a rotated token pair carried on a successful [GenSession] response and passes the
-     * result through unchanged. This is how the app learns the tokens the server rotated during
-     * an active session, since it does not refresh on its own while a session is live
-     * (SPEC section 5).
-     */
-    private suspend fun ApiResult<GenSession>.adoptingRotatedTokens(): ApiResult<GenSession> {
-        (this as? ApiResult.Success)?.data?.adoptRotatedTokens()
-        return this
-    }
-
-    private suspend fun GenSession.adoptRotatedTokens() {
-        rotatedTokens?.let { tokenStore.updateTokens(it.accessToken, it.refreshToken) }
-    }
+        rotation.adopt(
+            execute(sessionEndpoint = true) { playbackApi.seekSession(SeekRequest(positionSeconds)) },
+        ).map { it.toDomain(coverEndpoint) }
 
     // --- error handling -----------------------------------------------------------------
 
