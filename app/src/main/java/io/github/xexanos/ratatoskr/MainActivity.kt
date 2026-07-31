@@ -80,8 +80,8 @@ class MainActivity : ComponentActivity() {
     /**
      * Launch routing (SPEC section 13): no trusted server -> connect; no stored tokens ->
      * sign-in; otherwise the library. Runs off the main thread: on a cold start the DataStore
-     * reads and the Keystore-backed decrypt in authSession() are blocking, so resolving this
-     * inside onCreate would risk dropped launch frames or an ANR.
+     * reads and the Keystore-backed decrypt behind hasCredential() are blocking, so resolving
+     * this inside onCreate would risk dropped launch frames or an ANR.
      */
     private suspend fun decideStartDestination(container: AppContainer): Route =
         withContext(Dispatchers.IO) {
@@ -89,7 +89,7 @@ class MainActivity : ComponentActivity() {
                 container.connectionStore.fingerprint() != null
             when {
                 !hasTrustedServer -> Route.Connect
-                container.tokenStore.authSession() == null -> Route.SignIn
+                !container.credentialStore.hasCredential() -> Route.SignIn
                 else -> Route.Library
             }
         }

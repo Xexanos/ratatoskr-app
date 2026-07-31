@@ -86,7 +86,7 @@ class SettingsViewModel(
 
     fun signOut() {
         viewModelScope.launch {
-            connectionManager.tokenStore.clear()
+            connectionManager.credentials.clear()
             clearCoverCache()
             _uiState.value = _uiState.value.copy(signedOut = true)
         }

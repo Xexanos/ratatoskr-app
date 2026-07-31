@@ -8,6 +8,7 @@ package io.github.xexanos.ratatoskr.data
 import io.github.xexanos.ratatoskr.network.api.RatatoskrClient
 import io.github.xexanos.ratatoskr.network.api.RatatoskrClientFactory
 import io.github.xexanos.ratatoskr.network.persist.ConnectionStore
+import io.github.xexanos.ratatoskr.network.persist.CredentialStore
 import io.github.xexanos.ratatoskr.network.persist.TokenAccess
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -17,7 +18,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Owns the current [RatatoskrClient], rebuilding it whenever the trusted server or its
@@ -26,11 +26,20 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 class ConnectionManager(
     val connectionStore: ConnectionStore,
+    // The pair-shaped network handle: passed to the factory (which needs the bearer/refresh
+    // tokens) and used by the tests. App code goes through [credentials], never the pair.
     val tokenStore: TokenAccess,
 ) {
-    // While a playback session is active the server owns refresh-token rotation, so the
-    // client must not refresh independently (SPEC section 5).
-    private val sessionActive = AtomicBoolean(false)
+    /**
+     * The credential-shaped seam app code uses for auth state (SPEC section 5): a presence check
+     * and a clear, nothing pair-shaped. Backed by [tokenStore]; the /v2 cutover reshapes what is
+     * behind this without touching the callers.
+     */
+    val credentials: CredentialStore get() = tokenStore
+
+    // While a playback session is active the server owns refresh-token rotation, so the client
+    // must not refresh independently (SPEC section 5). Isolated in one deletable feed:
+    private val refreshSuppression = RefreshSuppression()
 
     // Guards client construction so concurrent callers (e.g. the poll loop and a screen right
     // after sign-in) cannot each build a client. Two OkHttp stacks would each hold their own
@@ -55,16 +64,16 @@ class ConnectionManager(
     private val _reauthRequired = MutableStateFlow(false)
     val reauthRequired: StateFlow<Boolean> = _reauthRequired.asStateFlow()
 
-    fun setSessionActive(active: Boolean) = sessionActive.set(active)
+    fun setSessionActive(active: Boolean) = refreshSuppression.setSessionActive(active)
 
     /**
-     * Terminal auth failure: stop suppressing refresh, discard the stranded tokens, and signal
-     * the UI to send the user back to sign-in. Idempotent - safe to call from several failing
-     * calls at once. Cleared by [acknowledgeReauth] once the nav host has routed.
+     * Terminal auth failure: stop suppressing refresh, discard the stranded credential, and
+     * signal the UI to send the user back to sign-in. Idempotent - safe to call from several
+     * failing calls at once. Cleared by [acknowledgeReauth] once the nav host has routed.
      */
     suspend fun requireReauth() {
-        sessionActive.set(false)
-        tokenStore.clear()
+        refreshSuppression.setSessionActive(false)
+        credentials.clear()
         _reauthRequired.value = true
     }
 
@@ -83,7 +92,7 @@ class ConnectionManager(
     fun peekClient(): RatatoskrClient? = cached?.client
 
     /** Whether a playback session is currently active - gates client-side token refresh (SPEC section 5). */
-    fun isSessionActive(): Boolean = sessionActive.get()
+    fun isSessionActive(): Boolean = refreshSuppression.isSessionActive()
 
     /** The client for the currently trusted server, or null if none is configured yet. */
     suspend fun client(): RatatoskrClient? {
@@ -100,7 +109,7 @@ class ConnectionManager(
                 baseUrl = config.baseUrl,
                 fingerprint = fingerprint,
                 tokenStore = tokenStore,
-                sessionActive = { sessionActive.get() },
+                sessionActive = refreshSuppression.suppressed,
             ).also {
                 cached = Cached(key, it)
             }

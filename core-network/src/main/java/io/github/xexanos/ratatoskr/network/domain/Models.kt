@@ -40,6 +40,19 @@ data class AuthSession(
     val user: AuthUser,
 )
 
+/**
+ * The app's single, opaque auth credential (SPEC section 5). The app module treats it as a
+ * black box: it only checks presence (signed in or not) and clears it on sign-out, and the
+ * [value] never leaves core-network - its constructor and field are `internal`, so no
+ * cross-module caller can read or forge it.
+ *
+ * On the /v1 contract this projects the stored token pair to the bearer the client sends; the
+ * /v2 cutover makes it the one stored Ratatoskr token, with no change on the app side. It is
+ * the stable, credential-shaped seam the cutover swaps behind (SPEC section 5).
+ */
+@JvmInline
+value class Credential internal constructor(internal val value: String)
+
 data class Speaker(
     val id: String,
     val name: String,
