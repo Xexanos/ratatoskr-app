@@ -5,6 +5,8 @@
  */
 package io.github.xexanos.ratatoskr.network.api
 
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.Types
 import io.github.xexanos.ratatoskr.network.FakeTokenAccess
 import io.github.xexanos.ratatoskr.network.WireFixtures
 import io.github.xexanos.ratatoskr.network.domain.ApiResult
@@ -23,7 +25,6 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -125,10 +126,12 @@ class RatatoskrClientTest {
 
         assertTrue(result is ApiResult.Success)
         val body = server.takeRequest().body.readUtf8()
-        assertTrue("request should carry the item id, was: $body", body.contains("\"i1\""))
-        assertTrue("request should carry the speaker id, was: $body", body.contains("\"s1\""))
-        // The /v2 request is item + speaker only; no refresh-token handoff leaks into it.
-        assertFalse("request must not carry a token, was: $body", body.contains("token"))
+        val fields = Moshi.Builder().build()
+            .adapter<Map<String, Any?>>(
+                Types.newParameterizedType(Map::class.java, String::class.java, Any::class.java),
+            )
+            .fromJson(body)
+        assertEquals(mapOf("itemId" to "i1", "speakerId" to "s1"), fields)
     }
 
     @Test
