@@ -37,11 +37,21 @@ class TokenStore(
         return AuthSession(token, AuthUser(userId, username))
     }
 
+    override suspend fun username(): String? = dataStore.data.first()[USERNAME]
+
     override suspend fun save(session: AuthSession) {
         dataStore.edit { prefs ->
             prefs[TOKEN] = crypto.encrypt(session.token)
             prefs[USER_ID] = session.user.id
             prefs[USERNAME] = session.user.username
+        }
+    }
+
+    override suspend fun clearToken() {
+        // Keep USERNAME for the sign-in pre-fill; drop the token and user id (SPEC section 5).
+        dataStore.edit { prefs ->
+            prefs.remove(TOKEN)
+            prefs.remove(USER_ID)
         }
     }
 

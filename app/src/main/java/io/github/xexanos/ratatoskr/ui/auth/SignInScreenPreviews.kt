@@ -24,11 +24,25 @@ internal fun SignInIdlePreview() = RatatoskrTheme {
 @Preview(name = "Sign in - error", widthDp = 360, heightDp = 800)
 @Composable
 internal fun SignInErrorPreview() = RatatoskrTheme {
-    Surface { SignInScreen(SignInUiState.Error(UiError.Domain(RatatoskrError.Unauthorized))) { _, _ -> } }
+    Surface { SignInScreen(SignInUiState.Error(UiError.Domain(RatatoskrError.Unauthorized()))) { _, _ -> } }
 }
 
 @Preview(name = "Sign in - submitting", widthDp = 360, heightDp = 800)
 @Composable
 internal fun SignInSubmittingPreview() = RatatoskrTheme {
     Surface { SignInScreen(SignInUiState.Submitting) { _, _ -> } }
+}
+
+// The 401 re-authentication path (SPEC section 5): pre-filled username, an explanatory notice, and
+// a blank password.
+@Preview(name = "Sign in - reauth notice", widthDp = 360, heightDp = 800)
+@Composable
+internal fun SignInReauthNoticePreview() = RatatoskrTheme {
+    Surface {
+        SignInScreen(
+            state = SignInUiState.Idle,
+            initialUsername = "alex",
+            notice = SignInNotice.MEDIA_SERVER_EXPIRED,
+        ) { _, _ -> }
+    }
 }

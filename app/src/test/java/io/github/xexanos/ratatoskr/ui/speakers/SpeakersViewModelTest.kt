@@ -127,7 +127,7 @@ class SpeakersViewModelTest {
         val viewModel = speakersViewModel(trustedConnectionManager())
         waitUntil { !viewModel.uiState.value.loading }
 
-        assertEquals(UiError.Domain(RatatoskrError.Unauthorized), viewModel.uiState.value.error)
+        assertEquals(UiError.Domain(RatatoskrError.Unauthorized("unauthorized")), viewModel.uiState.value.error)
     }
 
     @Test

@@ -24,6 +24,8 @@
     <string name="signin_username_label">Username</string>
     <string name="signin_password_label">Password</string>
     <string name="signin_action">Sign in</string>
+    <string name="signin_notice_media_server_expired">Your media-server sign-in expired. Enter your password to reconnect.</string>
+    <string name="signin_notice_session_ended">You were signed out. Enter your password to sign in again.</string>
 
     <!-- Library -->
     <string name="library_title">Library</string>
