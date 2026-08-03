@@ -13,6 +13,7 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import io.github.xexanos.ratatoskr.network.FakeTokenAccess
 import io.github.xexanos.ratatoskr.network.WireFixtures
 import io.github.xexanos.ratatoskr.network.domain.ApiResult
+import io.github.xexanos.ratatoskr.network.domain.AuthSession
 import io.github.xexanos.ratatoskr.network.domain.AuthUser
 import io.github.xexanos.ratatoskr.network.domain.PlaybackState
 import io.github.xexanos.ratatoskr.network.domain.RatatoskrError
@@ -266,17 +267,17 @@ class SessionManagerTest {
     }
 
     @Test
-    fun `a 401 while a session is active signals reauth and clears the token`() = runBlocking {
+    fun `a 401 while a session is active signals reauth and keeps the username for the pre-fill`() = runBlocking {
         // The "Anmeldung abgelaufen" recovery (SPEC section 5): an audiobook is playing (session
         // active), the app is backgrounded, and on the next poll the stored Ratatoskr token is no
         // longer accepted - it was revoked, or the server's upstream session died. There is no
         // refresh to fall back on, so the app clears the stranded token and asks the user to sign
-        // in again, keeping the trusted server and its certificate.
+        // in again, keeping the trusted server, its certificate, and the username.
         val calls = AtomicInteger(0)
         server.dispatch {
             when (calls.getAndIncrement()) {
                 0 -> jsonResponse(WireFixtures.sessionJson(state = "playing"))
-                else -> jsonResponse("""{"code":"unauthorized","message":"token no longer valid"}""", code = 401)
+                else -> jsonResponse("""{"code":"UPSTREAM_SESSION_LOST","message":"token no longer valid"}""", code = 401)
             }
         }
         val connectionManager =
@@ -287,31 +288,77 @@ class SessionManagerTest {
         assertTrue(manager.state.value.active)
 
         manager.poll() // 401 after a long background: the stored token is dead
-        assertEquals(RatatoskrError.Unauthorized, manager.state.value.error)
+        assertEquals(RatatoskrError.Unauthorized("UPSTREAM_SESSION_LOST"), manager.state.value.error)
         // Recovery (SPEC section 5): ask the user to sign in again. The stranded token is cleared
-        // and a re-auth is signalled, which the nav host routes to the sign-in screen - so the
-        // user re-enters credentials instead of forgetting the cert.
+        // and a re-auth is signalled, which the nav host routes to the sign-in screen. The username
+        // survives for the pre-fill, and the 401 code is forwarded so the screen can vary its notice.
         assertTrue(connectionManager.reauthRequired.value)
         assertNull(connectionManager.tokenStore.authSession())
+        assertEquals("alex", connectionManager.prefillUsername())
+        assertEquals("UPSTREAM_SESSION_LOST", connectionManager.consumeReauthPrompt()?.code)
     }
 
     @Test
-    fun `a 401 poll with no active session does not force reauth`() = runBlocking {
-        // Issue #108: the process-wide poll runs during the unauthenticated window too - a server
-        // is trusted so client() is non-null, but no session has ever been active (the user is on
-        // Connect/Sign-in, or has just signed in and holds a fresh token without playback yet). The
-        // negative counterpart to `a 401 while a session is active ...` above: here the 401 must
-        // NOT escalate to reauth (see maybeRequireReauth's gate).
-        server.dispatch { jsonResponse("""{"code":"unauthorized","message":"token expired"}""", code = 401) }
+    fun `a 401 while signed in but not playing still forces reauth`() = runBlocking {
+        // SPEC section 5: every 401 while signed in leads to the same recovery, not only during
+        // playback. The user holds a token but nothing is playing (browsing the library, say) when
+        // the token is revoked; the poll's 401 must still route them to a pre-filled sign-in.
+        server.dispatch { jsonResponse("""{"code":"unauthorized","message":"token revoked"}""", code = 401) }
         val connectionManager =
-            trustedConnectionManager(FakeTokenAccess("fresh-token", AuthUser("7", "alex")))
+            trustedConnectionManager(FakeTokenAccess("live-token", AuthUser("7", "alex")))
         val manager = SessionManager(connectionManager)
 
-        manager.poll() // 401 while no session was ever active
+        manager.poll() // 401 while signed in, no active session
 
-        assertEquals(RatatoskrError.Unauthorized, manager.state.value.error)
+        assertEquals(RatatoskrError.Unauthorized("unauthorized"), manager.state.value.error)
         assertFalse(manager.state.value.active)
-        // The freshly-stored token must survive and no re-auth must be signalled.
+        assertTrue(connectionManager.reauthRequired.value)
+        assertNull(connectionManager.tokenStore.authSession())
+        assertEquals("alex", connectionManager.prefillUsername())
+    }
+
+    @Test
+    fun `a 401 poll during the unauthenticated window does not force reauth`() = runBlocking {
+        // Issue #108: the process-wide poll runs during the unauthenticated window too - a server
+        // is trusted so client() is non-null, but no one is signed in (the user is on
+        // Connect/Sign-in). No token was ever stored, so its 401 is the ordinary "not signed in"
+        // state, not a dead credential: it must NOT escalate to reauth (see maybeRequireReauth's
+        // hadCredential guard).
+        server.dispatch { jsonResponse("""{"code":"unauthorized","message":"no token"}""", code = 401) }
+        val connectionManager = trustedConnectionManager(FakeTokenAccess()) // no credential stored
+        val manager = SessionManager(connectionManager)
+
+        manager.poll() // 401 while signed out
+
+        assertEquals(RatatoskrError.Unauthorized("unauthorized"), manager.state.value.error)
+        assertFalse(connectionManager.reauthRequired.value)
+    }
+
+    @Test
+    fun `a 401 for a poll begun before sign-in does not clear the just-stored token`() = runBlocking {
+        // The post-login race the hadCredential guard exists for: a poll issues its request during
+        // the unauthenticated window (no token), the user signs in, and only then does that
+        // pre-sign-in poll's 401 arrive. Escalating it would clear the freshly stored token and
+        // bounce the user off the Library. The credential snapshot is taken when the poll began, so
+        // this stale 401 is ignored.
+        val requestReached = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        server.dispatch {
+            requestReached.countDown() // the poll has already read hadCredential (= false) by now
+            release.await()
+            jsonResponse("""{"code":"unauthorized","message":"no token was sent"}""", code = 401)
+        }
+        val tokens = FakeTokenAccess() // unauthenticated window: no token yet
+        val connectionManager = trustedConnectionManager(tokens)
+        val manager = SessionManager(connectionManager)
+
+        val poll = async(Dispatchers.IO) { manager.poll() }
+        requestReached.await(5, TimeUnit.SECONDS)
+        tokens.save(AuthSession("fresh-token", AuthUser("7", "alex"))) // sign in mid-flight
+        release.countDown()
+        poll.await()
+
+        // The 401 belonged to the token-less request, so the fresh token survives and no reauth fires.
         assertFalse(connectionManager.reauthRequired.value)
         assertNotNull(connectionManager.tokenStore.authSession())
     }

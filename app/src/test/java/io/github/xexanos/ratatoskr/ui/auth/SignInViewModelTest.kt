@@ -13,6 +13,7 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import io.github.xexanos.ratatoskr.data.ConnectionManager
 import io.github.xexanos.ratatoskr.network.FakeTokenAccess
 import io.github.xexanos.ratatoskr.network.WireFixtures
+import io.github.xexanos.ratatoskr.network.domain.AuthUser
 import io.github.xexanos.ratatoskr.network.persist.ConnectionStore
 import io.github.xexanos.ratatoskr.network.persist.DataStoreConnectionStore
 import io.github.xexanos.ratatoskr.network.testutil.HttpsMockServer
@@ -27,6 +28,7 @@ import kotlinx.coroutines.test.setMain
 import okhttp3.mockwebserver.MockResponse
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -52,10 +54,10 @@ class SignInViewModelTest {
     }
 
     /** A [ConnectionManager] whose client() resolves against [server] (trusted server config saved). */
-    private fun trustedConnectionManager(): ConnectionManager {
+    private fun trustedConnectionManager(tokens: FakeTokenAccess = FakeTokenAccess()): ConnectionManager {
         val store = connectionStore()
         runBlocking { store.saveTrustedServer(server.baseUrl, server.fingerprint) }
-        return ConnectionManager(store, FakeTokenAccess())
+        return ConnectionManager(store, tokens)
     }
 
     private fun unconfiguredConnectionManager(): ConnectionManager =
@@ -123,5 +125,43 @@ class SignInViewModelTest {
         waitUntil { viewModel.uiState.value != SignInUiState.Submitting }
 
         assertEquals(SignInUiState.Error(UiError.NoServer), viewModel.uiState.value)
+    }
+
+    @Test
+    fun `an UPSTREAM_SESSION_LOST reauth pre-fills the username and shows the media-server notice`() =
+        runTest(dispatcher) {
+            // The 401 recovery (SPEC section 5): the token is gone but the username survives, and the
+            // code selects the media-server notice. Password is never pre-filled - the screen owns it.
+            val connectionManager = trustedConnectionManager(FakeTokenAccess("stale", AuthUser("7", "alex")))
+            connectionManager.requireReauth("UPSTREAM_SESSION_LOST")
+
+            val viewModel = SignInViewModel(connectionManager)
+            waitUntil { viewModel.prefill.value.username == "alex" }
+
+            assertEquals("alex", viewModel.prefill.value.username)
+            assertEquals(SignInNotice.MEDIA_SERVER_EXPIRED, viewModel.prefill.value.notice)
+        }
+
+    @Test
+    fun `any other 401 code shows the session-ended notice`() = runTest(dispatcher) {
+        val connectionManager = trustedConnectionManager(FakeTokenAccess("stale", AuthUser("7", "alex")))
+        connectionManager.requireReauth(null) // a 401 with no distinguishing code
+
+        val viewModel = SignInViewModel(connectionManager)
+        waitUntil { viewModel.prefill.value.username == "alex" }
+
+        assertEquals(SignInNotice.SESSION_ENDED, viewModel.prefill.value.notice)
+    }
+
+    @Test
+    fun `an ordinary sign-in visit shows no notice`() = runTest(dispatcher) {
+        // No reauth is pending: the username may still pre-fill (a remembered user), but there is no
+        // explanatory notice.
+        val connectionManager = trustedConnectionManager(FakeTokenAccess("live", AuthUser("7", "alex")))
+
+        val viewModel = SignInViewModel(connectionManager)
+        waitUntil { viewModel.prefill.value.username == "alex" }
+
+        assertNull(viewModel.prefill.value.notice)
     }
 }

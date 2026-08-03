@@ -18,8 +18,13 @@ inline fun <T, R> ApiResult<T>.map(transform: (T) -> R): ApiResult<R> = when (th
 
 /** Everything that can go wrong talking to the server, mapped away from HTTP/transport detail. */
 sealed interface RatatoskrError {
-    /** Missing/invalid token (HTTP 401), after refresh has been attempted and failed. */
-    data object Unauthorized : RatatoskrError
+    /**
+     * The stored Ratatoskr token no longer works (HTTP 401). There is no refresh to fall back on
+     * (SPEC section 5), so this always ends in the same recovery: sign in again. [code] is the
+     * server's machine-readable reason, kept only to vary the sign-in notice's copy
+     * (`UPSTREAM_SESSION_LOST` vs anything else), never the behaviour.
+     */
+    data class Unauthorized(val code: String? = null) : RatatoskrError
 
     /** Nothing is playing (HTTP 404 on a session endpoint). */
     data object NoActiveSession : RatatoskrError

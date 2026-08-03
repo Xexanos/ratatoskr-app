@@ -22,6 +22,22 @@ interface TokenAccess : CredentialStore {
     // clear() is inherited from CredentialStore.
 
     /**
+     * The display username of the last signed-in user, if one is remembered - independent of the
+     * token, so it survives [clearToken]. Backs the sign-in screen's pre-fill on the 401
+     * re-authentication path (SPEC section 5): only the password is blank.
+     */
+    suspend fun username(): String?
+
+    /**
+     * Discards the token but keeps the remembered username - the 401 re-authentication path
+     * (SPEC section 5), where server URL, certificate trust, and username all survive and only
+     * the password is re-entered. After this, [authSession]/[credential] read null (signed out),
+     * but [username] still pre-fills the sign-in screen. Full sign-out uses [clear] instead,
+     * which forgets the username too.
+     */
+    suspend fun clearToken()
+
+    /**
      * Blocking read of the current Ratatoskr token, for OkHttp interceptors which run on a
      * background thread and cannot suspend.
      */
