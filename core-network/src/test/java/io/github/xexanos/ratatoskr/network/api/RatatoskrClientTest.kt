@@ -5,6 +5,8 @@
  */
 package io.github.xexanos.ratatoskr.network.api
 
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.Types
 import io.github.xexanos.ratatoskr.network.FakeTokenAccess
 import io.github.xexanos.ratatoskr.network.WireFixtures
 import io.github.xexanos.ratatoskr.network.domain.ApiResult
@@ -33,7 +35,7 @@ import retrofit2.converter.scalars.ScalarsConverterFactory
 class RatatoskrClientTest {
 
     private val server = MockWebServer()
-    private val tokens = FakeTokenAccess(accessToken = "a0", refreshToken = "r0")
+    private val tokens = FakeTokenAccess(token = "t0")
     private lateinit var client: RatatoskrClient
 
     @Before
@@ -41,7 +43,7 @@ class RatatoskrClientTest {
         server.start()
         val moshi = ratatoskrMoshi()
         val retrofit = Retrofit.Builder()
-            .baseUrl(server.url("/v1/"))
+            .baseUrl(server.url("/v2/"))
             .client(OkHttpClient())
             .addConverterFactory(ScalarsConverterFactory.create())
             .addConverterFactory(MoshiConverterFactory.create(moshi))
@@ -61,14 +63,13 @@ class RatatoskrClientTest {
     @After fun tearDown() = server.shutdown()
 
     @Test
-    fun `login stores the returned token pair`() = runBlocking {
-        server.enqueue(MockResponse().setBody(WireFixtures.authTokensJson()))
+    fun `login stores the returned Ratatoskr token`() = runBlocking {
+        server.enqueue(MockResponse().setBody(WireFixtures.authSessionJson()))
 
         val result = client.login("alex", "secret")
 
         assertTrue(result is ApiResult.Success)
-        assertEquals("a1", tokens.currentAccessTokenBlocking())
-        assertEquals("r1", tokens.refreshToken())
+        assertEquals("t1", tokens.currentTokenBlocking())
         assertEquals("alex", tokens.savedSession!!.user.username)
     }
 
@@ -118,14 +119,19 @@ class RatatoskrClientTest {
     }
 
     @Test
-    fun `startSession hands the stored refresh token to the server`() = runBlocking {
+    fun `startSession posts only the item and speaker, no token handoff`() = runBlocking {
         server.enqueue(MockResponse().setBody(WireFixtures.sessionJson(positionSeconds = 0.0)))
 
         val result = client.startSession("i1", "s1")
 
         assertTrue(result is ApiResult.Success)
         val body = server.takeRequest().body.readUtf8()
-        assertTrue("request should carry the refresh token, was: $body", body.contains("\"r0\""))
+        val fields = Moshi.Builder().build()
+            .adapter<Map<String, Any?>>(
+                Types.newParameterizedType(Map::class.java, String::class.java, Any::class.java),
+            )
+            .fromJson(body)
+        assertEquals(mapOf("itemId" to "i1", "speakerId" to "s1"), fields)
     }
 
     @Test
@@ -143,50 +149,13 @@ class RatatoskrClientTest {
     }
 
     @Test
-    fun `a session response with rotatedTokens is adopted`() = runBlocking {
-        server.enqueue(MockResponse().setBody(WireFixtures.sessionJson(rotatedTokens = "a2" to "r2")))
-
-        val result = client.currentSession()
-
-        assertTrue(result is ApiResult.Success)
-        assertEquals("a2", tokens.currentAccessTokenBlocking())
-        assertEquals("r2", tokens.refreshToken())
-    }
-
-    @Test
-    fun `a session response without rotatedTokens leaves the stored pair untouched`() = runBlocking {
-        server.enqueue(MockResponse().setBody(WireFixtures.sessionJson()))
-
-        client.currentSession()
-
-        assertEquals("a0", tokens.currentAccessTokenBlocking())
-        assertEquals("r0", tokens.refreshToken())
-    }
-
-    @Test
-    fun `stopSession adopts a rotated pair from a 200 body`() = runBlocking {
-        server.enqueue(
-            MockResponse().setResponseCode(200).setBody(
-                WireFixtures.sessionJson(state = "stopped", positionSeconds = 5.0, rotatedTokens = "a3" to "r3"),
-            ),
-        )
-
-        val result = client.stopSession()
-
-        assertTrue(result is ApiResult.Success)
-        assertEquals("a3", tokens.currentAccessTokenBlocking())
-        assertEquals("r3", tokens.refreshToken())
-    }
-
-    @Test
-    fun `stopSession succeeds on a 204 and keeps the stored tokens`() = runBlocking {
+    fun `stopSession succeeds on a 204 and keeps the stored token`() = runBlocking {
         server.enqueue(MockResponse().setResponseCode(204))
 
         val result = client.stopSession()
 
         assertTrue(result is ApiResult.Success)
-        assertEquals("a0", tokens.currentAccessTokenBlocking())
-        assertEquals("r0", tokens.refreshToken())
+        assertEquals("t0", tokens.currentTokenBlocking())
     }
 
     @Test

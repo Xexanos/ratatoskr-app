@@ -94,7 +94,6 @@ class SessionManagerTest {
         assertFalse(snapshot.loading)
         assertNull(snapshot.error)
         assertTrue(snapshot.active)
-        assertTrue(connectionManager.isSessionActive())
     }
 
     @Test
@@ -127,19 +126,19 @@ class SessionManagerTest {
         val manager = SessionManager(connectionManager)
 
         manager.poll() // playing -> session active
-        assertTrue(connectionManager.isSessionActive())
+        assertTrue(manager.state.value.active)
 
         manager.poll() // 502 -> error kept, session and active flag retained (no error state per
         // consumer - this only reports the error, it does not clear the session)
         assertEquals("Sonos is unavailable", (manager.state.value.error as RatatoskrError.Upstream).message)
         assertEquals(PlaybackState.PLAYING, manager.state.value.session?.state)
-        assertTrue(connectionManager.isSessionActive())
+        assertTrue(manager.state.value.active)
 
         manager.poll() // 404 -> relinquished: session gone, error cleared, active flag released
         val snapshot = manager.state.value
         assertNull(snapshot.session)
         assertNull(snapshot.error)
-        assertFalse(connectionManager.isSessionActive())
+        assertFalse(snapshot.active)
     }
 
     @Test
@@ -195,7 +194,7 @@ class SessionManagerTest {
 
         assertTrue(result is ApiResult.Success)
         assertNull(manager.state.value.session)
-        assertFalse(connectionManager.isSessionActive())
+        assertFalse(manager.state.value.active)
     }
 
     @Test
@@ -267,38 +266,31 @@ class SessionManagerTest {
     }
 
     @Test
-    fun `a 401 while a session is active un-suppresses the client's own refresh`() = runBlocking {
-        // Repro of the "Anmeldung abgelaufen" stuck state (ported from the pre-SessionManager
-        // NowPlayingViewModel seam, issue fixed on main while this branch was in flight): an
-        // audiobook is playing (session active, so the client suppresses its own /auth/refresh -
-        // the server owns rotation, SPEC section 5), the app is backgrounded long enough that its
-        // access token expires, then it is reopened and the resumed poll hits a 401. Because
-        // getCurrentSession itself failed auth, the server never got to hand back a rotated pair.
-        // The app must not stay pinned to sessionActive=true forever - that keeps suppressing
-        // refresh with no live session to justify it, exactly the reasoning the NoActiveSession
-        // branch already acts on.
+    fun `a 401 while a session is active signals reauth and clears the token`() = runBlocking {
+        // The "Anmeldung abgelaufen" recovery (SPEC section 5): an audiobook is playing (session
+        // active), the app is backgrounded, and on the next poll the stored Ratatoskr token is no
+        // longer accepted - it was revoked, or the server's upstream session died. There is no
+        // refresh to fall back on, so the app clears the stranded token and asks the user to sign
+        // in again, keeping the trusted server and its certificate.
         val calls = AtomicInteger(0)
         server.dispatch {
             when (calls.getAndIncrement()) {
                 0 -> jsonResponse(WireFixtures.sessionJson(state = "playing"))
-                else -> jsonResponse("""{"code":"unauthorized","message":"token expired"}""", code = 401)
+                else -> jsonResponse("""{"code":"unauthorized","message":"token no longer valid"}""", code = 401)
             }
         }
         val connectionManager =
-            trustedConnectionManager(FakeTokenAccess("stale-access", "stale-refresh", AuthUser("7", "alex")))
+            trustedConnectionManager(FakeTokenAccess("stale-token", AuthUser("7", "alex")))
         val manager = SessionManager(connectionManager)
 
         manager.poll() // playing -> session active
-        assertTrue(connectionManager.isSessionActive())
+        assertTrue(manager.state.value.active)
 
-        manager.poll() // 401 after a long background: access token lapsed
+        manager.poll() // 401 after a long background: the stored token is dead
         assertEquals(RatatoskrError.Unauthorized, manager.state.value.error)
-        // The bug was: sessionActive stayed true, so the client kept suppressing its own refresh
-        // and every later call (incl. the "Erneut versuchen" retry) 401'd with no way to recover.
-        assertFalse(connectionManager.isSessionActive())
-        // Recovery (SPEC section 5, irreducible residual): ask the user to sign in again. The
-        // stranded tokens are cleared and a re-auth is signalled, which the nav host routes to
-        // the sign-in screen - so the user re-enters credentials instead of forgetting the cert.
+        // Recovery (SPEC section 5): ask the user to sign in again. The stranded token is cleared
+        // and a re-auth is signalled, which the nav host routes to the sign-in screen - so the
+        // user re-enters credentials instead of forgetting the cert.
         assertTrue(connectionManager.reauthRequired.value)
         assertNull(connectionManager.tokenStore.authSession())
     }
@@ -307,19 +299,19 @@ class SessionManagerTest {
     fun `a 401 poll with no active session does not force reauth`() = runBlocking {
         // Issue #108: the process-wide poll runs during the unauthenticated window too - a server
         // is trusted so client() is non-null, but no session has ever been active (the user is on
-        // Connect/Sign-in, or has just signed in and holds fresh tokens without playback yet). The
+        // Connect/Sign-in, or has just signed in and holds a fresh token without playback yet). The
         // negative counterpart to `a 401 while a session is active ...` above: here the 401 must
         // NOT escalate to reauth (see maybeRequireReauth's gate).
         server.dispatch { jsonResponse("""{"code":"unauthorized","message":"token expired"}""", code = 401) }
         val connectionManager =
-            trustedConnectionManager(FakeTokenAccess("fresh-access", "fresh-refresh", AuthUser("7", "alex")))
+            trustedConnectionManager(FakeTokenAccess("fresh-token", AuthUser("7", "alex")))
         val manager = SessionManager(connectionManager)
 
         manager.poll() // 401 while no session was ever active
 
         assertEquals(RatatoskrError.Unauthorized, manager.state.value.error)
-        assertFalse(connectionManager.isSessionActive())
-        // The freshly-stored tokens must survive and no re-auth must be signalled.
+        assertFalse(manager.state.value.active)
+        // The freshly-stored token must survive and no re-auth must be signalled.
         assertFalse(connectionManager.reauthRequired.value)
         assertNotNull(connectionManager.tokenStore.authSession())
     }

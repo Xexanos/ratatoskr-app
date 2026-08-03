@@ -43,9 +43,9 @@ import org.junit.runner.RunWith
  * app itself drives its real navigation -> ViewModels -> ConnectionManager -> core-network
  * against a [HttpsMockServer] standing in for the Ratatoskr server.
  *
- * This layer asserts user-visible outcomes and flow; the wire-level mechanics (token rotation,
- * error taxonomy, enum fallback, concurrency) are the component layer's job (see
- * core-network `Factory*ComponentTest`) and are deliberately not re-checked here.
+ * This layer asserts user-visible outcomes and flow; the wire-level mechanics (bearer
+ * attachment, error taxonomy, enum fallback) are the component layer's job (see core-network
+ * `Factory*ComponentTest`) and are deliberately not re-checked here.
  *
  * Synchronisation: the clock is left auto-advancing (default). Material3 spinners animate
  * forever, but here they are transient - MockWebServer answers in milliseconds, so each load
@@ -175,11 +175,11 @@ class AppFlowTest {
 
     @Test
     fun libraryCoversLoadThroughTheAuthenticatedPinnedStack() {
-        // A library item whose coverUrl is origin-relative, as the server sends it since
-        // contract 1.3.x; the dispatcher's cover route serves a real decodable PNG.
+        // A library item whose coverUrl is origin-relative, as the server sends it; the
+        // dispatcher's cover route serves a real decodable PNG.
         val dispatcher = RatatoskrDispatcher(
             libraryPage = WireFixtures.libraryPageJson(
-                items = listOf(WireFixtures.libraryItemSummaryJson(coverUrl = "/v1/library/items/i1/cover")),
+                items = listOf(WireFixtures.libraryItemSummaryJson(coverUrl = "/v2/library/items/i1/cover")),
             ),
         )
         useDispatcher(dispatcher)
@@ -192,7 +192,7 @@ class AppFlowTest {
         val request = dispatcher.lastCoverRequest!!
 
         // The bearer token rode along on the image request (same token the API calls use)...
-        assertEquals("Bearer a1", request.getHeader("Authorization"))
+        assertEquals("Bearer t1", request.getHeader("Authorization"))
         // ...and the height arrived quantized to a bucket, not as raw view pixels.
         val h = request.requestUrl?.queryParameter("h")?.toIntOrNull()
         assertTrue("expected a bucketed h, got h=$h", h in listOf(128, 256, 512, 1024))

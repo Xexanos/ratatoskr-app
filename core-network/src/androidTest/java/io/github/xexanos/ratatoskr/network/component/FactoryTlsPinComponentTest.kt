@@ -40,7 +40,7 @@ class FactoryTlsPinComponentTest {
     @get:Rule val https = HttpsMockServer()
 
     private fun client(fingerprint: String?): RatatoskrClient =
-        https.track(RatatoskrClientFactory.create(https.baseUrl, fingerprint, FakeTokenAccess("a0", "r0")))
+        https.track(RatatoskrClientFactory.create(https.baseUrl, fingerprint, FakeTokenAccess(token = "t0")))
 
     @Test
     fun aMatchingPinnedFingerprintConnects() = runBlocking {

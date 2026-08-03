@@ -51,12 +51,12 @@ class MappersTest {
             id = "42",
             title = "The Hobbit",
             durationSeconds = 39600.0,
-            coverUrl = "/v1/library/items/42/cover",
+            coverUrl = "/v2/library/items/42/cover",
         )
 
         val domain = gen.toDomain(CoverEndpoint("https://ratatoskr.home:8080"))
 
-        assertEquals("https://ratatoskr.home:8080/v1/library/items/42/cover", domain.coverUrl)
+        assertEquals("https://ratatoskr.home:8080/v2/library/items/42/cover", domain.coverUrl)
     }
 
     @Test
@@ -86,7 +86,6 @@ class MappersTest {
               "positionSeconds": 12.5,
               "durationSeconds": 100.0,
               "updatedAt": "2026-07-05T12:00:00Z",
-              "accessToken": "future-rotation-field",
               "someFutureField": {"nested": [1, 2, 3]},
               "item": {
                 "id": "i1",

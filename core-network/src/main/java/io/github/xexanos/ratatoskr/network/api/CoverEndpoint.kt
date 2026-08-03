@@ -13,8 +13,8 @@ package io.github.xexanos.ratatoskr.network.api
 class CoverEndpoint internal constructor(private val baseUrl: String) {
 
     /**
-     * Resolves the contract's `coverUrl` into a loadable absolute URL. Since contract 1.3.x the
-     * server sends a path relative to its own origin (e.g. `/v1/library/items/{id}/cover`); this
+     * Resolves the contract's `coverUrl` into a loadable absolute URL. The server sends a path
+     * relative to its own origin (e.g. `/v2/library/items/{id}/cover`); this
      * absorbs [baseUrl] so the domain model always carries an absolute, bearer-authenticated URL
      * and no UI code needs to know the server origin. An already-absolute value passes through
      * untouched (tolerant reader: contract 1.1.0 documented an absolute URL, a future server could

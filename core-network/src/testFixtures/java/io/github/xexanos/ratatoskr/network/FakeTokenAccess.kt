@@ -15,46 +15,34 @@ import java.util.concurrent.atomic.AtomicReference
  * tests (SPEC section 9: platform pieces faked). Tests where persistence itself is the
  * point use the real Keystore-backed TokenStore instead.
  *
- * All views derive from ONE atomic state, mirroring the real store's semantics: after
- * [updateTokens], [authSession] reports the rotated pair rather than a stale snapshot,
- * and it returns null unless tokens AND a user are present (a token-only seed has no
- * signed-in user, exactly like the real store).
+ * All views derive from ONE atomic state, mirroring the real store's semantics: [authSession]
+ * returns null unless a token AND a user are present (a token-only seed has no signed-in user,
+ * exactly like the real store).
  */
 class FakeTokenAccess(
-    accessToken: String? = null,
-    refreshToken: String? = null,
+    token: String? = null,
     user: AuthUser? = null,
 ) : TokenAccess {
 
-    private data class State(val access: String?, val refresh: String?, val user: AuthUser?)
+    private data class State(val token: String?, val user: AuthUser?)
 
-    private val state = AtomicReference(State(accessToken, refreshToken, user))
+    private val state = AtomicReference(State(token, user))
 
-    /** The session as the current state reports it - null unless tokens and user are present. */
+    /** The session as the current state reports it - null unless a token and user are present. */
     val savedSession: AuthSession?
         get() = state.get().let { s ->
-            if (s.access != null && s.refresh != null && s.user != null) {
-                AuthSession(s.access, s.refresh, s.user)
-            } else {
-                null
-            }
+            if (s.token != null && s.user != null) AuthSession(s.token, s.user) else null
         }
 
     override suspend fun authSession(): AuthSession? = savedSession
 
     override suspend fun save(session: AuthSession) {
-        state.set(State(session.accessToken, session.refreshToken, session.user))
+        state.set(State(session.token, session.user))
     }
-
-    override suspend fun updateTokens(accessToken: String, refreshToken: String) {
-        state.updateAndGet { State(accessToken, refreshToken, it.user) }
-    }
-
-    override suspend fun refreshToken(): String? = state.get().refresh
 
     override suspend fun clear() {
-        state.set(State(null, null, null))
+        state.set(State(null, null))
     }
 
-    override fun currentAccessTokenBlocking(): String? = state.get().access
+    override fun currentTokenBlocking(): String? = state.get().token
 }

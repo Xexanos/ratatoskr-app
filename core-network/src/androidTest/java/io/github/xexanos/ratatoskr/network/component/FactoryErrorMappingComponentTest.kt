@@ -29,20 +29,17 @@ class FactoryErrorMappingComponentTest {
 
     @get:Rule val https = HttpsMockServer()
 
-    private fun client(
-        fingerprint: String? = https.fingerprint,
-        sessionActive: () -> Boolean = { false },
-    ): RatatoskrClient =
+    private fun client(fingerprint: String? = https.fingerprint): RatatoskrClient =
         https.track(
-            RatatoskrClientFactory.create(https.baseUrl, fingerprint, FakeTokenAccess("a0", "r0"), sessionActive),
+            RatatoskrClientFactory.create(https.baseUrl, fingerprint, FakeTokenAccess(token = "t0")),
         )
 
     @Test
     fun a401MapsToUnauthorized() = runBlocking {
         https.enqueueJson("""{"code":"unauthorized","message":"no"}""", code = 401)
 
-        // sessionActive suppresses the refresh attempt so the 401 surfaces as the mapped error.
-        val result = client(sessionActive = { true }).listSpeakers()
+        // No refresh path on /v2: the 401 surfaces verbatim as the mapped error.
+        val result = client().listSpeakers()
 
         assertEquals(RatatoskrError.Unauthorized, (result as ApiResult.Failure).error)
     }

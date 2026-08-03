@@ -134,8 +134,8 @@ class SpeakersViewModelTest {
     fun `starting a session on a speaker moves to started`() = runTest(dispatcher) {
         server.dispatch { request ->
             when {
-                request.path.orEmpty().startsWith("/v1/speakers") -> jsonResponse(WireFixtures.speakerListJson())
-                request.path.orEmpty().startsWith("/v1/sessions/current") && request.method == "PUT" ->
+                request.path.orEmpty().startsWith("/v2/speakers") -> jsonResponse(WireFixtures.speakerListJson())
+                request.path.orEmpty().startsWith("/v2/sessions/current") && request.method == "PUT" ->
                     jsonResponse(WireFixtures.sessionJson())
                 else -> MockResponse().setResponseCode(404)
             }
@@ -155,8 +155,8 @@ class SpeakersViewModelTest {
     fun `a failing start surfaces an error and stops starting`() = runTest(dispatcher) {
         server.dispatch { request ->
             when {
-                request.path.orEmpty().startsWith("/v1/speakers") -> jsonResponse(WireFixtures.speakerListJson())
-                request.path.orEmpty().startsWith("/v1/sessions/current") && request.method == "PUT" ->
+                request.path.orEmpty().startsWith("/v2/speakers") -> jsonResponse(WireFixtures.speakerListJson())
+                request.path.orEmpty().startsWith("/v2/sessions/current") && request.method == "PUT" ->
                     MockResponse().setResponseCode(502).setBody(
                         """{"code":"abs_unreachable","message":"Audiobookshelf down"}""",
                     )

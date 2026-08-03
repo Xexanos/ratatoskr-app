@@ -29,8 +29,8 @@ class BearerAuthInterceptorTest {
     @Test
     fun `attaches bearer token to regular requests`() {
         server.enqueue(MockResponse())
-        client(FakeTokenAccess(accessToken = "token-1"))
-            .newCall(Request.Builder().url(server.url("/v1/speakers")).build())
+        client(FakeTokenAccess(token = "token-1"))
+            .newCall(Request.Builder().url(server.url("/v2/speakers")).build())
             .execute().close()
 
         assertEquals("Bearer token-1", server.takeRequest().getHeader("Authorization"))
@@ -39,8 +39,8 @@ class BearerAuthInterceptorTest {
     @Test
     fun `does not attach a token to auth endpoints`() {
         server.enqueue(MockResponse())
-        client(FakeTokenAccess(accessToken = "token-1"))
-            .newCall(Request.Builder().url(server.url("/v1/auth/login")).build())
+        client(FakeTokenAccess(token = "token-1"))
+            .newCall(Request.Builder().url(server.url("/v2/auth/login")).build())
             .execute().close()
 
         assertNull(server.takeRequest().getHeader("Authorization"))
@@ -50,7 +50,7 @@ class BearerAuthInterceptorTest {
     fun `proceeds without a header when no token is stored`() {
         server.enqueue(MockResponse())
         client(FakeTokenAccess())
-            .newCall(Request.Builder().url(server.url("/v1/speakers")).build())
+            .newCall(Request.Builder().url(server.url("/v2/speakers")).build())
             .execute().close()
 
         assertNull(server.takeRequest().getHeader("Authorization"))

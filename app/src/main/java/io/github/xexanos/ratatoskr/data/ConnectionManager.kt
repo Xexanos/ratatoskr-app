@@ -26,26 +26,20 @@ import kotlinx.coroutines.withContext
  */
 class ConnectionManager(
     val connectionStore: ConnectionStore,
-    // The pair-shaped network handle: passed to the factory (which needs the bearer/refresh
-    // tokens) and used by the tests. App code goes through [credentials], never the pair.
+    // The token-shaped network handle: passed to the factory (which attaches the bearer) and
+    // used by the tests. App code goes through [credentials], never the token itself.
     val tokenStore: TokenAccess,
 ) {
     /**
      * The credential-shaped seam app code uses for auth state (SPEC section 5): a presence check
-     * and a clear, nothing pair-shaped. Backed by [tokenStore]; the /v2 cutover reshapes what is
-     * behind this without touching the callers.
+     * and a clear, nothing token-shaped. Backed by [tokenStore].
      */
     val credentials: CredentialStore get() = tokenStore
 
-    // While a playback session is active the server owns refresh-token rotation, so the client
-    // must not refresh independently (SPEC section 5). Isolated in one deletable feed:
-    private val refreshSuppression = RefreshSuppression()
-
     // Guards client construction so concurrent callers (e.g. the poll loop and a screen right
-    // after sign-in) cannot each build a client. Two OkHttp stacks would each hold their own
-    // single-flight refresh lock and could refresh the same rotating token twice, invalidating
-    // the pair and signing the user out (SPEC section 5). @Volatile makes the fast-path read
-    // see the winner's write.
+    // after sign-in) cannot each build a client: two OkHttp stacks would each hold their own
+    // dispatcher and connection pool for the same server, wasting sockets and threads until GC.
+    // @Volatile makes the fast-path read see the winner's write.
     private val buildMutex = Mutex()
 
     // The client and the key it was built for, held as one object so the lock-free fast path
@@ -54,25 +48,21 @@ class ConnectionManager(
 
     @Volatile private var cached: Cached? = null
 
-    // Set when a call surfaces an Unauthorized the app cannot silently recover from: the access
-    // token lapsed while a session was active, so the poll's getCurrentSession 401'd before the
-    // server could return a rotated pair, and the refresh token the app still holds has been
-    // rotated away - /auth/refresh would only loop (SPEC section 5). The nav host observes this
-    // and routes to the sign-in screen so the user re-enters credentials (SPEC section 5's
-    // irreducible residual), instead of being stranded on a dead-end error whose retry never
-    // recovers. The trusted server and its certificate are kept; only the tokens are cleared.
+    // Set when a call surfaces an Unauthorized the app cannot recover from: the stored Ratatoskr
+    // token no longer works against this server (revoked, or the server's upstream session died),
+    // and there is no refresh to fall back on (SPEC section 5). The nav host observes this and
+    // routes to the sign-in screen so the user re-enters credentials, instead of being stranded
+    // on a dead-end error whose retry never recovers. The trusted server and its certificate are
+    // kept; only the token is cleared.
     private val _reauthRequired = MutableStateFlow(false)
     val reauthRequired: StateFlow<Boolean> = _reauthRequired.asStateFlow()
 
-    fun setSessionActive(active: Boolean) = refreshSuppression.setSessionActive(active)
-
     /**
-     * Terminal auth failure: stop suppressing refresh, discard the stranded credential, and
-     * signal the UI to send the user back to sign-in. Idempotent - safe to call from several
-     * failing calls at once. Cleared by [acknowledgeReauth] once the nav host has routed.
+     * Terminal auth failure: discard the stranded credential and signal the UI to send the user
+     * back to sign-in. Idempotent - safe to call from several failing calls at once. Cleared by
+     * [acknowledgeReauth] once the nav host has routed.
      */
     suspend fun requireReauth() {
-        refreshSuppression.setSessionActive(false)
         credentials.clear()
         _reauthRequired.value = true
     }
@@ -91,9 +81,6 @@ class ConnectionManager(
      */
     fun peekClient(): RatatoskrClient? = cached?.client
 
-    /** Whether a playback session is currently active - gates client-side token refresh (SPEC section 5). */
-    fun isSessionActive(): Boolean = refreshSuppression.isSessionActive()
-
     /** The client for the currently trusted server, or null if none is configured yet. */
     suspend fun client(): RatatoskrClient? {
         val config = connectionStore.currentServerConfig() ?: return null
@@ -109,7 +96,6 @@ class ConnectionManager(
                 baseUrl = config.baseUrl,
                 fingerprint = fingerprint,
                 tokenStore = tokenStore,
-                sessionActive = refreshSuppression.suppressed,
             ).also {
                 cached = Cached(key, it)
             }
