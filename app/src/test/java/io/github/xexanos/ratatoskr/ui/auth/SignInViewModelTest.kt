@@ -104,17 +104,33 @@ class SignInViewModelTest {
     }
 
     @Test
-    fun `a rejected login surfaces an error and does not report Success`() = runTest(dispatcher) {
+    fun `a rejected login surfaces the wrong-credentials error, not the expired-session one`() =
+        runTest(dispatcher) {
+            // A 401 from the login call means the entered credentials were rejected (ux-design:
+            // Sign in, decision 4) - not the "sign-in expired" copy a 401 means elsewhere.
+            server.server.enqueue(
+                MockResponse().setResponseCode(401).setBody("""{"code":"unauthorized","message":"no"}"""),
+            )
+            val viewModel = SignInViewModel(trustedConnectionManager())
+
+            viewModel.signIn("alex", "wrong")
+            waitUntil { viewModel.uiState.value != SignInUiState.Submitting }
+
+            assertEquals(SignInUiState.Error(UiError.WrongCredentials), viewModel.uiState.value)
+        }
+
+    @Test
+    fun `a non-401 login failure keeps the domain error`() = runTest(dispatcher) {
         server.server.enqueue(
-            MockResponse().setResponseCode(401).setBody("""{"code":"unauthorized","message":"no"}"""),
+            MockResponse().setResponseCode(500).setBody("""{"code":"internal","message":"boom"}"""),
         )
         val viewModel = SignInViewModel(trustedConnectionManager())
 
-        viewModel.signIn("alex", "wrong")
+        viewModel.signIn("alex", "secret")
         waitUntil { viewModel.uiState.value != SignInUiState.Submitting }
 
         val state = viewModel.uiState.value
-        assertTrue("expected Error, was $state", state is SignInUiState.Error)
+        assertTrue("expected a Domain error, was $state", state is SignInUiState.Error && state.error is UiError.Domain)
     }
 
     @Test

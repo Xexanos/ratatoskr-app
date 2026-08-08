@@ -96,6 +96,7 @@
     <!-- Errors -->
     <string name="error_no_server">No server configured.</string>
     <string name="error_unauthorized">Sign-in expired. Please sign in again.</string>
+    <string name="error_wrong_credentials">Wrong username or password.</string>
     <string name="error_no_active_session">Nothing is playing right now.</string>
     <string name="error_not_found">Not found.</string>
     <string name="error_server">The server reported an error (%1$d).</string>

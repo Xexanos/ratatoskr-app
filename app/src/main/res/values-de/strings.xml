@@ -90,6 +90,7 @@
     <!-- Errors -->
     <string name="error_no_server">Kein Server konfiguriert.</string>
     <string name="error_unauthorized">Anmeldung abgelaufen. Bitte melde dich erneut an.</string>
+    <string name="error_wrong_credentials">Falscher Benutzername oder falsches Passwort.</string>
     <string name="error_no_active_session">Gerade wird nichts wiedergegeben.</string>
     <string name="error_not_found">Nicht gefunden.</string>
     <string name="error_server">Der Server hat einen Fehler gemeldet (%1$d).</string>
