@@ -20,6 +20,13 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
+ * A pending 401 re-authentication (SPEC section 5). Its presence means the user was returned to
+ * sign-in by a dead token; [code] is the 401 body's machine-readable reason, kept only to vary the
+ * sign-in notice's copy and null when the 401 carried none.
+ */
+data class ReauthPrompt(val code: String?)
+
+/**
  * Owns the current [RatatoskrClient], rebuilding it whenever the trusted server or its
  * fingerprint changes. Returns null until the user has confirmed a server certificate
  * (SPEC section 6), which is how the UI knows to route to the connect screen.
@@ -52,18 +59,28 @@ class ConnectionManager(
     // token no longer works against this server (revoked, or the server's upstream session died),
     // and there is no refresh to fall back on (SPEC section 5). The nav host observes this and
     // routes to the sign-in screen so the user re-enters credentials, instead of being stranded
-    // on a dead-end error whose retry never recovers. The trusted server and its certificate are
-    // kept; only the token is cleared.
+    // on a dead-end error whose retry never recovers. The trusted server, its certificate, and the
+    // display username are kept; only the token is cleared, so sign-in comes up pre-filled.
     private val _reauthRequired = MutableStateFlow(false)
     val reauthRequired: StateFlow<Boolean> = _reauthRequired.asStateFlow()
 
+    // The reauth that is pending, read once by the sign-in screen to choose its notice copy (SPEC
+    // section 5). Non-null means the user landed on sign-in via a 401; [ReauthPrompt.code] then
+    // varies UPSTREAM_SESSION_LOST vs anything else. Consumed on read so a later, ordinary visit to
+    // sign-in shows no stale notice. Null means the visit is not a reauth.
+    @Volatile private var pendingReauth: ReauthPrompt? = null
+
     /**
-     * Terminal auth failure: discard the stranded credential and signal the UI to send the user
-     * back to sign-in. Idempotent - safe to call from several failing calls at once. Cleared by
-     * [acknowledgeReauth] once the nav host has routed.
+     * Terminal auth failure: discard the stranded token (keeping the username for the sign-in
+     * pre-fill) and signal the UI to send the user back to sign-in. [code] is the 401 body's code,
+     * kept only to vary the sign-in notice. Idempotent - safe to call from several failing calls at
+     * once. Cleared by [acknowledgeReauth] once the nav host has routed.
      */
-    suspend fun requireReauth() {
-        credentials.clear()
+    suspend fun requireReauth(code: String?) {
+        tokenStore.clearToken()
+        // Set the prompt before raising the flag: the nav host routes on the flag and the sign-in
+        // screen then reads the prompt, so it must already be in place.
+        pendingReauth = ReauthPrompt(code)
         _reauthRequired.value = true
     }
 
@@ -71,6 +88,16 @@ class ConnectionManager(
     fun acknowledgeReauth() {
         _reauthRequired.value = false
     }
+
+    /**
+     * The pending reauth prompt, consumed on read (returns it once, then null). The sign-in screen
+     * calls this to decide whether - and which - re-authentication notice to show. Null when the
+     * user reached sign-in by an ordinary route rather than a 401.
+     */
+    fun consumeReauthPrompt(): ReauthPrompt? = pendingReauth.also { pendingReauth = null }
+
+    /** The remembered display username for the sign-in pre-fill, or null if none is stored. */
+    suspend fun prefillUsername(): String? = tokenStore.username()
 
     /**
      * The already-built client, without building one: a lock-free volatile read. Cover-image

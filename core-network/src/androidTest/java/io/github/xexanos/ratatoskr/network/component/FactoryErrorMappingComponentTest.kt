@@ -41,7 +41,7 @@ class FactoryErrorMappingComponentTest {
         // No refresh path on /v2: the 401 surfaces verbatim as the mapped error.
         val result = client().listSpeakers()
 
-        assertEquals(RatatoskrError.Unauthorized, (result as ApiResult.Failure).error)
+        assertEquals(RatatoskrError.Unauthorized("unauthorized"), (result as ApiResult.Failure).error)
     }
 
     @Test

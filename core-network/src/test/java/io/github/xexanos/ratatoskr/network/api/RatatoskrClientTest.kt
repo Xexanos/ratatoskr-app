@@ -96,12 +96,33 @@ class RatatoskrClientTest {
     }
 
     @Test
-    fun `401 maps to Unauthorized`() = runBlocking {
+    fun `401 maps to Unauthorized carrying the body code`() = runBlocking {
         server.enqueue(MockResponse().setResponseCode(401).setBody("""{"code":"unauthorized","message":"no"}"""))
 
         val result = client.listSpeakers()
 
-        assertEquals(RatatoskrError.Unauthorized, (result as ApiResult.Failure).error)
+        assertEquals(RatatoskrError.Unauthorized("unauthorized"), (result as ApiResult.Failure).error)
+    }
+
+    @Test
+    fun `401 keeps UPSTREAM_SESSION_LOST so the sign-in notice can vary`() = runBlocking {
+        server.enqueue(
+            MockResponse().setResponseCode(401)
+                .setBody("""{"code":"UPSTREAM_SESSION_LOST","message":"gone"}"""),
+        )
+
+        val result = client.listSpeakers()
+
+        assertEquals(RatatoskrError.Unauthorized("UPSTREAM_SESSION_LOST"), (result as ApiResult.Failure).error)
+    }
+
+    @Test
+    fun `a 401 with no body code maps to Unauthorized with a null code`() = runBlocking {
+        server.enqueue(MockResponse().setResponseCode(401))
+
+        val result = client.listSpeakers()
+
+        assertEquals(RatatoskrError.Unauthorized(null), (result as ApiResult.Failure).error)
     }
 
     @Test

@@ -24,9 +24,11 @@ class FakeTokenAccess(
     user: AuthUser? = null,
 ) : TokenAccess {
 
-    private data class State(val token: String?, val user: AuthUser?)
+    // retainedUsername survives clearToken (the 401 pre-fill), so it is held apart from the
+    // token/user pair rather than derived from it.
+    private data class State(val token: String?, val user: AuthUser?, val retainedUsername: String?)
 
-    private val state = AtomicReference(State(token, user))
+    private val state = AtomicReference(State(token, user, user?.username))
 
     /** The session as the current state reports it - null unless a token and user are present. */
     val savedSession: AuthSession?
@@ -36,12 +38,20 @@ class FakeTokenAccess(
 
     override suspend fun authSession(): AuthSession? = savedSession
 
+    override suspend fun username(): String? = state.get().retainedUsername
+
     override suspend fun save(session: AuthSession) {
-        state.set(State(session.token, session.user))
+        state.set(State(session.token, session.user, session.user.username))
+    }
+
+    override suspend fun clearToken() {
+        // Keep the remembered username; drop the token and user (SPEC section 5), mirroring the
+        // real store.
+        state.updateAndGet { State(null, null, it.retainedUsername) }
     }
 
     override suspend fun clear() {
-        state.set(State(null, null))
+        state.set(State(null, null, null))
     }
 
     override fun currentTokenBlocking(): String? = state.get().token

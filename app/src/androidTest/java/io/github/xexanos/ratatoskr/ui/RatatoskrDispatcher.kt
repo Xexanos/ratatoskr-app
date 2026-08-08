@@ -41,15 +41,29 @@ class RatatoskrDispatcher(
     // poll after Stop gets 404, not a revived session.
     @Volatile private var ended = false
 
+    // When set, every authenticated request answers 401 with this code, standing in for a dead
+    // Ratatoskr token (SPEC section 5). A fresh /v2/auth/login clears it - re-login mints a working
+    // token. Used to drive the 401 re-authentication flow.
+    @Volatile private var unauthorizedCode: String? = null
+
+    /** Simulate the stored token dying: the next authenticated request 401s with [code]. */
+    fun expireTokenWith(code: String) { unauthorizedCode = code }
+
     /** The last request the cover route served, for asserting auth and the `?h=` bucket. */
     @Volatile var lastCoverRequest: RecordedRequest? = null
         private set
 
     override fun dispatch(request: RecordedRequest): MockResponse {
         val path = request.path.orEmpty().substringBefore('?')
+        // A dead token 401s every authenticated route (not /health, not login itself, which mints a
+        // fresh one and clears the flag). Checked before the route table so any polled/tapped call
+        // triggers the re-auth path (SPEC section 5).
+        if (unauthorizedCode != null && path != "/health" && path != "/v2/auth/login") {
+            return jsonResponse("""{"code":"$unauthorizedCode","message":"token no longer valid"}""", code = 401)
+        }
         return when {
             path == "/health" -> jsonResponse("""{"reachable":true}""")
-            path == "/v2/auth/login" -> login()
+            path == "/v2/auth/login" -> { unauthorizedCode = null; login() }
             path == "/v2/speakers" -> jsonResponse(speakers)
             // The cover proxy: real PNG bytes so Coil decodes and renders them.
             path.startsWith("/v2/library/items/") && path.endsWith("/cover") -> {

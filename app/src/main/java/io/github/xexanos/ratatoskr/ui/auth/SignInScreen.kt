@@ -63,12 +63,52 @@ sealed interface SignInUiState {
     data class Error(val error: UiError) : SignInUiState
 }
 
+/**
+ * Why the user is on sign-in when they arrived via a 401 (SPEC section 5). It varies only the
+ * explanatory notice's copy - the recovery is one path either way. Absent on an ordinary sign-in.
+ */
+enum class SignInNotice {
+    /** `code: UPSTREAM_SESSION_LOST` - the server's own media-server sign-in expired. */
+    MEDIA_SERVER_EXPIRED,
+
+    /** Any other 401 - the token was revoked or the session ended elsewhere. */
+    SESSION_ENDED,
+}
+
+/** The pre-fill the sign-in screen opens with: a remembered username and an optional 401 notice. */
+data class SignInPrefill(
+    val username: String = "",
+    val notice: SignInNotice? = null,
+)
+
+// The contract's machine-readable code for "the server lost its Audiobookshelf session" (SPEC
+// section 5). Every other - or absent - code lands on [SignInNotice.SESSION_ENDED].
+private const val UPSTREAM_SESSION_LOST = "UPSTREAM_SESSION_LOST"
+
 class SignInViewModel(
     private val connectionManager: ConnectionManager,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<SignInUiState>(SignInUiState.Idle)
     val uiState: StateFlow<SignInUiState> = _uiState.asStateFlow()
+
+    // Loaded once from storage: the remembered username to pre-fill and, if the user got here via
+    // a 401, which notice to show. Both survive the dead token (SPEC section 5).
+    private val _prefill = MutableStateFlow(SignInPrefill())
+    val prefill: StateFlow<SignInPrefill> = _prefill.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            val notice = connectionManager.consumeReauthPrompt()?.let {
+                if (it.code == UPSTREAM_SESSION_LOST) SignInNotice.MEDIA_SERVER_EXPIRED
+                else SignInNotice.SESSION_ENDED
+            }
+            _prefill.value = SignInPrefill(
+                username = connectionManager.prefillUsername().orEmpty(),
+                notice = notice,
+            )
+        }
+    }
 
     fun signIn(username: String, password: String) {
         if (username.isBlank() || password.isBlank()) return
@@ -95,21 +135,32 @@ fun SignInScreenHost(
     onSignedIn: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val prefill by viewModel.prefill.collectAsStateWithLifecycle()
 
     LaunchedEffect(state) {
         if (state is SignInUiState.Success) onSignedIn()
     }
 
-    SignInScreen(state = state, onSignIn = viewModel::signIn)
+    SignInScreen(
+        state = state,
+        initialUsername = prefill.username,
+        notice = prefill.notice,
+        onSignIn = viewModel::signIn,
+    )
 }
 
-// The screen itself: a pure function of [state], previewable without a ViewModel or server.
+// The screen itself: a pure function of its inputs, previewable without a ViewModel or server.
 @Composable
 fun SignInScreen(
     state: SignInUiState,
+    initialUsername: String = "",
+    notice: SignInNotice? = null,
     onSignIn: (String, String) -> Unit,
 ) {
-    var username by rememberSaveable { mutableStateOf("") }
+    // Keyed on the remembered username: it loads asynchronously (empty, then the stored value), so
+    // the field re-initialises once when it arrives. The password is never pre-filled (SPEC
+    // section 5). User edits still survive config changes - the key is stable after the load.
+    var username by rememberSaveable(initialUsername) { mutableStateOf(initialUsername) }
     // Plain remember, not rememberSaveable: the password must not be written to the
     // saved-instance-state Bundle (persisted to disk on process death). Losing it across
     // process death is the right trade-off for a credential.
@@ -144,6 +195,15 @@ fun SignInScreen(
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(32.dp))
+
+        // The 401 re-authentication notice (SPEC section 5): shown only when the user was returned
+        // here by a dead token, explaining why. Distinct from the [SignInUiState.Error] card below,
+        // which reports a failed sign-in attempt.
+        if (notice != null) {
+            ReauthNoticeCard(notice)
+            Spacer(Modifier.height(24.dp))
+        }
+
         OutlinedTextField(
             value = username,
             onValueChange = { username = it },
@@ -215,6 +275,30 @@ fun SignInScreen(
                 Text(stringResource(R.string.signin_action))
             }
         }
+    }
+}
+
+// The explanatory notice for the 401 re-authentication path. A neutral, warm tonal card
+// (surfaceVariant), deliberately neither the success-reading secondaryContainer green nor the
+// errorContainer red of the sign-in-failure card below it: being signed out is an unexpected but
+// routine heads-up to act on, not a success and not a failure the user caused.
+@Composable
+private fun ReauthNoticeCard(notice: SignInNotice) {
+    val message = when (notice) {
+        SignInNotice.MEDIA_SERVER_EXPIRED -> stringResource(R.string.signin_notice_media_server_expired)
+        SignInNotice.SESSION_ENDED -> stringResource(R.string.signin_notice_session_ended)
+    }
+    Surface(
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text(
+            message,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(16.dp),
+        )
     }
 }
 

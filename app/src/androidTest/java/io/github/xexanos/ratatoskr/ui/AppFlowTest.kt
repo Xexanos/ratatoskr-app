@@ -218,6 +218,38 @@ class AppFlowTest {
     }
 
     @Test
+    fun aDeadTokenReturnsToPrefilledSignInAndRecovers() {
+        // The 401 re-authentication path (SPEC section 5, issue #119): a book is playing when the
+        // stored token dies. The app discards the token and returns to the SAME sign-in screen,
+        // pre-filled - server URL, certificate trust, and username survive; only the password is
+        // blank - with an explanatory notice whose copy the 401 `code` selects.
+        val dispatcher = RatatoskrDispatcher()
+        useDispatcher(dispatcher)
+        connectTrustAndSubmitSignIn()
+
+        // Drive into an active, polling session.
+        compose.awaitTag(UiTestTags.LIBRARY_ROW)
+        compose.onAllNodesWithTag(UiTestTags.LIBRARY_ROW)[0].performClick()
+        compose.awaitTag(UiTestTags.SPEAKER_ROW)
+        compose.onAllNodesWithTag(UiTestTags.SPEAKER_ROW)[0].performClick()
+        compose.awaitContentDescription(str(R.string.nowplaying_action_pause))
+
+        // The server loses its Audiobookshelf session: the next poll 401s with UPSTREAM_SESSION_LOST.
+        dispatcher.expireTokenWith("UPSTREAM_SESSION_LOST")
+
+        // Landed back on a pre-filled sign-in: the media-server notice, the surviving username, and
+        // the sign-in action (not a dedicated screen).
+        compose.awaitText(str(R.string.signin_notice_media_server_expired))
+        compose.onNodeWithText("alex").assertIsDisplayed()
+        compose.onNodeWithText(str(R.string.signin_action)).assertIsDisplayed()
+
+        // Re-login mints a fresh, working token and the user resumes at the library.
+        compose.onNode(hasSetTextAction() and hasImeAction(ImeAction.Done)).performTextInput("secret")
+        compose.onNodeWithText(str(R.string.signin_action)).performClick()
+        compose.awaitTag(UiTestTags.LIBRARY_ROW)
+    }
+
+    @Test
     fun forgetCertificateFromSettingsReturnsToConnect() {
         connectTrustAndSubmitSignIn()
         compose.awaitTag(UiTestTags.LIBRARY_ROW)

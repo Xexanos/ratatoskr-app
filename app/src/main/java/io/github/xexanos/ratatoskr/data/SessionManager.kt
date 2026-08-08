@@ -75,6 +75,10 @@ class SessionManager(private val connectionManager: ConnectionManager) : Default
     suspend fun poll() {
         val epoch = commandEpoch
         val client = connectionManager.client() ?: return
+        // Snapshot whether a credential was stored when this poll issued its request. A 401 only
+        // escalates to reauth if it did (see [maybeRequireReauth]): it separates a dead stored
+        // token from an in-flight poll that carried no token because it started before sign-in.
+        val hadCredential = connectionManager.credentials.hasCredential()
         when (val result = client.currentSession()) {
             is ApiResult.Success -> applySession(result.data, epoch)
             is ApiResult.Failure -> {
@@ -85,7 +89,7 @@ class SessionManager(private val connectionManager: ConnectionManager) : Default
                         _state.value = _state.value.copy(loading = false, session = null, error = null)
                     }
                     else -> {
-                        result.error.maybeRequireReauth()
+                        result.error.maybeRequireReauth(hadCredential)
                         _state.value = _state.value.copy(loading = false, error = result.error)
                     }
                 }
@@ -179,21 +183,22 @@ class SessionManager(private val connectionManager: ConnectionManager) : Default
     /**
      * A terminal [RatatoskrError.Unauthorized] is a dead credential the app cannot recover from
      * (SPEC section 5): the stored Ratatoskr token no longer works and there is no refresh to
-     * fall back on. Hand it to the connection manager, which discards the stranded token and
-     * signals the nav host to route back to sign-in. Any other error is left to the caller
+     * fall back on. Hand it to the connection manager, which discards the stranded token (keeping
+     * the username) and signals the nav host to route back to a pre-filled sign-in. Its `code` is
+     * forwarded only to vary that screen's notice. Any other error is left to the caller
      * (poll()/stop()/control()'s caller) to show in its own card/banner.
      *
-     * Gated on an active session (issue #108): the process-wide poll runs during the
-     * unauthenticated window too - a server is trusted so the client is non-null, but no one has
-     * signed in yet - and there a 401 is the ordinary "not signed in" state, not a dead
-     * credential. Escalating an unauthenticated-window 401 would clear the just-stored token and
-     * bounce the app off the Library right after sign-in, so only a 401 raised *while a session
-     * is active* is treated as terminal here. The active state is read from [state], the manager's
-     * own view of playback, so the escalation needs no flag on the connection manager.
+     * Every 401 raised while signed in escalates - not just during playback (SPEC section 5, one
+     * recovery path). [hadCredential] is the guard: the process-wide poll also runs during the
+     * unauthenticated window (a server is trusted so the client is non-null, but no one has signed
+     * in yet), and a poll that issued its request before sign-in carried no token, so its 401 is
+     * the ordinary "not signed in" state, not a dead credential. Escalating it would clear the
+     * just-stored token and bounce the app off the Library right after sign-in. Control actions
+     * (pause/resume/seek/stop) only exist once signed in, so they pass the default `true`.
      */
-    private suspend fun RatatoskrError.maybeRequireReauth() {
-        if (this is RatatoskrError.Unauthorized && _state.value.active) {
-            connectionManager.requireReauth()
+    private suspend fun RatatoskrError.maybeRequireReauth(hadCredential: Boolean = true) {
+        if (this is RatatoskrError.Unauthorized && hadCredential) {
+            connectionManager.requireReauth(code)
         }
     }
 

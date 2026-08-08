@@ -55,7 +55,7 @@ class FactoryAuthComponentTest {
 
         val result = client().listSpeakers()
 
-        assertEquals(RatatoskrError.Unauthorized, (result as ApiResult.Failure).error)
+        assertEquals(RatatoskrError.Unauthorized("unauthorized"), (result as ApiResult.Failure).error)
         // No authenticator means no silent retry: the single request is the whole story.
         assertEquals(1, requests.get())
     }

@@ -172,7 +172,7 @@ class RatatoskrClient internal constructor(
     private fun mapHttpError(status: Int, errorBody: String?, sessionEndpoint: Boolean): RatatoskrError {
         val parsed = errorBody?.let { runCatching { moshi.adapter(GenError::class.java).fromJson(it) }.getOrNull() }
         return when (status) {
-            401 -> RatatoskrError.Unauthorized
+            401 -> RatatoskrError.Unauthorized(parsed?.code)
             404 -> if (sessionEndpoint) RatatoskrError.NoActiveSession else RatatoskrError.NotFound
             502 -> RatatoskrError.Upstream(parsed?.code, parsed?.message)
             else -> RatatoskrError.Server(status, parsed?.code, parsed?.message)
