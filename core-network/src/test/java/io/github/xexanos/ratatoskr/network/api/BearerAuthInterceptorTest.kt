@@ -37,13 +37,26 @@ class BearerAuthInterceptorTest {
     }
 
     @Test
-    fun `does not attach a token to auth endpoints`() {
+    fun `does not attach a token to the login endpoint`() {
         server.enqueue(MockResponse())
         client(FakeTokenAccess(token = "token-1"))
             .newCall(Request.Builder().url(server.url("/v2/auth/login")).build())
             .execute().close()
 
         assertNull(server.takeRequest().getHeader("Authorization"))
+    }
+
+    @Test
+    fun `attaches the bearer token to the logout endpoint`() {
+        // Logout is the one auth endpoint that REQUIRES the bearer: the server resolves the
+        // presented token to the device session it revokes (contract 2.0.0). A blanket /auth/
+        // exemption would send it bare and the revocation would silently never happen.
+        server.enqueue(MockResponse())
+        client(FakeTokenAccess(token = "token-1"))
+            .newCall(Request.Builder().url(server.url("/v2/auth/logout")).build())
+            .execute().close()
+
+        assertEquals("Bearer token-1", server.takeRequest().getHeader("Authorization"))
     }
 
     @Test
