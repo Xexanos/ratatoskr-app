@@ -48,9 +48,7 @@ class BearerAuthInterceptorTest {
 
     @Test
     fun `attaches the bearer token to the logout endpoint`() {
-        // Logout is the one auth endpoint that REQUIRES the bearer: the server resolves the
-        // presented token to the device session it revokes (contract 2.0.0). A blanket /auth/
-        // exemption would send it bare and the revocation would silently never happen.
+        // Why logout must carry the bearer: see the BearerAuthInterceptor KDoc.
         server.enqueue(MockResponse())
         client(FakeTokenAccess(token = "token-1"))
             .newCall(Request.Builder().url(server.url("/v2/auth/logout")).build())

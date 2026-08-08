@@ -181,8 +181,7 @@ class RatatoskrClientTest {
         val request = server.takeRequest()
         assertEquals("POST", request.method)
         assertEquals("/v2/auth/logout", request.path)
-        // MockWebServer enforces no auth, so the revocation only provably happened if the
-        // bearer is asserted explicitly (review discussion on #126).
+        // Asserted explicitly because MockWebServer enforces no auth (see #126).
         assertEquals("Bearer t0", request.getHeader("Authorization"))
         assertNull(tokens.currentTokenBlocking())
     }

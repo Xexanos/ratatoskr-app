@@ -52,10 +52,9 @@ class FactoryAuthComponentTest {
         val tokens = FakeTokenAccess(token = "t0")
         client(tokens).signOut()
 
-        // MockWebServer enforces no auth, so revocation is only proven by the header itself:
-        // logout is the one auth endpoint that REQUIRES the bearer (the server resolves it to
-        // the device session it revokes), which the interceptor's /auth/login-only exemption
-        // must not strip.
+        // MockWebServer enforces no auth, so revocation is only proven by asserting the header
+        // itself: without it this test would stay green while the server-side revocation
+        // silently never happens (review discussion on #126).
         val request = https.takeRequest()
         assertEquals("POST", request.method)
         assertEquals("/v2/auth/logout", request.path)
