@@ -45,8 +45,9 @@ class MigrationFlowTest {
     /**
      * A pre-update install's persisted state, written through the container the app itself
      * uses (its DataStores are process singletons - a second instance per file would crash).
-     * The legacy keys go in raw exactly as the /v1 app left them; their values never need to
-     * decrypt because the migration discards ciphertext unread.
+     * The legacy keys go in raw exactly as the /v1 app left them - frozen history, deliberately
+     * duplicated here rather than shared with TokenStore (like TokenStoreMigrationTest); their
+     * values never need to decrypt because the migration discards ciphertext unread.
      */
     private val seedV1State = object : ExternalResource() {
         override fun before() {
