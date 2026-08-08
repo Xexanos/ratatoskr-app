@@ -60,6 +60,24 @@ class TokenStore(
     }
 
     /**
+     * Removes the /v1 keys without decrypting them - the pair is dead weight, not a credential
+     * to carry over. The user id is dropped with it (it belonged to that pair, mirroring
+     * [clearToken]); the username stays for the sign-in pre-fill.
+     */
+    override suspend fun discardLegacyTokens(): Boolean {
+        val prefs = dataStore.data.first()
+        val hadLegacyTokens = prefs.contains(LEGACY_ACCESS_TOKEN) || prefs.contains(LEGACY_REFRESH_TOKEN)
+        if (hadLegacyTokens) {
+            dataStore.edit {
+                it.remove(LEGACY_ACCESS_TOKEN)
+                it.remove(LEGACY_REFRESH_TOKEN)
+                it.remove(USER_ID)
+            }
+        }
+        return hadLegacyTokens
+    }
+
+    /**
      * Blocking read of the current Ratatoskr token, for the OkHttp auth interceptor which runs
      * on a background thread and cannot suspend. DataStore keeps values in memory after the
      * first read, so this is cheap.
@@ -72,5 +90,10 @@ class TokenStore(
         val TOKEN = stringPreferencesKey("ratatoskr_token")
         val USER_ID = stringPreferencesKey("user_id")
         val USERNAME = stringPreferencesKey("username")
+
+        // The keys the /v1 app stored its Audiobookshelf token pair under. Read only by
+        // [discardLegacyTokens]; nothing writes them anymore.
+        val LEGACY_ACCESS_TOKEN = stringPreferencesKey("access_token")
+        val LEGACY_REFRESH_TOKEN = stringPreferencesKey("refresh_token")
     }
 }

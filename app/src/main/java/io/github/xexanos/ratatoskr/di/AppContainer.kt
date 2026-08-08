@@ -33,7 +33,9 @@ class AppContainer(context: Context) {
     private val connectionDataStore: DataStore<Preferences> =
         PreferenceDataStoreFactory.create { appContext.preferencesDataStoreFile("connection") }
 
-    private val tokenDataStore: DataStore<Preferences> =
+    // Internal (not private) only so the instrumented migration test can seed the raw /v1 keys
+    // a pre-update install left behind; production code outside this class never touches it.
+    internal val tokenDataStore: DataStore<Preferences> =
         PreferenceDataStoreFactory.create { appContext.preferencesDataStoreFile("tokens") }
 
     val connectionStore = DataStoreConnectionStore(connectionDataStore)

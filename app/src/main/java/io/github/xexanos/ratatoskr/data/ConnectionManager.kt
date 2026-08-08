@@ -20,11 +20,21 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
- * A pending 401 re-authentication (SPEC section 5). Its presence means the user was returned to
- * sign-in by a dead token; [code] is the 401 body's machine-readable reason, kept only to vary the
- * sign-in notice's copy and null when the 401 carried none.
+ * Why the next visit to the sign-in screen deserves an explanatory notice (SPEC section 5). Its
+ * presence means the user did not choose to sign in - a dead token or the /v1 -> /v2 update sent
+ * them there. It varies only the notice's copy, never the sign-in behaviour; absent on an
+ * ordinary visit.
  */
-data class ReauthPrompt(val code: String?)
+sealed interface SignInPrompt {
+    /**
+     * Returned to sign-in by a 401; [code] is the body's machine-readable reason, kept only to
+     * vary the notice's copy and null when the 401 carried none.
+     */
+    data class Reauth(val code: String?) : SignInPrompt
+
+    /** First launch after the /v1 -> /v2 update: the one-time re-login (SPEC section 5). */
+    data object AppUpdated : SignInPrompt
+}
 
 /**
  * Owns the current [RatatoskrClient], rebuilding it whenever the trusted server or its
@@ -64,11 +74,11 @@ class ConnectionManager(
     private val _reauthRequired = MutableStateFlow(false)
     val reauthRequired: StateFlow<Boolean> = _reauthRequired.asStateFlow()
 
-    // The reauth that is pending, read once by the sign-in screen to choose its notice copy (SPEC
-    // section 5). Non-null means the user landed on sign-in via a 401; [ReauthPrompt.code] then
-    // varies UPSTREAM_SESSION_LOST vs anything else. Consumed on read so a later, ordinary visit to
-    // sign-in shows no stale notice. Null means the visit is not a reauth.
-    @Volatile private var pendingReauth: ReauthPrompt? = null
+    // The prompt that is pending, read once by the sign-in screen to choose its notice copy (SPEC
+    // section 5): a 401 reauth (whose code varies UPSTREAM_SESSION_LOST vs anything else) or the
+    // one-time /v1 -> /v2 re-login. Consumed on read so a later, ordinary visit to sign-in shows
+    // no stale notice. Null means the visit needs no notice.
+    @Volatile private var pendingPrompt: SignInPrompt? = null
 
     /**
      * Terminal auth failure: discard the stranded token (keeping the username for the sign-in
@@ -80,7 +90,7 @@ class ConnectionManager(
         tokenStore.clearToken()
         // Set the prompt before raising the flag: the nav host routes on the flag and the sign-in
         // screen then reads the prompt, so it must already be in place.
-        pendingReauth = ReauthPrompt(code)
+        pendingPrompt = SignInPrompt.Reauth(code)
         _reauthRequired.value = true
     }
 
@@ -90,11 +100,25 @@ class ConnectionManager(
     }
 
     /**
-     * The pending reauth prompt, consumed on read (returns it once, then null). The sign-in screen
-     * calls this to decide whether - and which - re-authentication notice to show. Null when the
-     * user reached sign-in by an ordinary route rather than a 401.
+     * The one-time /v1 -> /v2 migration (SPEC section 5), run on every launch before the routing
+     * credential check: discards the Audiobookshelf token pair a pre-update install left behind
+     * and queues the "app updated" sign-in notice. The trusted server, its certificate, and the
+     * username are untouched, so that launch routes to a pre-filled sign-in on its own - no
+     * navigation signal needed. Every launch but the first after the update finds nothing and
+     * changes nothing.
      */
-    fun consumeReauthPrompt(): ReauthPrompt? = pendingReauth.also { pendingReauth = null }
+    suspend fun migrateFromV1() {
+        if (tokenStore.discardLegacyTokens()) {
+            pendingPrompt = SignInPrompt.AppUpdated
+        }
+    }
+
+    /**
+     * The pending sign-in prompt, consumed on read (returns it once, then null). The sign-in
+     * screen calls this to decide whether - and which - explanatory notice to show. Null when the
+     * user reached sign-in by an ordinary route.
+     */
+    fun consumeSignInPrompt(): SignInPrompt? = pendingPrompt.also { pendingPrompt = null }
 
     /** The remembered display username for the sign-in pre-fill, or null if none is stored. */
     suspend fun prefillUsername(): String? = tokenStore.username()
