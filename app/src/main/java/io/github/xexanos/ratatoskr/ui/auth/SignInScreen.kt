@@ -278,8 +278,10 @@ fun SignInScreen(
     }
 }
 
-// The explanatory notice for the 401 re-authentication path. A tonal (non-error) card: being
-// signed out again is a routine recovery, not a failure the user did something wrong to cause.
+// The explanatory notice for the 401 re-authentication path. A neutral, warm tonal card
+// (surfaceVariant), deliberately neither the success-reading secondaryContainer green nor the
+// errorContainer red of the sign-in-failure card below it: being signed out is an unexpected but
+// routine heads-up to act on, not a success and not a failure the user caused.
 @Composable
 private fun ReauthNoticeCard(notice: SignInNotice) {
     val message = when (notice) {
@@ -288,12 +290,12 @@ private fun ReauthNoticeCard(notice: SignInNotice) {
     }
     Surface(
         shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.secondaryContainer,
+        color = MaterialTheme.colorScheme.surfaceVariant,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Text(
             message,
-            color = MaterialTheme.colorScheme.onSecondaryContainer,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(16.dp),
         )
