@@ -6,7 +6,9 @@
 package io.github.xexanos.ratatoskr.ui.auth
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,8 +19,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -265,12 +269,22 @@ fun SignInScreen(
                 color = MaterialTheme.colorScheme.errorContainer,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(
-                    state.error.text(),
-                    color = MaterialTheme.colorScheme.onErrorContainer,
-                    style = MaterialTheme.typography.bodyMedium,
+                Row(
                     modifier = Modifier.padding(16.dp),
-                )
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    Icon(
+                        Icons.Default.WarningAmber,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onErrorContainer,
+                    )
+                    Text(
+                        state.error.text(),
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
             }
             Spacer(Modifier.height(16.dp))
         }
@@ -297,7 +311,9 @@ fun SignInScreen(
 // /v1 -> /v2 re-login). A neutral, warm tonal card (surfaceVariant), deliberately neither the
 // success-reading secondaryContainer green nor the errorContainer red of the sign-in-failure
 // card below it: being signed out is an unexpected but routine heads-up to act on, not a
-// success and not a failure the user caused.
+// success and not a failure the user caused. Color alone cannot carry that distinction - the
+// light palette's surfaceVariant and errorContainer are near-identical warm tints - so each
+// card leads with its own glyph: info here, warning there.
 @Composable
 private fun SignInNoticeCard(notice: SignInNotice) {
     val message = when (notice) {
@@ -310,12 +326,22 @@ private fun SignInNoticeCard(notice: SignInNotice) {
         color = MaterialTheme.colorScheme.surfaceVariant,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Text(
-            message,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.bodyMedium,
+        Row(
             modifier = Modifier.padding(16.dp),
-        )
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Icon(
+                Icons.Default.Info,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                message,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
     }
 }
 
