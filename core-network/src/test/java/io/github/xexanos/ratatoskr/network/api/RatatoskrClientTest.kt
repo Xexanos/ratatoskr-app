@@ -97,8 +97,6 @@ class RatatoskrClientTest {
 
     @Test
     fun `bare 404 on a session endpoint maps to ServerTooOld`() = runBlocking {
-        // A server too old to speak /v2 answers its routes with a bare 404 - no contract error
-        // body - unlike a real /v2 404, which always carries one (SPEC section 5, rollout guard).
         server.enqueue(MockResponse().setResponseCode(404))
 
         val result = client.currentSession()

@@ -173,8 +173,6 @@ class RatatoskrClient internal constructor(
         val parsed = errorBody?.let { runCatching { moshi.adapter(GenError::class.java).fromJson(it) }.getOrNull() }
         return when (status) {
             401 -> RatatoskrError.Unauthorized(parsed?.code)
-            // Every 404 a real server sends carries the contract's error body; a bare one comes
-            // from a server too old to route /v2 at all (SPEC section 5, rollout guard).
             404 -> when {
                 parsed == null -> RatatoskrError.ServerTooOld
                 sessionEndpoint -> RatatoskrError.NoActiveSession

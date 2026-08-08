@@ -13,6 +13,7 @@ import io.github.xexanos.ratatoskr.network.domain.ApiResult
 import io.github.xexanos.ratatoskr.network.domain.RatatoskrError
 import io.github.xexanos.ratatoskr.network.testutil.HttpsMockServer
 import kotlinx.coroutines.runBlocking
+import okhttp3.mockwebserver.MockResponse
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -64,9 +65,7 @@ class FactoryErrorMappingComponentTest {
 
     @Test
     fun aBare404MapsToServerTooOld() = runBlocking {
-        // A server too old to route /v2 answers with a bare 404 - no contract error body
-        // (SPEC section 5, rollout guard); a real /v2 404 always carries one (the tests above).
-        https.server.enqueue(okhttp3.mockwebserver.MockResponse().setResponseCode(404))
+        https.server.enqueue(MockResponse().setResponseCode(404))
 
         val result = client().getLibraryItem("nope")
 
