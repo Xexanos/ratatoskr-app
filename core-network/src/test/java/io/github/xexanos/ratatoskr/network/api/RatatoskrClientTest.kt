@@ -96,6 +96,29 @@ class RatatoskrClientTest {
     }
 
     @Test
+    fun `bare 404 on a session endpoint maps to ServerTooOld`() = runBlocking {
+        // A server too old to speak /v2 answers its routes with a bare 404 - no contract error
+        // body - unlike a real /v2 404, which always carries one (SPEC section 5, rollout guard).
+        server.enqueue(MockResponse().setResponseCode(404))
+
+        val result = client.currentSession()
+
+        assertEquals(RatatoskrError.ServerTooOld, (result as ApiResult.Failure).error)
+    }
+
+    @Test
+    fun `bare 404 elsewhere maps to ServerTooOld`() = runBlocking {
+        // "Bare" includes a framework's HTML error page: anything but the contract's Error shape.
+        server.enqueue(
+            MockResponse().setResponseCode(404).setBody("<html>Cannot POST /v2/auth/login</html>"),
+        )
+
+        val result = client.login("alex", "secret")
+
+        assertEquals(RatatoskrError.ServerTooOld, (result as ApiResult.Failure).error)
+    }
+
+    @Test
     fun `401 maps to Unauthorized carrying the body code`() = runBlocking {
         server.enqueue(MockResponse().setResponseCode(401).setBody("""{"code":"unauthorized","message":"no"}"""))
 

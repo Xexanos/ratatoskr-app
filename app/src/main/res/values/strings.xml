@@ -98,6 +98,7 @@
     <string name="error_unauthorized">Sign-in expired. Please sign in again.</string>
     <string name="error_no_active_session">Nothing is playing right now.</string>
     <string name="error_not_found">Not found.</string>
+    <string name="error_server_too_old">Your Ratatoskr server is too old for this version of the app. Please update the server to 2.0.0 or newer. If you cannot update it right now, install an earlier version of this app instead.</string>
     <string name="error_server">The server reported an error (%1$d).</string>
     <string name="error_upstream">Audiobookshelf or Sonos is unavailable.</string>
     <string name="error_cert_untrusted">The server certificate is not trusted. Re-confirm it in settings if it changed.</string>

@@ -32,6 +32,13 @@ sealed interface RatatoskrError {
     /** A requested resource was not found (HTTP 404 elsewhere). */
     data object NotFound : RatatoskrError
 
+    /**
+     * A route answered 404 without the contract's error body. Every 404 a real server sends
+     * carries one, so a bare 404 means the server predates `/v2` entirely and is too old for
+     * this app (SPEC section 5, rollout guard). The UI prompts to update the server.
+     */
+    data object ServerTooOld : RatatoskrError
+
     /** The server reported a structured error. [code] is its stable machine-readable code. */
     data class Server(val httpStatus: Int, val code: String?, val message: String?) : RatatoskrError
 
