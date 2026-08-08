@@ -8,7 +8,6 @@ package io.github.xexanos.ratatoskr.ui.auth
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
-import io.github.xexanos.ratatoskr.network.domain.RatatoskrError
 import io.github.xexanos.ratatoskr.ui.UiError
 import io.github.xexanos.ratatoskr.ui.theme.RatatoskrTheme
 
@@ -24,7 +23,7 @@ internal fun SignInIdlePreview() = RatatoskrTheme {
 @Preview(name = "Sign in - error", widthDp = 360, heightDp = 800)
 @Composable
 internal fun SignInErrorPreview() = RatatoskrTheme {
-    Surface { SignInScreen(SignInUiState.Error(UiError.Domain(RatatoskrError.Unauthorized()))) { _, _ -> } }
+    Surface { SignInScreen(SignInUiState.Error(UiError.WrongCredentials)) { _, _ -> } }
 }
 
 @Preview(name = "Sign in - submitting", widthDp = 360, heightDp = 800)

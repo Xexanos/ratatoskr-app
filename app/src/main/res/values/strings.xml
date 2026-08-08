@@ -97,6 +97,7 @@
     <!-- Errors -->
     <string name="error_no_server">No server configured.</string>
     <string name="error_unauthorized">Sign-in expired. Please sign in again.</string>
+    <string name="error_wrong_credentials">Wrong username or password.</string>
     <string name="error_no_active_session">Nothing is playing right now.</string>
     <string name="error_not_found">Not found.</string>
     <string name="error_server_too_old">Your Ratatoskr server is too old for this version of the app. Please update the server to 2.0.0 or newer. If you cannot update it right now, install an earlier version of this app instead.</string>
