@@ -25,6 +25,7 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -44,7 +45,9 @@ class RatatoskrClientTest {
         val moshi = ratatoskrMoshi()
         val retrofit = Retrofit.Builder()
             .baseUrl(server.url("/v2/"))
-            .client(OkHttpClient())
+            // Production-shaped auth chain (the factory wires the same interceptor), so the
+            // signOut test can assert the bearer actually rides on the logout request.
+            .client(OkHttpClient.Builder().addInterceptor(BearerAuthInterceptor(tokens)).build())
             .addConverterFactory(ScalarsConverterFactory.create())
             .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()
@@ -167,6 +170,41 @@ class RatatoskrClientTest {
         job.cancelAndJoin()
 
         assertTrue(job.isCancelled)
+    }
+
+    @Test
+    fun `signOut posts logout with the bearer token and clears the store`() = runBlocking {
+        server.enqueue(MockResponse().setResponseCode(204))
+
+        client.signOut()
+
+        val request = server.takeRequest()
+        assertEquals("POST", request.method)
+        assertEquals("/v2/auth/logout", request.path)
+        // MockWebServer enforces no auth, so the revocation only provably happened if the
+        // bearer is asserted explicitly (review discussion on #126).
+        assertEquals("Bearer t0", request.getHeader("Authorization"))
+        assertNull(tokens.currentTokenBlocking())
+    }
+
+    @Test
+    fun `signOut clears the store even when the server rejects the logout`() = runBlocking {
+        server.enqueue(
+            MockResponse().setResponseCode(500).setBody("""{"code":"boom","message":"broken"}"""),
+        )
+
+        client.signOut()
+
+        assertNull(tokens.currentTokenBlocking())
+    }
+
+    @Test
+    fun `signOut clears the store even when the server is unreachable`() = runBlocking {
+        server.shutdown()
+
+        client.signOut()
+
+        assertNull(tokens.currentTokenBlocking())
     }
 
     @Test

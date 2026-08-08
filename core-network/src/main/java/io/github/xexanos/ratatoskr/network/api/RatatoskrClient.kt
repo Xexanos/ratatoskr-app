@@ -24,6 +24,8 @@ import io.github.xexanos.ratatoskr.network.generated.model.StartSessionRequest
 import io.github.xexanos.ratatoskr.network.generated.model.Error as GenError
 import io.github.xexanos.ratatoskr.network.persist.TokenAccess
 import com.squareup.moshi.Moshi
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import retrofit2.Response
 import java.io.IOException
 import java.security.cert.CertificateException
@@ -72,8 +74,23 @@ class RatatoskrClient internal constructor(
         return result
     }
 
+    /**
+     * Signs this device out: tells the server to revoke the token (best-effort - logout is
+     * idempotent and answers 204 even for an unknown token, SPEC section 5) and always clears
+     * the stored credential, whatever the server said. The order matters: the request must go
+     * out while the token is still stored, because the bearer IS what the server resolves to
+     * the device session it revokes.
+     */
     suspend fun signOut() {
-        tokenStore.clear()
+        try {
+            // Best-effort: a Failure result (unreachable server, 5xx, whatever) is deliberately
+            // ignored - the local sign-out below must complete regardless.
+            executeNullable { systemApi.logout() }
+        } finally {
+            // NonCancellable so a caller cancelled mid-request (e.g. a cleared ViewModel scope)
+            // still ends up signed out locally.
+            withContext(NonCancellable) { tokenStore.clear() }
+        }
     }
 
     suspend fun listSpeakers(): ApiResult<List<Speaker>> =

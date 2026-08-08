@@ -53,6 +53,10 @@ class RatatoskrDispatcher(
     @Volatile var lastCoverRequest: RecordedRequest? = null
         private set
 
+    /** The last logout request served, for asserting sign-out told the server. */
+    @Volatile var lastLogoutRequest: RecordedRequest? = null
+        private set
+
     override fun dispatch(request: RecordedRequest): MockResponse {
         val path = request.path.orEmpty().substringBefore('?')
         // A dead token 401s every authenticated route (not /health, not login itself, which mints a
@@ -64,6 +68,10 @@ class RatatoskrDispatcher(
         return when {
             path == "/health" -> jsonResponse("""{"reachable":true}""")
             path == "/v2/auth/login" -> { unauthorizedCode = null; login() }
+            path == "/v2/auth/logout" -> {
+                lastLogoutRequest = request
+                MockResponse().setResponseCode(204)
+            }
             path == "/v2/speakers" -> jsonResponse(speakers)
             // The cover proxy: real PNG bytes so Coil decodes and renders them.
             path.startsWith("/v2/library/items/") && path.endsWith("/cover") -> {
