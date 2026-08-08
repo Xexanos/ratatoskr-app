@@ -22,13 +22,22 @@ import java.util.concurrent.atomic.AtomicReference
 class FakeTokenAccess(
     token: String? = null,
     user: AuthUser? = null,
+    // Seeds the fake as a pre-/v2 install: a legacy Audiobookshelf token pair is present until
+    // [discardLegacyTokens] removes it. Pair it with a user (and no token) to model the
+    // remembered username that survives the migration.
+    legacyTokens: Boolean = false,
 ) : TokenAccess {
 
     // retainedUsername survives clearToken (the 401 pre-fill), so it is held apart from the
     // token/user pair rather than derived from it.
-    private data class State(val token: String?, val user: AuthUser?, val retainedUsername: String?)
+    private data class State(
+        val token: String?,
+        val user: AuthUser?,
+        val retainedUsername: String?,
+        val legacyTokens: Boolean,
+    )
 
-    private val state = AtomicReference(State(token, user, user?.username))
+    private val state = AtomicReference(State(token, user, user?.username, legacyTokens))
 
     /** The session as the current state reports it - null unless a token and user are present. */
     val savedSession: AuthSession?
@@ -41,18 +50,23 @@ class FakeTokenAccess(
     override suspend fun username(): String? = state.get().retainedUsername
 
     override suspend fun save(session: AuthSession) {
-        state.set(State(session.token, session.user, session.user.username))
+        state.updateAndGet {
+            State(session.token, session.user, session.user.username, it.legacyTokens)
+        }
     }
 
     override suspend fun clearToken() {
         // Keep the remembered username; drop the token and user (SPEC section 5), mirroring the
         // real store.
-        state.updateAndGet { State(null, null, it.retainedUsername) }
+        state.updateAndGet { State(null, null, it.retainedUsername, it.legacyTokens) }
     }
 
     override suspend fun clear() {
-        state.set(State(null, null, null))
+        state.set(State(null, null, null, legacyTokens = false))
     }
+
+    override suspend fun discardLegacyTokens(): Boolean =
+        state.getAndUpdate { it.copy(legacyTokens = false) }.legacyTokens
 
     override fun currentTokenBlocking(): String? = state.get().token
 }

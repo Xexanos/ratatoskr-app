@@ -48,6 +48,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.xexanos.ratatoskr.R
 import io.github.xexanos.ratatoskr.data.ConnectionManager
+import io.github.xexanos.ratatoskr.data.SignInPrompt
 import io.github.xexanos.ratatoskr.network.domain.ApiResult
 import io.github.xexanos.ratatoskr.ui.UiError
 import io.github.xexanos.ratatoskr.ui.text
@@ -64,8 +65,9 @@ sealed interface SignInUiState {
 }
 
 /**
- * Why the user is on sign-in when they arrived via a 401 (SPEC section 5). It varies only the
- * explanatory notice's copy - the recovery is one path either way. Absent on an ordinary sign-in.
+ * Why the user is on sign-in when they did not choose to be - a 401 or the /v1 -> /v2 update
+ * (SPEC section 5). It varies only the explanatory notice's copy - the recovery is one path
+ * either way. Absent on an ordinary sign-in.
  */
 enum class SignInNotice {
     /** `code: UPSTREAM_SESSION_LOST` - the server's own media-server sign-in expired. */
@@ -73,6 +75,9 @@ enum class SignInNotice {
 
     /** Any other 401 - the token was revoked or the session ended elsewhere. */
     SESSION_ENDED,
+
+    /** First launch after the /v1 -> /v2 update - the one-time re-login (SPEC section 5). */
+    APP_UPDATED,
 }
 
 /** The pre-fill the sign-in screen opens with: a remembered username and an optional 401 notice. */
@@ -99,9 +104,12 @@ class SignInViewModel(
 
     init {
         viewModelScope.launch {
-            val notice = connectionManager.consumeReauthPrompt()?.let {
-                if (it.code == UPSTREAM_SESSION_LOST) SignInNotice.MEDIA_SERVER_EXPIRED
-                else SignInNotice.SESSION_ENDED
+            val notice = when (val prompt = connectionManager.consumeSignInPrompt()) {
+                is SignInPrompt.Reauth ->
+                    if (prompt.code == UPSTREAM_SESSION_LOST) SignInNotice.MEDIA_SERVER_EXPIRED
+                    else SignInNotice.SESSION_ENDED
+                SignInPrompt.AppUpdated -> SignInNotice.APP_UPDATED
+                null -> null
             }
             _prefill.value = SignInPrefill(
                 username = connectionManager.prefillUsername().orEmpty(),
@@ -196,11 +204,11 @@ fun SignInScreen(
         )
         Spacer(Modifier.height(32.dp))
 
-        // The 401 re-authentication notice (SPEC section 5): shown only when the user was returned
-        // here by a dead token, explaining why. Distinct from the [SignInUiState.Error] card below,
-        // which reports a failed sign-in attempt.
+        // The explanatory notice (SPEC section 5): shown only when the user was sent here by a
+        // dead token or the /v1 -> /v2 update, explaining why. Distinct from the
+        // [SignInUiState.Error] card below, which reports a failed sign-in attempt.
         if (notice != null) {
-            ReauthNoticeCard(notice)
+            SignInNoticeCard(notice)
             Spacer(Modifier.height(24.dp))
         }
 
@@ -278,15 +286,17 @@ fun SignInScreen(
     }
 }
 
-// The explanatory notice for the 401 re-authentication path. A neutral, warm tonal card
-// (surfaceVariant), deliberately neither the success-reading secondaryContainer green nor the
-// errorContainer red of the sign-in-failure card below it: being signed out is an unexpected but
-// routine heads-up to act on, not a success and not a failure the user caused.
+// The explanatory notice for the sign-ins the user did not choose (a 401, or the one-time
+// /v1 -> /v2 re-login). A neutral, warm tonal card (surfaceVariant), deliberately neither the
+// success-reading secondaryContainer green nor the errorContainer red of the sign-in-failure
+// card below it: being signed out is an unexpected but routine heads-up to act on, not a
+// success and not a failure the user caused.
 @Composable
-private fun ReauthNoticeCard(notice: SignInNotice) {
+private fun SignInNoticeCard(notice: SignInNotice) {
     val message = when (notice) {
         SignInNotice.MEDIA_SERVER_EXPIRED -> stringResource(R.string.signin_notice_media_server_expired)
         SignInNotice.SESSION_ENDED -> stringResource(R.string.signin_notice_session_ended)
+        SignInNotice.APP_UPDATED -> stringResource(R.string.signin_notice_app_updated)
     }
     Surface(
         shape = MaterialTheme.shapes.large,

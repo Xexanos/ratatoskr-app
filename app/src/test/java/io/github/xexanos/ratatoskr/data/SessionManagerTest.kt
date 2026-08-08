@@ -295,7 +295,7 @@ class SessionManagerTest {
         assertTrue(connectionManager.reauthRequired.value)
         assertNull(connectionManager.tokenStore.authSession())
         assertEquals("alex", connectionManager.prefillUsername())
-        assertEquals("UPSTREAM_SESSION_LOST", connectionManager.consumeReauthPrompt()?.code)
+        assertEquals(SignInPrompt.Reauth("UPSTREAM_SESSION_LOST"), connectionManager.consumeSignInPrompt())
     }
 
     @Test
