@@ -14,6 +14,7 @@ import io.github.xexanos.ratatoskr.data.ConnectionManager
 import io.github.xexanos.ratatoskr.network.FakeTokenAccess
 import io.github.xexanos.ratatoskr.network.WireFixtures
 import io.github.xexanos.ratatoskr.network.domain.AuthUser
+import io.github.xexanos.ratatoskr.network.domain.RatatoskrError
 import io.github.xexanos.ratatoskr.network.persist.ConnectionStore
 import io.github.xexanos.ratatoskr.network.persist.DataStoreConnectionStore
 import io.github.xexanos.ratatoskr.network.testutil.HttpsMockServer
@@ -115,6 +116,23 @@ class SignInViewModelTest {
 
         val state = viewModel.uiState.value
         assertTrue("expected Error, was $state", state is SignInUiState.Error)
+    }
+
+    @Test
+    fun `a bare 404 from a pre-v2 server surfaces the server-too-old error`() = runTest(dispatcher) {
+        // The rollout guard (SPEC section 5): a server too old to route /v2 answers the login
+        // route with a bare 404, which must land as the targeted update prompt, not a generic
+        // failure.
+        server.server.enqueue(MockResponse().setResponseCode(404))
+        val viewModel = SignInViewModel(trustedConnectionManager())
+
+        viewModel.signIn("alex", "secret")
+        waitUntil { viewModel.uiState.value != SignInUiState.Submitting }
+
+        assertEquals(
+            SignInUiState.Error(UiError.Domain(RatatoskrError.ServerTooOld)),
+            viewModel.uiState.value,
+        )
     }
 
     @Test

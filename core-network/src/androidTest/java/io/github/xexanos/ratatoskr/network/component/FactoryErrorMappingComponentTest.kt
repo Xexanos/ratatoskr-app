@@ -63,6 +63,17 @@ class FactoryErrorMappingComponentTest {
     }
 
     @Test
+    fun aBare404MapsToServerTooOld() = runBlocking {
+        // A server too old to route /v2 answers with a bare 404 - no contract error body
+        // (SPEC section 5, rollout guard); a real /v2 404 always carries one (the tests above).
+        https.server.enqueue(okhttp3.mockwebserver.MockResponse().setResponseCode(404))
+
+        val result = client().getLibraryItem("nope")
+
+        assertEquals(RatatoskrError.ServerTooOld, (result as ApiResult.Failure).error)
+    }
+
+    @Test
     fun a502MapsToUpstreamWithTheParsedErrorBody() = runBlocking {
         https.enqueueJson("""{"code":"abs_unreachable","message":"Audiobookshelf down"}""", code = 502)
 

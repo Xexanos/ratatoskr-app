@@ -39,6 +39,7 @@ fun RatatoskrError.text(): String = when (this) {
     is RatatoskrError.Unauthorized -> stringResource(R.string.error_unauthorized)
     is RatatoskrError.NoActiveSession -> stringResource(R.string.error_no_active_session)
     is RatatoskrError.NotFound -> stringResource(R.string.error_not_found)
+    is RatatoskrError.ServerTooOld -> stringResource(R.string.error_server_too_old)
     is RatatoskrError.Server -> message ?: stringResource(R.string.error_server, httpStatus)
     is RatatoskrError.Upstream -> message ?: stringResource(R.string.error_upstream)
     is RatatoskrError.CertificateUntrusted -> stringResource(R.string.error_cert_untrusted)
