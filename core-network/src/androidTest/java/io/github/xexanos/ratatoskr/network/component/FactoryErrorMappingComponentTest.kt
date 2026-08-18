@@ -13,6 +13,7 @@ import io.github.xexanos.ratatoskr.network.domain.ApiResult
 import io.github.xexanos.ratatoskr.network.domain.RatatoskrError
 import io.github.xexanos.ratatoskr.network.testutil.HttpsMockServer
 import kotlinx.coroutines.runBlocking
+import okhttp3.mockwebserver.MockResponse
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -60,6 +61,15 @@ class FactoryErrorMappingComponentTest {
         val result = client().getLibraryItem("nope")
 
         assertEquals(RatatoskrError.NotFound, (result as ApiResult.Failure).error)
+    }
+
+    @Test
+    fun aBare404MapsToServerTooOld() = runBlocking {
+        https.server.enqueue(MockResponse().setResponseCode(404))
+
+        val result = client().getLibraryItem("nope")
+
+        assertEquals(RatatoskrError.ServerTooOld, (result as ApiResult.Failure).error)
     }
 
     @Test

@@ -92,6 +92,7 @@
     <string name="error_unauthorized">Anmeldung abgelaufen. Bitte melde dich erneut an.</string>
     <string name="error_no_active_session">Gerade wird nichts wiedergegeben.</string>
     <string name="error_not_found">Nicht gefunden.</string>
+    <string name="error_server_too_old">Dein Ratatoskr-Server ist zu alt für diese Version der App. Aktualisiere den Server auf 2.0.0 oder neuer. Falls du den Server gerade nicht aktualisieren kannst, installiere stattdessen eine ältere Version dieser App.</string>
     <string name="error_server">Der Server hat einen Fehler gemeldet (%1$d).</string>
     <string name="error_upstream">Audiobookshelf oder Sonos ist nicht verfügbar.</string>
     <string name="error_cert_untrusted">Dem Serverzertifikat wird nicht vertraut. Bestätige es in den Einstellungen erneut, falls es sich geändert hat.</string>

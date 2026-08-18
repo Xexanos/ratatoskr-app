@@ -166,6 +166,16 @@ class AppFlowTest {
     }
 
     @Test
+    fun aPreV2ServerAtSignInShowsTheUpdateServerPrompt() {
+        // The rollout guard (SPEC section 5): the user must see the targeted "update your
+        // server" guidance (with its generic install-an-older-app fallback), not a generic error.
+        useDispatcher(RatatoskrDispatcher(login = { MockResponse().setResponseCode(404) }))
+        connectTrustAndSubmitSignIn()
+        compose.awaitText(str(R.string.error_server_too_old))
+        compose.onAllNodesWithTag(UiTestTags.LIBRARY_ROW).assertCountEquals(0)
+    }
+
+    @Test
     fun emptyLibraryShowsTheEmptyState() {
         useDispatcher(RatatoskrDispatcher(libraryPage = WireFixtures.libraryPageJson(items = emptyList())))
         connectTrustAndSubmitSignIn()
