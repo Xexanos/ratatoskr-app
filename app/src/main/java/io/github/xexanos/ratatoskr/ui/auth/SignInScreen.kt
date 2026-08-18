@@ -50,6 +50,7 @@ import io.github.xexanos.ratatoskr.R
 import io.github.xexanos.ratatoskr.data.ConnectionManager
 import io.github.xexanos.ratatoskr.data.SignInPrompt
 import io.github.xexanos.ratatoskr.network.domain.ApiResult
+import io.github.xexanos.ratatoskr.network.domain.RatatoskrError
 import io.github.xexanos.ratatoskr.ui.UiError
 import io.github.xexanos.ratatoskr.ui.text
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -129,7 +130,13 @@ class SignInViewModel(
             }
             _uiState.value = when (val result = client.login(username, password)) {
                 is ApiResult.Success -> SignInUiState.Success
-                is ApiResult.Failure -> SignInUiState.Error(UiError.Domain(result.error))
+                is ApiResult.Failure -> SignInUiState.Error(
+                    // A 401 here rejects the just-entered credentials (ux-design: Sign in,
+                    // decision 4) - unlike a 401 on an authenticated call, where the shared
+                    // mapping's "sign-in expired" copy is right.
+                    if (result.error is RatatoskrError.Unauthorized) UiError.WrongCredentials
+                    else UiError.Domain(result.error),
+                )
             }
         }
     }
