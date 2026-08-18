@@ -58,3 +58,24 @@ internal fun SignInAppUpdatedNoticePreview() = RatatoskrTheme {
         ) { _, _ -> }
     }
 }
+
+// Notice and error on one screen (a 401 return followed by a failed re-login), in both themes:
+// the two cards must read as different kinds of message, not two shades of the same card.
+@Composable
+private fun NoticeVsErrorPreview(dark: Boolean) = RatatoskrTheme(darkTheme = dark) {
+    Surface {
+        SignInScreen(
+            state = SignInUiState.Error(UiError.WrongCredentials),
+            initialUsername = "alex",
+            notice = SignInNotice.SESSION_ENDED,
+        ) { _, _ -> }
+    }
+}
+
+@Preview(name = "Sign in - notice vs error light", widthDp = 360, heightDp = 800)
+@Composable
+internal fun SignInNoticeVsErrorLightPreview() = NoticeVsErrorPreview(dark = false)
+
+@Preview(name = "Sign in - notice vs error dark", widthDp = 360, heightDp = 800)
+@Composable
+internal fun SignInNoticeVsErrorDarkPreview() = NoticeVsErrorPreview(dark = true)
