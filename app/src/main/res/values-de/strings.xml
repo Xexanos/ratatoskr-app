@@ -24,6 +24,7 @@
     <string name="signin_action">Anmelden</string>
     <string name="signin_notice_media_server_expired">Deine Medienserver-Anmeldung ist abgelaufen. Gib dein Passwort ein, um dich erneut zu verbinden.</string>
     <string name="signin_notice_session_ended">Du wurdest abgemeldet. Gib dein Passwort ein, um dich erneut anzumelden.</string>
+    <string name="signin_notice_app_updated">Die Ratatoskr-App wurde aktualisiert und benötigt eine einmalige Anmeldung. Gib dein Passwort ein, um fortzufahren.</string>
 
     <!-- Library -->
     <string name="library_title">Bibliothek</string>

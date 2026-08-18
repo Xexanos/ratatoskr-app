@@ -38,6 +38,14 @@ interface TokenAccess : CredentialStore {
     suspend fun clearToken()
 
     /**
+     * The one-time /v1 -> /v2 migration (SPEC section 5): discards the Audiobookshelf token
+     * pair a pre-update install left behind, keeping the remembered username like [clearToken]
+     * does. Returns whether there was a pair to discard - true exactly once, on the first
+     * launch after the update; a no-op false on every other launch.
+     */
+    suspend fun discardLegacyTokens(): Boolean
+
+    /**
      * Blocking read of the current Ratatoskr token, for OkHttp interceptors which run on a
      * background thread and cannot suspend.
      */

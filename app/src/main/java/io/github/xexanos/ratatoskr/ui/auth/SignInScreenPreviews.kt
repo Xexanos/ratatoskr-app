@@ -46,3 +46,16 @@ internal fun SignInReauthNoticePreview() = RatatoskrTheme {
         ) { _, _ -> }
     }
 }
+
+// The one-time /v1 -> /v2 re-login (SPEC section 5): same pre-filled screen, the update notice.
+@Preview(name = "Sign in - app-updated notice", widthDp = 360, heightDp = 800)
+@Composable
+internal fun SignInAppUpdatedNoticePreview() = RatatoskrTheme {
+    Surface {
+        SignInScreen(
+            state = SignInUiState.Idle,
+            initialUsername = "alex",
+            notice = SignInNotice.APP_UPDATED,
+        ) { _, _ -> }
+    }
+}

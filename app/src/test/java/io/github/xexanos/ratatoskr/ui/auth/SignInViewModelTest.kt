@@ -154,6 +154,22 @@ class SignInViewModelTest {
     }
 
     @Test
+    fun `the one-time migration shows the app-updated notice with the username pre-filled`() =
+        runTest(dispatcher) {
+            // First launch after the /v1 -> /v2 update (SPEC section 5, issue #121): the legacy
+            // tokens were discarded at launch, the username survives, and the one-time notice
+            // explains the re-login.
+            val connectionManager =
+                trustedConnectionManager(FakeTokenAccess(user = AuthUser("7", "alex"), legacyTokens = true))
+            connectionManager.migrateFromV1()
+
+            val viewModel = SignInViewModel(connectionManager)
+            waitUntil { viewModel.prefill.value.username == "alex" }
+
+            assertEquals(SignInNotice.APP_UPDATED, viewModel.prefill.value.notice)
+        }
+
+    @Test
     fun `an ordinary sign-in visit shows no notice`() = runTest(dispatcher) {
         // No reauth is pending: the username may still pre-fill (a remembered user), but there is no
         // explanatory notice.
