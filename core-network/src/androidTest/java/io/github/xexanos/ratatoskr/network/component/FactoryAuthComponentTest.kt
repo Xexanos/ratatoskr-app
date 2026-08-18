@@ -15,6 +15,7 @@ import io.github.xexanos.ratatoskr.network.testutil.HttpsMockServer
 import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.MockResponse
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -42,6 +43,23 @@ class FactoryAuthComponentTest {
 
         val request = https.takeRequest()
         assertEquals("Bearer t0", request.getHeader("Authorization"))
+    }
+
+    @Test
+    fun signOutSendsTheBearerOnTheLogoutRequest() = runBlocking {
+        https.enqueue204()
+
+        val tokens = FakeTokenAccess(token = "t0")
+        client(tokens).signOut()
+
+        // MockWebServer enforces no auth, so revocation is only proven by asserting the header
+        // itself: without it this test would stay green while the server-side revocation
+        // silently never happens (review discussion on #126).
+        val request = https.takeRequest()
+        assertEquals("POST", request.method)
+        assertEquals("/v2/auth/logout", request.path)
+        assertEquals("Bearer t0", request.getHeader("Authorization"))
+        assertNull(tokens.currentTokenBlocking())
     }
 
     @Test

@@ -207,6 +207,8 @@ class AppFlowTest {
 
     @Test
     fun signOutFromSettingsReturnsToSignIn() {
+        val dispatcher = RatatoskrDispatcher()
+        useDispatcher(dispatcher)
         connectTrustAndSubmitSignIn()
         compose.awaitTag(UiTestTags.LIBRARY_ROW)
         compose.onNodeWithContentDescription(str(R.string.library_settings)).performClick()
@@ -215,6 +217,9 @@ class AppFlowTest {
         // Signing out clears the tokens and routes back to sign-in.
         compose.awaitText(str(R.string.signin_action))
         compose.onNodeWithText(str(R.string.signin_action)).assertIsDisplayed()
+        // ...and told the server, so the device session is revoked (issue #120). The header
+        // mechanics live in the component layer; here only the flow-level outcome is checked.
+        compose.waitUntil(5_000) { dispatcher.lastLogoutRequest != null }
     }
 
     @Test
