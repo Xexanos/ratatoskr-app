@@ -21,6 +21,8 @@ Working agreements:
 - The technology stack (SPEC section 12) and the screen and module structure (SPEC
   section 13) are decided and recorded in the SPEC; changes to them go through the SPEC
   first.
+- Store listing text, and release changelogs in particular, follow
+  `fastlane/metadata/README.md` (500-character limit, one line, both locales).
 
 ## Agent skills
 
