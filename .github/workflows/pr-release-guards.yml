@@ -1,5 +1,5 @@
-# Per-PR release guards. Two independent checks that keep the continuous-versioning release model
-# (SPEC section 8) honest, so a release-worthy change can never merge without the version bump the
+# Per-PR release guards. Three independent checks that keep the release model (SPEC section 8)
+# honest, so a release-worthy change can never merge without the version bump the
 # automated tag gate (promote.yml) needs - "forgetting to bump" is caught here, loudly, instead of
 # silently producing no release later (promote.yml no-ops when the versionName is already tagged).
 #
@@ -10,10 +10,16 @@
 #                     bump versionName/versionCode in app/build.gradle.kts by at least the semver
 #                     level those commits imply, keep versionCode consistent with the SPEC formula,
 #                     and ship the matching fastlane changelog. Otherwise no bump is required.
+#   - store-metadata: the changelog entries themselves hold to the store's shape - the
+#                     500-CHARACTER limit, one paragraph on one line, and en-US/de-DE as a
+#                     pair. The version-bump guard only asserts that the new en-US file
+#                     exists and is non-empty, which is how the German 10800 entry went
+#                     missing (#142). Rules in fastlane/metadata/README.md.
 #
-# Deliberately its own workflow (no paths-ignore): both jobs must ALWAYS report so they are safe to
-# make required status checks. A docs-only PR still runs them - commitlint always applies, and the
-# version-bump guard simply finds no release-worthy commits and passes.
+# Deliberately its own workflow (no paths-ignore): all three jobs must ALWAYS report so they are safe
+# to make required status checks. A docs-only PR still runs them - commitlint always applies, the
+# version-bump guard simply finds no release-worthy commits and passes, and store-metadata checks
+# the entries whatever the PR is about (a changelog is just as easy to break in a docs PR).
 #
 # Concurrent-PR caveat: the guard compares against the PR's base. Two PRs branched off the same
 # commit can both bump to the same version and both pass; whichever merges second then re-points no
@@ -130,3 +136,11 @@ jobs:
           [ -s "$changelog" ] || fail "Missing (or empty) changelog ${changelog} for versionCode ${head_vc} (SPEC section 8 requires at least en-US)."
 
           echo "OK: ${bump}-level PR bumps ${base_vn} (${base_vc}) -> ${head_vn} (${head_vc}); changelog present."
+
+  store-metadata:
+    name: Store metadata conventions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check the fastlane changelog conventions
+        run: python3 scripts/check-store-metadata.py

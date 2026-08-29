@@ -18,9 +18,8 @@ One file per released version code: `android/<locale>/changelogs/<versionCode>.t
 - **One paragraph on one line.** No headings, no lists, no blank lines, no hard wrapping.
 - **UTF-8 without BOM, LF, exactly one trailing newline.** `.gitattributes` normalises the
   line ending; the rest is on you.
-- **`en-US` and `de-DE` come as a pair.** `pr-release-guards.yml` only checks that `en-US`
-  exists and is non-empty, so nothing catches a missing translation. Write both in the same
-  commit.
+- **`en-US` and `de-DE` come as a pair.** Write both in the same commit; the check below
+  rejects a version code that exists in only one of them.
 
 ### Voice
 
@@ -44,17 +43,13 @@ locale before writing.
 
 ### Checking an entry
 
-Byte-counting tools misreport the length, so check with Python:
-
 ```bash
-python - <<'PY'
-import glob, io
-NL = chr(10)
-for p in sorted(glob.glob("fastlane/metadata/android/*/changelogs/*.txt")):
-    s = io.open(p, encoding="utf-8").read()
-    if len(s) > 500 or s.count(NL) != 1 or not s.endswith(NL):
-        print("%s: %d characters, %d lines" % (p, len(s), s.count(NL)))
-PY
+python3 scripts/check-store-metadata.py
 ```
 
-Silence means every entry is within the limit, on a single line, and newline-terminated.
+It enforces the mechanical rules above over every entry - the character limit, the single
+line, the trailing newline, LF, and the locale pairing - and reports the paths that break
+them. CI runs the same script as the "Store metadata conventions" job of
+`pr-release-guards.yml`, so a broken entry fails the PR rather than reaching the store.
+
+Voice is deliberately not checked. Read the neighbouring entries instead.
