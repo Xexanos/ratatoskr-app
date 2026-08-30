@@ -24,7 +24,9 @@ val BackgroundLight = Color(0xFFFFFBF8)
 val OnBackgroundLight = Color(0xFF211A17)
 val SurfaceVariantLight = Color(0xFFF4DED5)
 val OnSurfaceVariantLight = Color(0xFF53433D)
-val OutlineLight = Color(0xFF85736C)
+// Darker than the tone the palette derivation gives: ATF's screenshot contrast check reads a
+// text field's outline as its text, so this has to clear 4.5:1 against BackgroundLight (4.76:1).
+val OutlineLight = Color(0xFF7F6D67)
 // Tonal container band (the search bar's container tone in the design doc, used by the
 // continue-listening shelf) and the hairline edge that closes it.
 val SurfaceContainerLight = Color(0xFFF6EAE2)
