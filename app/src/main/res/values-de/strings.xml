@@ -22,6 +22,9 @@
     <string name="signin_username_label">Benutzername</string>
     <string name="signin_password_label">Passwort</string>
     <string name="signin_action">Anmelden</string>
+    <string name="signin_notice_media_server_expired">Deine Medienserver-Anmeldung ist abgelaufen. Gib dein Passwort ein, um dich erneut zu verbinden.</string>
+    <string name="signin_notice_session_ended">Du wurdest abgemeldet. Gib dein Passwort ein, um dich erneut anzumelden.</string>
+    <string name="signin_notice_app_updated">Die Ratatoskr-App wurde aktualisiert und benötigt eine einmalige Anmeldung. Gib dein Passwort ein, um fortzufahren.</string>
 
     <!-- Library -->
     <string name="library_title">Bibliothek</string>
@@ -88,8 +91,10 @@
     <!-- Errors -->
     <string name="error_no_server">Kein Server konfiguriert.</string>
     <string name="error_unauthorized">Anmeldung abgelaufen. Bitte melde dich erneut an.</string>
+    <string name="error_wrong_credentials">Falscher Benutzername oder falsches Passwort.</string>
     <string name="error_no_active_session">Gerade wird nichts wiedergegeben.</string>
     <string name="error_not_found">Nicht gefunden.</string>
+    <string name="error_server_too_old">Dein Ratatoskr-Server ist zu alt für diese Version der App. Aktualisiere den Server auf 2.0.0 oder neuer. Falls du den Server gerade nicht aktualisieren kannst, installiere stattdessen eine ältere Version dieser App.</string>
     <string name="error_server">Der Server hat einen Fehler gemeldet (%1$d).</string>
     <string name="error_upstream">Audiobookshelf oder Sonos ist nicht verfügbar.</string>
     <string name="error_cert_untrusted">Dem Serverzertifikat wird nicht vertraut. Bestätige es in den Einstellungen erneut, falls es sich geändert hat.</string>

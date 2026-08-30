@@ -43,9 +43,9 @@ import org.junit.runner.RunWith
  * app itself drives its real navigation -> ViewModels -> ConnectionManager -> core-network
  * against a [HttpsMockServer] standing in for the Ratatoskr server.
  *
- * This layer asserts user-visible outcomes and flow; the wire-level mechanics (token rotation,
- * error taxonomy, enum fallback, concurrency) are the component layer's job (see
- * core-network `Factory*ComponentTest`) and are deliberately not re-checked here.
+ * This layer asserts user-visible outcomes and flow; the wire-level mechanics (bearer
+ * attachment, error taxonomy, enum fallback) are the component layer's job (see core-network
+ * `Factory*ComponentTest`) and are deliberately not re-checked here.
  *
  * Synchronisation: the clock is left auto-advancing (default). Material3 spinners animate
  * forever, but here they are transient - MockWebServer answers in milliseconds, so each load
@@ -166,6 +166,16 @@ class AppFlowTest {
     }
 
     @Test
+    fun aPreV2ServerAtSignInShowsTheUpdateServerPrompt() {
+        // The rollout guard (SPEC section 5): the user must see the targeted "update your
+        // server" guidance (with its generic install-an-older-app fallback), not a generic error.
+        useDispatcher(RatatoskrDispatcher(login = { MockResponse().setResponseCode(404) }))
+        connectTrustAndSubmitSignIn()
+        compose.awaitText(str(R.string.error_server_too_old))
+        compose.onAllNodesWithTag(UiTestTags.LIBRARY_ROW).assertCountEquals(0)
+    }
+
+    @Test
     fun emptyLibraryShowsTheEmptyState() {
         useDispatcher(RatatoskrDispatcher(libraryPage = WireFixtures.libraryPageJson(items = emptyList())))
         connectTrustAndSubmitSignIn()
@@ -175,11 +185,11 @@ class AppFlowTest {
 
     @Test
     fun libraryCoversLoadThroughTheAuthenticatedPinnedStack() {
-        // A library item whose coverUrl is origin-relative, as the server sends it since
-        // contract 1.3.x; the dispatcher's cover route serves a real decodable PNG.
+        // A library item whose coverUrl is origin-relative, as the server sends it; the
+        // dispatcher's cover route serves a real decodable PNG.
         val dispatcher = RatatoskrDispatcher(
             libraryPage = WireFixtures.libraryPageJson(
-                items = listOf(WireFixtures.libraryItemSummaryJson(coverUrl = "/v1/library/items/i1/cover")),
+                items = listOf(WireFixtures.libraryItemSummaryJson(coverUrl = "/v2/library/items/i1/cover")),
             ),
         )
         useDispatcher(dispatcher)
@@ -192,7 +202,7 @@ class AppFlowTest {
         val request = dispatcher.lastCoverRequest!!
 
         // The bearer token rode along on the image request (same token the API calls use)...
-        assertEquals("Bearer a1", request.getHeader("Authorization"))
+        assertEquals("Bearer t1", request.getHeader("Authorization"))
         // ...and the height arrived quantized to a bucket, not as raw view pixels.
         val h = request.requestUrl?.queryParameter("h")?.toIntOrNull()
         assertTrue("expected a bucketed h, got h=$h", h in listOf(128, 256, 512, 1024))
@@ -207,6 +217,8 @@ class AppFlowTest {
 
     @Test
     fun signOutFromSettingsReturnsToSignIn() {
+        val dispatcher = RatatoskrDispatcher()
+        useDispatcher(dispatcher)
         connectTrustAndSubmitSignIn()
         compose.awaitTag(UiTestTags.LIBRARY_ROW)
         compose.onNodeWithContentDescription(str(R.string.library_settings)).performClick()
@@ -215,6 +227,41 @@ class AppFlowTest {
         // Signing out clears the tokens and routes back to sign-in.
         compose.awaitText(str(R.string.signin_action))
         compose.onNodeWithText(str(R.string.signin_action)).assertIsDisplayed()
+        // ...and told the server, so the device session is revoked (issue #120). The header
+        // mechanics live in the component layer; here only the flow-level outcome is checked.
+        compose.waitUntil(5_000) { dispatcher.lastLogoutRequest != null }
+    }
+
+    @Test
+    fun aDeadTokenReturnsToPrefilledSignInAndRecovers() {
+        // The 401 re-authentication path (SPEC section 5, issue #119): a book is playing when the
+        // stored token dies. The app discards the token and returns to the SAME sign-in screen,
+        // pre-filled - server URL, certificate trust, and username survive; only the password is
+        // blank - with an explanatory notice whose copy the 401 `code` selects.
+        val dispatcher = RatatoskrDispatcher()
+        useDispatcher(dispatcher)
+        connectTrustAndSubmitSignIn()
+
+        // Drive into an active, polling session.
+        compose.awaitTag(UiTestTags.LIBRARY_ROW)
+        compose.onAllNodesWithTag(UiTestTags.LIBRARY_ROW)[0].performClick()
+        compose.awaitTag(UiTestTags.SPEAKER_ROW)
+        compose.onAllNodesWithTag(UiTestTags.SPEAKER_ROW)[0].performClick()
+        compose.awaitContentDescription(str(R.string.nowplaying_action_pause))
+
+        // The server loses its Audiobookshelf session: the next poll 401s with UPSTREAM_SESSION_LOST.
+        dispatcher.expireTokenWith("UPSTREAM_SESSION_LOST")
+
+        // Landed back on a pre-filled sign-in: the media-server notice, the surviving username, and
+        // the sign-in action (not a dedicated screen).
+        compose.awaitText(str(R.string.signin_notice_media_server_expired))
+        compose.onNodeWithText("alex").assertIsDisplayed()
+        compose.onNodeWithText(str(R.string.signin_action)).assertIsDisplayed()
+
+        // Re-login mints a fresh, working token and the user resumes at the library.
+        compose.onNode(hasSetTextAction() and hasImeAction(ImeAction.Done)).performTextInput("secret")
+        compose.onNodeWithText(str(R.string.signin_action)).performClick()
+        compose.awaitTag(UiTestTags.LIBRARY_ROW)
     }
 
     @Test

@@ -15,14 +15,14 @@ import okhttp3.mockwebserver.RecordedRequest
  * flow. Path + method based (not enqueue) because a UI flow issues many requests in an order
  * the test does not control (the now-playing screen also polls). It serves the root
  * `GET /health` the connect screen's [io.github.xexanos.ratatoskr.network.tls.CertificateInspector]
- * probes, plus the `/v1/` endpoints, and tracks playback `state`/`position` so pause/resume/
+ * probes, plus the `/v2/` endpoints, and tracks playback `state`/`position` so pause/resume/
  * seek produce a realistic session on the next poll.
  *
  * Response bodies come from the shared [WireFixtures]; [login] is injectable so a test can make
  * sign-in fail.
  */
 class RatatoskrDispatcher(
-    private val login: () -> MockResponse = { jsonResponse(WireFixtures.authTokensJson()) },
+    private val login: () -> MockResponse = { jsonResponse(WireFixtures.authSessionJson()) },
     private val speakers: String = WireFixtures.speakerListJson(),
     private val libraryPage: String = WireFixtures.libraryPageJson(),
     // Empty by default: the flows' row counts and "first row" taps predate the shelf, and an
@@ -41,18 +41,40 @@ class RatatoskrDispatcher(
     // poll after Stop gets 404, not a revived session.
     @Volatile private var ended = false
 
+    // When set, every authenticated request answers 401 with this code, standing in for a dead
+    // Ratatoskr token (SPEC section 5). A fresh /v2/auth/login clears it - re-login mints a working
+    // token. Used to drive the 401 re-authentication flow.
+    @Volatile private var unauthorizedCode: String? = null
+
+    /** Simulate the stored token dying: the next authenticated request 401s with [code]. */
+    fun expireTokenWith(code: String) { unauthorizedCode = code }
+
     /** The last request the cover route served, for asserting auth and the `?h=` bucket. */
     @Volatile var lastCoverRequest: RecordedRequest? = null
         private set
 
+    /** The last logout request served, for asserting sign-out told the server. */
+    @Volatile var lastLogoutRequest: RecordedRequest? = null
+        private set
+
     override fun dispatch(request: RecordedRequest): MockResponse {
         val path = request.path.orEmpty().substringBefore('?')
+        // A dead token 401s every authenticated route (not /health, not login itself, which mints a
+        // fresh one and clears the flag). Checked before the route table so any polled/tapped call
+        // triggers the re-auth path (SPEC section 5).
+        if (unauthorizedCode != null && path != "/health" && path != "/v2/auth/login") {
+            return jsonResponse("""{"code":"$unauthorizedCode","message":"token no longer valid"}""", code = 401)
+        }
         return when {
             path == "/health" -> jsonResponse("""{"reachable":true}""")
-            path == "/v1/auth/login" -> login()
-            path == "/v1/speakers" -> jsonResponse(speakers)
+            path == "/v2/auth/login" -> { unauthorizedCode = null; login() }
+            path == "/v2/auth/logout" -> {
+                lastLogoutRequest = request
+                MockResponse().setResponseCode(204)
+            }
+            path == "/v2/speakers" -> jsonResponse(speakers)
             // The cover proxy: real PNG bytes so Coil decodes and renders them.
-            path.startsWith("/v1/library/items/") && path.endsWith("/cover") -> {
+            path.startsWith("/v2/library/items/") && path.endsWith("/cover") -> {
                 lastCoverRequest = request
                 MockResponse()
                     .setResponseCode(200)
@@ -61,21 +83,21 @@ class RatatoskrDispatcher(
             }
             // A library item tap navigates to the speaker picker, so the item-detail endpoint
             // is not part of the happy path; answer defensively.
-            path.startsWith("/v1/library/items/") -> MockResponse().setResponseCode(404)
-            path == "/v1/library/items" -> jsonResponse(libraryPage)
-            path == "/v1/library/in-progress" -> jsonResponse(inProgressShelf)
-            path == "/v1/sessions/current" && request.method == "PUT" -> {
+            path.startsWith("/v2/library/items/") -> MockResponse().setResponseCode(404)
+            path == "/v2/library/items" -> jsonResponse(libraryPage)
+            path == "/v2/library/in-progress" -> jsonResponse(inProgressShelf)
+            path == "/v2/sessions/current" && request.method == "PUT" -> {
                 ended = false
                 state = "playing"
                 jsonResponse(session())
             }
-            path == "/v1/sessions/current" && request.method == "GET" ->
+            path == "/v2/sessions/current" && request.method == "GET" ->
                 if (ended) {
                     jsonResponse("""{"code":"no_active_session","message":"Nothing playing"}""", code = 404)
                 } else {
                     jsonResponse(session())
                 }
-            path == "/v1/sessions/current" && request.method == "DELETE" -> {
+            path == "/v2/sessions/current" && request.method == "DELETE" -> {
                 ended = true
                 MockResponse().setResponseCode(204)
             }

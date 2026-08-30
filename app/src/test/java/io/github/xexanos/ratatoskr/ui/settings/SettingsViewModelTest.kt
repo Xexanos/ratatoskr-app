@@ -97,13 +97,16 @@ class SettingsViewModelTest {
 
     @Test
     fun `signOut clears the token store and flips signedOut`() = runTest(dispatcher) {
-        val tokens = FakeTokenAccess(accessToken = "a1", refreshToken = "r1")
+        // No trusted server is configured, so this pins the client-less fallback: sign-out
+        // must clear locally even when there is no client to send the logout through. The
+        // logout call itself is covered in core-network (RatatoskrClientTest.signOut...).
+        val tokens = FakeTokenAccess(token = "t1")
         val viewModel = SettingsViewModel(connectionManager(tokenStore = tokens), clearCoverCache)
 
         viewModel.signOut()
 
         assertTrue(viewModel.uiState.value.signedOut)
-        assertNull(tokens.currentAccessTokenBlocking())
+        assertNull(tokens.currentTokenBlocking())
         // A signed-out device keeps no artwork of the library it left.
         assertEquals(1, coverCacheClears)
     }

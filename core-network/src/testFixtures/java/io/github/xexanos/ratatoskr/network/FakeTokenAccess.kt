@@ -15,46 +15,58 @@ import java.util.concurrent.atomic.AtomicReference
  * tests (SPEC section 9: platform pieces faked). Tests where persistence itself is the
  * point use the real Keystore-backed TokenStore instead.
  *
- * All views derive from ONE atomic state, mirroring the real store's semantics: after
- * [updateTokens], [authSession] reports the rotated pair rather than a stale snapshot,
- * and it returns null unless tokens AND a user are present (a token-only seed has no
- * signed-in user, exactly like the real store).
+ * All views derive from ONE atomic state, mirroring the real store's semantics: [authSession]
+ * returns null unless a token AND a user are present (a token-only seed has no signed-in user,
+ * exactly like the real store).
  */
 class FakeTokenAccess(
-    accessToken: String? = null,
-    refreshToken: String? = null,
+    token: String? = null,
     user: AuthUser? = null,
+    // Seeds the fake as a pre-/v2 install: a legacy Audiobookshelf token pair is present until
+    // [discardLegacyTokens] removes it. Pair it with a user (and no token) to model the
+    // remembered username that survives the migration.
+    legacyTokens: Boolean = false,
 ) : TokenAccess {
 
-    private data class State(val access: String?, val refresh: String?, val user: AuthUser?)
+    // retainedUsername survives clearToken (the 401 pre-fill), so it is held apart from the
+    // token/user pair rather than derived from it.
+    private data class State(
+        val token: String?,
+        val user: AuthUser?,
+        val retainedUsername: String?,
+        val legacyTokens: Boolean,
+    )
 
-    private val state = AtomicReference(State(accessToken, refreshToken, user))
+    private val state = AtomicReference(State(token, user, user?.username, legacyTokens))
 
-    /** The session as the current state reports it - null unless tokens and user are present. */
+    /** The session as the current state reports it - null unless a token and user are present. */
     val savedSession: AuthSession?
         get() = state.get().let { s ->
-            if (s.access != null && s.refresh != null && s.user != null) {
-                AuthSession(s.access, s.refresh, s.user)
-            } else {
-                null
-            }
+            if (s.token != null && s.user != null) AuthSession(s.token, s.user) else null
         }
 
     override suspend fun authSession(): AuthSession? = savedSession
 
+    override suspend fun username(): String? = state.get().retainedUsername
+
     override suspend fun save(session: AuthSession) {
-        state.set(State(session.accessToken, session.refreshToken, session.user))
+        state.updateAndGet {
+            State(session.token, session.user, session.user.username, it.legacyTokens)
+        }
     }
 
-    override suspend fun updateTokens(accessToken: String, refreshToken: String) {
-        state.updateAndGet { State(accessToken, refreshToken, it.user) }
+    override suspend fun clearToken() {
+        // Keep the remembered username; drop the token and user (SPEC section 5), mirroring the
+        // real store.
+        state.updateAndGet { State(null, null, it.retainedUsername, it.legacyTokens) }
     }
-
-    override suspend fun refreshToken(): String? = state.get().refresh
 
     override suspend fun clear() {
-        state.set(State(null, null, null))
+        state.set(State(null, null, null, legacyTokens = false))
     }
 
-    override fun currentAccessTokenBlocking(): String? = state.get().access
+    override suspend fun discardLegacyTokens(): Boolean =
+        state.getAndUpdate { it.copy(legacyTokens = false) }.legacyTokens
+
+    override fun currentTokenBlocking(): String? = state.get().token
 }

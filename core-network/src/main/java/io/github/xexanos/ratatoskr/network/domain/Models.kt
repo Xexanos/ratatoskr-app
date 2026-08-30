@@ -33,12 +33,23 @@ data class AuthUser(
     val username: String,
 )
 
-/** The token pair plus the authenticated user, as returned by login/refresh. */
+/** The opaque Ratatoskr token plus the authenticated user, as returned by /v2 login (SPEC section 5). */
 data class AuthSession(
-    val accessToken: String,
-    val refreshToken: String,
+    val token: String,
     val user: AuthUser,
 )
+
+/**
+ * The app's single, opaque auth credential (SPEC section 5). The app module treats it as a
+ * black box: it only checks presence (signed in or not) and clears it on sign-out, and the
+ * [value] never leaves core-network - its constructor and field are `internal`, so no
+ * cross-module caller can read or forge it.
+ *
+ * It carries the one stored Ratatoskr token the client sends as its bearer: a non-expiring,
+ * server-issued credential with no lifecycle on the app side (SPEC section 5).
+ */
+@JvmInline
+value class Credential internal constructor(internal val value: String)
 
 data class Speaker(
     val id: String,

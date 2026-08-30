@@ -13,6 +13,7 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import io.github.xexanos.ratatoskr.data.ConnectionManager
 import io.github.xexanos.ratatoskr.network.FakeTokenAccess
 import io.github.xexanos.ratatoskr.network.WireFixtures
+import io.github.xexanos.ratatoskr.network.domain.AuthUser
 import io.github.xexanos.ratatoskr.network.persist.ConnectionStore
 import io.github.xexanos.ratatoskr.network.persist.DataStoreConnectionStore
 import io.github.xexanos.ratatoskr.network.testutil.HttpsMockServer
@@ -27,6 +28,7 @@ import kotlinx.coroutines.test.setMain
 import okhttp3.mockwebserver.MockResponse
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -52,10 +54,10 @@ class SignInViewModelTest {
     }
 
     /** A [ConnectionManager] whose client() resolves against [server] (trusted server config saved). */
-    private fun trustedConnectionManager(): ConnectionManager {
+    private fun trustedConnectionManager(tokens: FakeTokenAccess = FakeTokenAccess()): ConnectionManager {
         val store = connectionStore()
         runBlocking { store.saveTrustedServer(server.baseUrl, server.fingerprint) }
-        return ConnectionManager(store, FakeTokenAccess())
+        return ConnectionManager(store, tokens)
     }
 
     private fun unconfiguredConnectionManager(): ConnectionManager =
@@ -92,7 +94,7 @@ class SignInViewModelTest {
 
     @Test
     fun `a successful login moves to Success`() = runTest(dispatcher) {
-        server.enqueueJson(WireFixtures.authTokensJson())
+        server.enqueueJson(WireFixtures.authSessionJson())
         val viewModel = SignInViewModel(trustedConnectionManager())
 
         viewModel.signIn("alex", "secret")
@@ -102,17 +104,33 @@ class SignInViewModelTest {
     }
 
     @Test
-    fun `a rejected login surfaces an error and does not report Success`() = runTest(dispatcher) {
+    fun `a rejected login surfaces the wrong-credentials error, not the expired-session one`() =
+        runTest(dispatcher) {
+            // A 401 from the login call means the entered credentials were rejected (ux-design:
+            // Sign in, decision 4) - not the "sign-in expired" copy a 401 means elsewhere.
+            server.server.enqueue(
+                MockResponse().setResponseCode(401).setBody("""{"code":"unauthorized","message":"no"}"""),
+            )
+            val viewModel = SignInViewModel(trustedConnectionManager())
+
+            viewModel.signIn("alex", "wrong")
+            waitUntil { viewModel.uiState.value != SignInUiState.Submitting }
+
+            assertEquals(SignInUiState.Error(UiError.WrongCredentials), viewModel.uiState.value)
+        }
+
+    @Test
+    fun `a non-401 login failure keeps the domain error`() = runTest(dispatcher) {
         server.server.enqueue(
-            MockResponse().setResponseCode(401).setBody("""{"code":"unauthorized","message":"no"}"""),
+            MockResponse().setResponseCode(500).setBody("""{"code":"internal","message":"boom"}"""),
         )
         val viewModel = SignInViewModel(trustedConnectionManager())
 
-        viewModel.signIn("alex", "wrong")
+        viewModel.signIn("alex", "secret")
         waitUntil { viewModel.uiState.value != SignInUiState.Submitting }
 
         val state = viewModel.uiState.value
-        assertTrue("expected Error, was $state", state is SignInUiState.Error)
+        assertTrue("expected a Domain error, was $state", state is SignInUiState.Error && state.error is UiError.Domain)
     }
 
     @Test
@@ -123,5 +141,59 @@ class SignInViewModelTest {
         waitUntil { viewModel.uiState.value != SignInUiState.Submitting }
 
         assertEquals(SignInUiState.Error(UiError.NoServer), viewModel.uiState.value)
+    }
+
+    @Test
+    fun `an UPSTREAM_SESSION_LOST reauth pre-fills the username and shows the media-server notice`() =
+        runTest(dispatcher) {
+            // The 401 recovery (SPEC section 5): the token is gone but the username survives, and the
+            // code selects the media-server notice. Password is never pre-filled - the screen owns it.
+            val connectionManager = trustedConnectionManager(FakeTokenAccess("stale", AuthUser("7", "alex")))
+            connectionManager.requireReauth("UPSTREAM_SESSION_LOST")
+
+            val viewModel = SignInViewModel(connectionManager)
+            waitUntil { viewModel.prefill.value.username == "alex" }
+
+            assertEquals("alex", viewModel.prefill.value.username)
+            assertEquals(SignInNotice.MEDIA_SERVER_EXPIRED, viewModel.prefill.value.notice)
+        }
+
+    @Test
+    fun `any other 401 code shows the session-ended notice`() = runTest(dispatcher) {
+        val connectionManager = trustedConnectionManager(FakeTokenAccess("stale", AuthUser("7", "alex")))
+        connectionManager.requireReauth(null) // a 401 with no distinguishing code
+
+        val viewModel = SignInViewModel(connectionManager)
+        waitUntil { viewModel.prefill.value.username == "alex" }
+
+        assertEquals(SignInNotice.SESSION_ENDED, viewModel.prefill.value.notice)
+    }
+
+    @Test
+    fun `the one-time migration shows the app-updated notice with the username pre-filled`() =
+        runTest(dispatcher) {
+            // First launch after the /v1 -> /v2 update (SPEC section 5, issue #121): the legacy
+            // tokens were discarded at launch, the username survives, and the one-time notice
+            // explains the re-login.
+            val connectionManager =
+                trustedConnectionManager(FakeTokenAccess(user = AuthUser("7", "alex"), legacyTokens = true))
+            connectionManager.migrateFromV1()
+
+            val viewModel = SignInViewModel(connectionManager)
+            waitUntil { viewModel.prefill.value.username == "alex" }
+
+            assertEquals(SignInNotice.APP_UPDATED, viewModel.prefill.value.notice)
+        }
+
+    @Test
+    fun `an ordinary sign-in visit shows no notice`() = runTest(dispatcher) {
+        // No reauth is pending: the username may still pre-fill (a remembered user), but there is no
+        // explanatory notice.
+        val connectionManager = trustedConnectionManager(FakeTokenAccess("live", AuthUser("7", "alex")))
+
+        val viewModel = SignInViewModel(connectionManager)
+        waitUntil { viewModel.prefill.value.username == "alex" }
+
+        assertNull(viewModel.prefill.value.notice)
     }
 }

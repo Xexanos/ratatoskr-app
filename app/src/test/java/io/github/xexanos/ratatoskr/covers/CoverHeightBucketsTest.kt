@@ -33,16 +33,16 @@ class CoverHeightBucketsTest {
     @Test
     fun `appends the bucketed height as the h query parameter`() {
         assertEquals(
-            "https://srv/v1/library/items/42/cover?h=256",
-            appendCoverHeightParam("https://srv/v1/library/items/42/cover", 168),
+            "https://srv/v2/library/items/42/cover?h=256",
+            appendCoverHeightParam("https://srv/v2/library/items/42/cover", 168),
         )
     }
 
     @Test
     fun `appends with an ampersand when the url already has a query`() {
         assertEquals(
-            "https://srv/v1/library/items/42/cover?x=1&h=128",
-            appendCoverHeightParam("https://srv/v1/library/items/42/cover?x=1", 96),
+            "https://srv/v2/library/items/42/cover?x=1&h=128",
+            appendCoverHeightParam("https://srv/v2/library/items/42/cover?x=1", 96),
         )
     }
 }

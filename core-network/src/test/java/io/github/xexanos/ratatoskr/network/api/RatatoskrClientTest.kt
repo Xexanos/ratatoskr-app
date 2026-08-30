@@ -5,6 +5,8 @@
  */
 package io.github.xexanos.ratatoskr.network.api
 
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.Types
 import io.github.xexanos.ratatoskr.network.FakeTokenAccess
 import io.github.xexanos.ratatoskr.network.WireFixtures
 import io.github.xexanos.ratatoskr.network.domain.ApiResult
@@ -23,6 +25,7 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -33,7 +36,7 @@ import retrofit2.converter.scalars.ScalarsConverterFactory
 class RatatoskrClientTest {
 
     private val server = MockWebServer()
-    private val tokens = FakeTokenAccess(accessToken = "a0", refreshToken = "r0")
+    private val tokens = FakeTokenAccess(token = "t0")
     private lateinit var client: RatatoskrClient
 
     @Before
@@ -41,8 +44,10 @@ class RatatoskrClientTest {
         server.start()
         val moshi = ratatoskrMoshi()
         val retrofit = Retrofit.Builder()
-            .baseUrl(server.url("/v1/"))
-            .client(OkHttpClient())
+            .baseUrl(server.url("/v2/"))
+            // Production-shaped auth chain (the factory wires the same interceptor), so the
+            // signOut test can assert the bearer actually rides on the logout request.
+            .client(OkHttpClient.Builder().addInterceptor(BearerAuthInterceptor(tokens)).build())
             .addConverterFactory(ScalarsConverterFactory.create())
             .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()
@@ -61,14 +66,13 @@ class RatatoskrClientTest {
     @After fun tearDown() = server.shutdown()
 
     @Test
-    fun `login stores the returned token pair`() = runBlocking {
-        server.enqueue(MockResponse().setBody(WireFixtures.authTokensJson()))
+    fun `login stores the returned Ratatoskr token`() = runBlocking {
+        server.enqueue(MockResponse().setBody(WireFixtures.authSessionJson()))
 
         val result = client.login("alex", "secret")
 
         assertTrue(result is ApiResult.Success)
-        assertEquals("a1", tokens.currentAccessTokenBlocking())
-        assertEquals("r1", tokens.refreshToken())
+        assertEquals("t1", tokens.currentTokenBlocking())
         assertEquals("alex", tokens.savedSession!!.user.username)
     }
 
@@ -95,12 +99,54 @@ class RatatoskrClientTest {
     }
 
     @Test
-    fun `401 maps to Unauthorized`() = runBlocking {
+    fun `bare 404 on a session endpoint maps to ServerTooOld`() = runBlocking {
+        server.enqueue(MockResponse().setResponseCode(404))
+
+        val result = client.currentSession()
+
+        assertEquals(RatatoskrError.ServerTooOld, (result as ApiResult.Failure).error)
+    }
+
+    @Test
+    fun `bare 404 elsewhere maps to ServerTooOld`() = runBlocking {
+        // "Bare" includes a framework's HTML error page: anything but the contract's Error shape.
+        server.enqueue(
+            MockResponse().setResponseCode(404).setBody("<html>Cannot POST /v2/auth/login</html>"),
+        )
+
+        val result = client.login("alex", "secret")
+
+        assertEquals(RatatoskrError.ServerTooOld, (result as ApiResult.Failure).error)
+    }
+
+    @Test
+    fun `401 maps to Unauthorized carrying the body code`() = runBlocking {
         server.enqueue(MockResponse().setResponseCode(401).setBody("""{"code":"unauthorized","message":"no"}"""))
 
         val result = client.listSpeakers()
 
-        assertEquals(RatatoskrError.Unauthorized, (result as ApiResult.Failure).error)
+        assertEquals(RatatoskrError.Unauthorized("unauthorized"), (result as ApiResult.Failure).error)
+    }
+
+    @Test
+    fun `401 keeps UPSTREAM_SESSION_LOST so the sign-in notice can vary`() = runBlocking {
+        server.enqueue(
+            MockResponse().setResponseCode(401)
+                .setBody("""{"code":"UPSTREAM_SESSION_LOST","message":"gone"}"""),
+        )
+
+        val result = client.listSpeakers()
+
+        assertEquals(RatatoskrError.Unauthorized("UPSTREAM_SESSION_LOST"), (result as ApiResult.Failure).error)
+    }
+
+    @Test
+    fun `a 401 with no body code maps to Unauthorized with a null code`() = runBlocking {
+        server.enqueue(MockResponse().setResponseCode(401))
+
+        val result = client.listSpeakers()
+
+        assertEquals(RatatoskrError.Unauthorized(null), (result as ApiResult.Failure).error)
     }
 
     @Test
@@ -118,14 +164,19 @@ class RatatoskrClientTest {
     }
 
     @Test
-    fun `startSession hands the stored refresh token to the server`() = runBlocking {
+    fun `startSession posts only the item and speaker, no token handoff`() = runBlocking {
         server.enqueue(MockResponse().setBody(WireFixtures.sessionJson(positionSeconds = 0.0)))
 
         val result = client.startSession("i1", "s1")
 
         assertTrue(result is ApiResult.Success)
         val body = server.takeRequest().body.readUtf8()
-        assertTrue("request should carry the refresh token, was: $body", body.contains("\"r0\""))
+        val fields = Moshi.Builder().build()
+            .adapter<Map<String, Any?>>(
+                Types.newParameterizedType(Map::class.java, String::class.java, Any::class.java),
+            )
+            .fromJson(body)
+        assertEquals(mapOf("itemId" to "i1", "speakerId" to "s1"), fields)
     }
 
     @Test
@@ -143,50 +194,47 @@ class RatatoskrClientTest {
     }
 
     @Test
-    fun `a session response with rotatedTokens is adopted`() = runBlocking {
-        server.enqueue(MockResponse().setBody(WireFixtures.sessionJson(rotatedTokens = "a2" to "r2")))
+    fun `signOut posts logout with the bearer token and clears the store`() = runBlocking {
+        server.enqueue(MockResponse().setResponseCode(204))
 
-        val result = client.currentSession()
+        client.signOut()
 
-        assertTrue(result is ApiResult.Success)
-        assertEquals("a2", tokens.currentAccessTokenBlocking())
-        assertEquals("r2", tokens.refreshToken())
+        val request = server.takeRequest()
+        assertEquals("POST", request.method)
+        assertEquals("/v2/auth/logout", request.path)
+        // Asserted explicitly because MockWebServer enforces no auth (see #126).
+        assertEquals("Bearer t0", request.getHeader("Authorization"))
+        assertNull(tokens.currentTokenBlocking())
     }
 
     @Test
-    fun `a session response without rotatedTokens leaves the stored pair untouched`() = runBlocking {
-        server.enqueue(MockResponse().setBody(WireFixtures.sessionJson()))
-
-        client.currentSession()
-
-        assertEquals("a0", tokens.currentAccessTokenBlocking())
-        assertEquals("r0", tokens.refreshToken())
-    }
-
-    @Test
-    fun `stopSession adopts a rotated pair from a 200 body`() = runBlocking {
+    fun `signOut clears the store even when the server rejects the logout`() = runBlocking {
         server.enqueue(
-            MockResponse().setResponseCode(200).setBody(
-                WireFixtures.sessionJson(state = "stopped", positionSeconds = 5.0, rotatedTokens = "a3" to "r3"),
-            ),
+            MockResponse().setResponseCode(500).setBody("""{"code":"boom","message":"broken"}"""),
         )
 
-        val result = client.stopSession()
+        client.signOut()
 
-        assertTrue(result is ApiResult.Success)
-        assertEquals("a3", tokens.currentAccessTokenBlocking())
-        assertEquals("r3", tokens.refreshToken())
+        assertNull(tokens.currentTokenBlocking())
     }
 
     @Test
-    fun `stopSession succeeds on a 204 and keeps the stored tokens`() = runBlocking {
+    fun `signOut clears the store even when the server is unreachable`() = runBlocking {
+        server.shutdown()
+
+        client.signOut()
+
+        assertNull(tokens.currentTokenBlocking())
+    }
+
+    @Test
+    fun `stopSession succeeds on a 204 and keeps the stored token`() = runBlocking {
         server.enqueue(MockResponse().setResponseCode(204))
 
         val result = client.stopSession()
 
         assertTrue(result is ApiResult.Success)
-        assertEquals("a0", tokens.currentAccessTokenBlocking())
-        assertEquals("r0", tokens.refreshToken())
+        assertEquals("t0", tokens.currentTokenBlocking())
     }
 
     @Test

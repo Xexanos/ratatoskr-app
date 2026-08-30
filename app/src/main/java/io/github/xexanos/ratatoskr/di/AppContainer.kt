@@ -15,6 +15,7 @@ import io.github.xexanos.ratatoskr.covers.CoverImages
 import io.github.xexanos.ratatoskr.data.ConnectionManager
 import io.github.xexanos.ratatoskr.data.SessionManager
 import io.github.xexanos.ratatoskr.data.SpeakerManager
+import io.github.xexanos.ratatoskr.network.persist.CredentialStore
 import io.github.xexanos.ratatoskr.network.persist.DataStoreConnectionStore
 import io.github.xexanos.ratatoskr.network.persist.KeystoreCrypto
 import io.github.xexanos.ratatoskr.network.persist.TokenStore
@@ -32,11 +33,19 @@ class AppContainer(context: Context) {
     private val connectionDataStore: DataStore<Preferences> =
         PreferenceDataStoreFactory.create { appContext.preferencesDataStoreFile("connection") }
 
-    private val tokenDataStore: DataStore<Preferences> =
+    // Internal (not private) only so the instrumented migration test can seed the raw /v1 keys
+    // a pre-update install left behind; production code outside this class never touches it.
+    internal val tokenDataStore: DataStore<Preferences> =
         PreferenceDataStoreFactory.create { appContext.preferencesDataStoreFile("tokens") }
 
     val connectionStore = DataStoreConnectionStore(connectionDataStore)
-    val tokenStore = TokenStore(tokenDataStore, KeystoreCrypto())
+
+    // The Keystore-backed store is the network module's pair-shaped handle; the factory (via
+    // ConnectionManager) needs it. The rest of the app sees only the credential-shaped
+    // [credentialStore] view of the same instance, never the token pair (SPEC section 5).
+    private val tokenStore = TokenStore(tokenDataStore, KeystoreCrypto())
+    val credentialStore: CredentialStore = tokenStore
+
     val certificateInspector = CertificateInspector()
     val connectionManager = ConnectionManager(connectionStore, tokenStore)
     val coverImages = CoverImages(appContext) { connectionManager.peekClient()?.coversCallFactory }
@@ -57,7 +66,7 @@ class AppContainer(context: Context) {
      */
     suspend fun reset() {
         connectionStore.clear()
-        tokenStore.clear()
+        credentialStore.clear()
         connectionManager.invalidate()
         coverImages.clear()
         sessionManager.reset()

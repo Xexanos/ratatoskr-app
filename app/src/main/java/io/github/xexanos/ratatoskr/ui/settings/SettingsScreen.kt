@@ -86,7 +86,10 @@ class SettingsViewModel(
 
     fun signOut() {
         viewModelScope.launch {
-            connectionManager.tokenStore.clear()
+            // Through the client so the server revokes the device session too (best-effort,
+            // SPEC section 5); the client clears the stored credential even when the server
+            // is unreachable. Without a client (no trusted server) only local state exists.
+            connectionManager.client()?.signOut() ?: connectionManager.credentials.clear()
             clearCoverCache()
             _uiState.value = _uiState.value.copy(signedOut = true)
         }

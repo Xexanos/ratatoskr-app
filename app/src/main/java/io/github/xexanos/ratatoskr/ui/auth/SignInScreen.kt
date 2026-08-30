@@ -6,7 +6,9 @@
 package io.github.xexanos.ratatoskr.ui.auth
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,8 +19,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -48,7 +52,9 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.xexanos.ratatoskr.R
 import io.github.xexanos.ratatoskr.data.ConnectionManager
+import io.github.xexanos.ratatoskr.data.SignInPrompt
 import io.github.xexanos.ratatoskr.network.domain.ApiResult
+import io.github.xexanos.ratatoskr.network.domain.RatatoskrError
 import io.github.xexanos.ratatoskr.ui.UiError
 import io.github.xexanos.ratatoskr.ui.text
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -63,12 +69,59 @@ sealed interface SignInUiState {
     data class Error(val error: UiError) : SignInUiState
 }
 
+/**
+ * Why the user is on sign-in when they did not choose to be - a 401 or the /v1 -> /v2 update
+ * (SPEC section 5). It varies only the explanatory notice's copy - the recovery is one path
+ * either way. Absent on an ordinary sign-in.
+ */
+enum class SignInNotice {
+    /** `code: UPSTREAM_SESSION_LOST` - the server's own media-server sign-in expired. */
+    MEDIA_SERVER_EXPIRED,
+
+    /** Any other 401 - the token was revoked or the session ended elsewhere. */
+    SESSION_ENDED,
+
+    /** First launch after the /v1 -> /v2 update - the one-time re-login (SPEC section 5). */
+    APP_UPDATED,
+}
+
+/** The pre-fill the sign-in screen opens with: a remembered username and an optional 401 notice. */
+data class SignInPrefill(
+    val username: String = "",
+    val notice: SignInNotice? = null,
+)
+
+// The contract's machine-readable code for "the server lost its Audiobookshelf session" (SPEC
+// section 5). Every other - or absent - code lands on [SignInNotice.SESSION_ENDED].
+private const val UPSTREAM_SESSION_LOST = "UPSTREAM_SESSION_LOST"
+
 class SignInViewModel(
     private val connectionManager: ConnectionManager,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<SignInUiState>(SignInUiState.Idle)
     val uiState: StateFlow<SignInUiState> = _uiState.asStateFlow()
+
+    // Loaded once from storage: the remembered username to pre-fill and, if the user got here via
+    // a 401, which notice to show. Both survive the dead token (SPEC section 5).
+    private val _prefill = MutableStateFlow(SignInPrefill())
+    val prefill: StateFlow<SignInPrefill> = _prefill.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            val notice = when (val prompt = connectionManager.consumeSignInPrompt()) {
+                is SignInPrompt.Reauth ->
+                    if (prompt.code == UPSTREAM_SESSION_LOST) SignInNotice.MEDIA_SERVER_EXPIRED
+                    else SignInNotice.SESSION_ENDED
+                SignInPrompt.AppUpdated -> SignInNotice.APP_UPDATED
+                null -> null
+            }
+            _prefill.value = SignInPrefill(
+                username = connectionManager.prefillUsername().orEmpty(),
+                notice = notice,
+            )
+        }
+    }
 
     fun signIn(username: String, password: String) {
         if (username.isBlank() || password.isBlank()) return
@@ -81,7 +134,13 @@ class SignInViewModel(
             }
             _uiState.value = when (val result = client.login(username, password)) {
                 is ApiResult.Success -> SignInUiState.Success
-                is ApiResult.Failure -> SignInUiState.Error(UiError.Domain(result.error))
+                is ApiResult.Failure -> SignInUiState.Error(
+                    // A 401 here rejects the just-entered credentials (ux-design: Sign in,
+                    // decision 4) - unlike a 401 on an authenticated call, where the shared
+                    // mapping's "sign-in expired" copy is right.
+                    if (result.error is RatatoskrError.Unauthorized) UiError.WrongCredentials
+                    else UiError.Domain(result.error),
+                )
             }
         }
     }
@@ -95,21 +154,32 @@ fun SignInScreenHost(
     onSignedIn: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val prefill by viewModel.prefill.collectAsStateWithLifecycle()
 
     LaunchedEffect(state) {
         if (state is SignInUiState.Success) onSignedIn()
     }
 
-    SignInScreen(state = state, onSignIn = viewModel::signIn)
+    SignInScreen(
+        state = state,
+        initialUsername = prefill.username,
+        notice = prefill.notice,
+        onSignIn = viewModel::signIn,
+    )
 }
 
-// The screen itself: a pure function of [state], previewable without a ViewModel or server.
+// The screen itself: a pure function of its inputs, previewable without a ViewModel or server.
 @Composable
 fun SignInScreen(
     state: SignInUiState,
+    initialUsername: String = "",
+    notice: SignInNotice? = null,
     onSignIn: (String, String) -> Unit,
 ) {
-    var username by rememberSaveable { mutableStateOf("") }
+    // Keyed on the remembered username: it loads asynchronously (empty, then the stored value), so
+    // the field re-initialises once when it arrives. The password is never pre-filled (SPEC
+    // section 5). User edits still survive config changes - the key is stable after the load.
+    var username by rememberSaveable(initialUsername) { mutableStateOf(initialUsername) }
     // Plain remember, not rememberSaveable: the password must not be written to the
     // saved-instance-state Bundle (persisted to disk on process death). Losing it across
     // process death is the right trade-off for a credential.
@@ -144,6 +214,15 @@ fun SignInScreen(
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(32.dp))
+
+        // The explanatory notice (SPEC section 5): shown only when the user was sent here by a
+        // dead token or the /v1 -> /v2 update, explaining why. Distinct from the
+        // [SignInUiState.Error] card below, which reports a failed sign-in attempt.
+        if (notice != null) {
+            SignInNoticeCard(notice)
+            Spacer(Modifier.height(24.dp))
+        }
+
         OutlinedTextField(
             value = username,
             onValueChange = { username = it },
@@ -190,12 +269,22 @@ fun SignInScreen(
                 color = MaterialTheme.colorScheme.errorContainer,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(
-                    state.error.text(),
-                    color = MaterialTheme.colorScheme.onErrorContainer,
-                    style = MaterialTheme.typography.bodyMedium,
+                Row(
                     modifier = Modifier.padding(16.dp),
-                )
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    Icon(
+                        Icons.Default.WarningAmber,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onErrorContainer,
+                    )
+                    Text(
+                        state.error.text(),
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
             }
             Spacer(Modifier.height(16.dp))
         }
@@ -214,6 +303,44 @@ fun SignInScreen(
             } else {
                 Text(stringResource(R.string.signin_action))
             }
+        }
+    }
+}
+
+// The explanatory notice for the sign-ins the user did not choose (a 401, or the one-time
+// /v1 -> /v2 re-login). A neutral, warm tonal card (surfaceVariant), deliberately neither the
+// success-reading secondaryContainer green nor the errorContainer red of the sign-in-failure
+// card below it: being signed out is an unexpected but routine heads-up to act on, not a
+// success and not a failure the user caused. Color alone cannot carry that distinction - the
+// light palette's surfaceVariant and errorContainer are near-identical warm tints - so each
+// card leads with its own glyph: info here, warning there.
+@Composable
+private fun SignInNoticeCard(notice: SignInNotice) {
+    val message = when (notice) {
+        SignInNotice.MEDIA_SERVER_EXPIRED -> stringResource(R.string.signin_notice_media_server_expired)
+        SignInNotice.SESSION_ENDED -> stringResource(R.string.signin_notice_session_ended)
+        SignInNotice.APP_UPDATED -> stringResource(R.string.signin_notice_app_updated)
+    }
+    Surface(
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Icon(
+                Icons.Default.Info,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                message,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+            )
         }
     }
 }

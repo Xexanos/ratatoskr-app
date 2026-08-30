@@ -8,7 +8,6 @@ package io.github.xexanos.ratatoskr.ui.auth
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
-import io.github.xexanos.ratatoskr.network.domain.RatatoskrError
 import io.github.xexanos.ratatoskr.ui.UiError
 import io.github.xexanos.ratatoskr.ui.theme.RatatoskrTheme
 
@@ -24,7 +23,7 @@ internal fun SignInIdlePreview() = RatatoskrTheme {
 @Preview(name = "Sign in - error", widthDp = 360, heightDp = 800)
 @Composable
 internal fun SignInErrorPreview() = RatatoskrTheme {
-    Surface { SignInScreen(SignInUiState.Error(UiError.Domain(RatatoskrError.Unauthorized))) { _, _ -> } }
+    Surface { SignInScreen(SignInUiState.Error(UiError.WrongCredentials)) { _, _ -> } }
 }
 
 @Preview(name = "Sign in - submitting", widthDp = 360, heightDp = 800)
@@ -32,3 +31,51 @@ internal fun SignInErrorPreview() = RatatoskrTheme {
 internal fun SignInSubmittingPreview() = RatatoskrTheme {
     Surface { SignInScreen(SignInUiState.Submitting) { _, _ -> } }
 }
+
+// The 401 re-authentication path (SPEC section 5): pre-filled username, an explanatory notice, and
+// a blank password.
+@Preview(name = "Sign in - reauth notice", widthDp = 360, heightDp = 800)
+@Composable
+internal fun SignInReauthNoticePreview() = RatatoskrTheme {
+    Surface {
+        SignInScreen(
+            state = SignInUiState.Idle,
+            initialUsername = "alex",
+            notice = SignInNotice.MEDIA_SERVER_EXPIRED,
+        ) { _, _ -> }
+    }
+}
+
+// The one-time /v1 -> /v2 re-login (SPEC section 5): same pre-filled screen, the update notice.
+@Preview(name = "Sign in - app-updated notice", widthDp = 360, heightDp = 800)
+@Composable
+internal fun SignInAppUpdatedNoticePreview() = RatatoskrTheme {
+    Surface {
+        SignInScreen(
+            state = SignInUiState.Idle,
+            initialUsername = "alex",
+            notice = SignInNotice.APP_UPDATED,
+        ) { _, _ -> }
+    }
+}
+
+// Notice and error on one screen (a 401 return followed by a failed re-login), in both themes:
+// the two cards must read as different kinds of message, not two shades of the same card.
+@Composable
+private fun NoticeVsErrorPreview(dark: Boolean) = RatatoskrTheme(darkTheme = dark) {
+    Surface {
+        SignInScreen(
+            state = SignInUiState.Error(UiError.WrongCredentials),
+            initialUsername = "alex",
+            notice = SignInNotice.SESSION_ENDED,
+        ) { _, _ -> }
+    }
+}
+
+@Preview(name = "Sign in - notice vs error light", widthDp = 360, heightDp = 800)
+@Composable
+internal fun SignInNoticeVsErrorLightPreview() = NoticeVsErrorPreview(dark = false)
+
+@Preview(name = "Sign in - notice vs error dark", widthDp = 360, heightDp = 800)
+@Composable
+internal fun SignInNoticeVsErrorDarkPreview() = NoticeVsErrorPreview(dark = true)

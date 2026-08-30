@@ -22,9 +22,10 @@ import io.github.xexanos.ratatoskr.network.generated.model.LoginRequest
 import io.github.xexanos.ratatoskr.network.generated.model.SeekRequest
 import io.github.xexanos.ratatoskr.network.generated.model.StartSessionRequest
 import io.github.xexanos.ratatoskr.network.generated.model.Error as GenError
-import io.github.xexanos.ratatoskr.network.generated.model.Session as GenSession
 import io.github.xexanos.ratatoskr.network.persist.TokenAccess
 import com.squareup.moshi.Moshi
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import retrofit2.Response
 import java.io.IOException
 import java.security.cert.CertificateException
@@ -48,10 +49,10 @@ class RatatoskrClient internal constructor(
     private val coverEndpoint: CoverEndpoint,
     /**
      * OkHttp stack for loading cover images, sharing this client's TLS trust (TOFU pin,
-     * SPEC section 6) and bearer/refresh auth (SPEC section 5) but with its own dispatcher,
-     * so a scroll burst of cover requests can never queue playback commands or the session
-     * poll behind it (OkHttp admission is per-dispatcher, default 5 per host - and covers
-     * share the API's host). Consumed by the app's image loader; closed with [close].
+     * SPEC section 6) and bearer auth (SPEC section 5) but with its own dispatcher, so a scroll
+     * burst of cover requests can never queue playback commands or the session poll behind it
+     * (OkHttp admission is per-dispatcher, default 5 per host - and covers share the API's host).
+     * Consumed by the app's image loader; closed with [close].
      */
     val coversCallFactory: okhttp3.Call.Factory,
     private val closeAction: () -> Unit = {},
@@ -73,8 +74,23 @@ class RatatoskrClient internal constructor(
         return result
     }
 
+    /**
+     * Signs this device out: tells the server to revoke the token (best-effort - logout is
+     * idempotent and answers 204 even for an unknown token, SPEC section 5) and always clears
+     * the stored credential, whatever the server said. The order matters: the request must go
+     * out while the token is still stored, because the bearer IS what the server resolves to
+     * the device session it revokes.
+     */
     suspend fun signOut() {
-        tokenStore.clear()
+        try {
+            // Best-effort: a Failure result (unreachable server, 5xx, whatever) is deliberately
+            // ignored - the local sign-out below must complete regardless.
+            executeNullable { systemApi.logout() }
+        } finally {
+            // NonCancellable so a caller cancelled mid-request (e.g. a cleared ViewModel scope)
+            // still ends up signed out locally.
+            withContext(NonCancellable) { tokenStore.clear() }
+        }
     }
 
     suspend fun listSpeakers(): ApiResult<List<Speaker>> =
@@ -101,63 +117,34 @@ class RatatoskrClient internal constructor(
 
     suspend fun currentSession(): ApiResult<Session> =
         execute(sessionEndpoint = true) { playbackApi.getCurrentSession() }
-            .adoptingRotatedTokens().map { it.toDomain(coverEndpoint) }
+            .map { it.toDomain(coverEndpoint) }
 
     /**
-     * Starts playback. The stored refresh token is handed to the server so its sync loop can
-     * renew the access token during long unattended playback (SPEC section 5 / contract
-     * StartSessionRequest.refreshToken).
+     * Starts playback. On /v2 the server owns the whole session lifecycle from its own stored
+     * Audiobookshelf credential (ADR-0001), so the request carries only what to play and where.
      */
-    suspend fun startSession(itemId: String, speakerId: String): ApiResult<Session> {
-        val refreshToken = tokenStore.refreshToken()
-        return execute {
-            playbackApi.startSession(StartSessionRequest(itemId, speakerId, refreshToken))
-        }.adoptingRotatedTokens().map { it.toDomain(coverEndpoint) }
-    }
+    suspend fun startSession(itemId: String, speakerId: String): ApiResult<Session> =
+        execute { playbackApi.startSession(StartSessionRequest(itemId, speakerId)) }
+            .map { it.toDomain(coverEndpoint) }
 
-    /**
-     * Stops playback. The contract returns 204 normally, or 200 with a final [GenSession]
-     * carrying a still-pending rotated token pair (SPEC section 5); either counts as success.
-     * Any pair in a 200 body is adopted before the session ends, since the server discards its
-     * in-memory tokens on stop and cannot redeliver them.
-     */
+    /** Stops playback. The contract returns 204 on success, so an empty body still counts. */
     suspend fun stopSession(): ApiResult<Unit> =
         when (val result = executeNullable(sessionEndpoint = true) { playbackApi.stopSession() }) {
-            is ApiResult.Success -> {
-                result.data?.adoptRotatedTokens()
-                ApiResult.Success(Unit)
-            }
+            is ApiResult.Success -> ApiResult.Success(Unit)
             is ApiResult.Failure -> result
         }
 
     suspend fun pause(): ApiResult<Session> =
         execute(sessionEndpoint = true) { playbackApi.pauseSession() }
-            .adoptingRotatedTokens().map { it.toDomain(coverEndpoint) }
+            .map { it.toDomain(coverEndpoint) }
 
     suspend fun resume(): ApiResult<Session> =
         execute(sessionEndpoint = true) { playbackApi.resumeSession() }
-            .adoptingRotatedTokens().map { it.toDomain(coverEndpoint) }
+            .map { it.toDomain(coverEndpoint) }
 
     suspend fun seek(positionSeconds: Double): ApiResult<Session> =
         execute(sessionEndpoint = true) { playbackApi.seekSession(SeekRequest(positionSeconds)) }
-            .adoptingRotatedTokens().map { it.toDomain(coverEndpoint) }
-
-    // --- token adoption -----------------------------------------------------------------
-
-    /**
-     * Adopts a rotated token pair carried on a successful [GenSession] response and passes the
-     * result through unchanged. This is how the app learns the tokens the server rotated during
-     * an active session, since it does not refresh on its own while a session is live
-     * (SPEC section 5).
-     */
-    private suspend fun ApiResult<GenSession>.adoptingRotatedTokens(): ApiResult<GenSession> {
-        (this as? ApiResult.Success)?.data?.adoptRotatedTokens()
-        return this
-    }
-
-    private suspend fun GenSession.adoptRotatedTokens() {
-        rotatedTokens?.let { tokenStore.updateTokens(it.accessToken, it.refreshToken) }
-    }
+            .map { it.toDomain(coverEndpoint) }
 
     // --- error handling -----------------------------------------------------------------
 
@@ -202,8 +189,12 @@ class RatatoskrClient internal constructor(
     private fun mapHttpError(status: Int, errorBody: String?, sessionEndpoint: Boolean): RatatoskrError {
         val parsed = errorBody?.let { runCatching { moshi.adapter(GenError::class.java).fromJson(it) }.getOrNull() }
         return when (status) {
-            401 -> RatatoskrError.Unauthorized
-            404 -> if (sessionEndpoint) RatatoskrError.NoActiveSession else RatatoskrError.NotFound
+            401 -> RatatoskrError.Unauthorized(parsed?.code)
+            404 -> when {
+                parsed == null -> RatatoskrError.ServerTooOld
+                sessionEndpoint -> RatatoskrError.NoActiveSession
+                else -> RatatoskrError.NotFound
+            }
             502 -> RatatoskrError.Upstream(parsed?.code, parsed?.message)
             else -> RatatoskrError.Server(status, parsed?.code, parsed?.message)
         }

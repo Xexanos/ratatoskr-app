@@ -19,6 +19,13 @@ sealed interface UiError {
     /** No trusted server is configured yet (the connection manager has no client). */
     data object NoServer : UiError
 
+    /**
+     * The login call itself returned 401: the entered credentials were rejected. Only the
+     * sign-in ViewModel produces this - it alone knows the 401 came from a login attempt, where
+     * the generic "sign-in expired" copy of [RatatoskrError.Unauthorized] would be circular.
+     */
+    data object WrongCredentials : UiError
+
     /** A domain error surfaced by the network layer. */
     data class Domain(val error: RatatoskrError) : UiError
 }
@@ -26,6 +33,7 @@ sealed interface UiError {
 @Composable
 fun UiError.text(): String = when (this) {
     UiError.NoServer -> stringResource(R.string.error_no_server)
+    UiError.WrongCredentials -> stringResource(R.string.error_wrong_credentials)
     is UiError.Domain -> error.text()
 }
 
@@ -39,6 +47,7 @@ fun RatatoskrError.text(): String = when (this) {
     is RatatoskrError.Unauthorized -> stringResource(R.string.error_unauthorized)
     is RatatoskrError.NoActiveSession -> stringResource(R.string.error_no_active_session)
     is RatatoskrError.NotFound -> stringResource(R.string.error_not_found)
+    is RatatoskrError.ServerTooOld -> stringResource(R.string.error_server_too_old)
     is RatatoskrError.Server -> message ?: stringResource(R.string.error_server, httpStatus)
     is RatatoskrError.Upstream -> message ?: stringResource(R.string.error_upstream)
     is RatatoskrError.CertificateUntrusted -> stringResource(R.string.error_cert_untrusted)

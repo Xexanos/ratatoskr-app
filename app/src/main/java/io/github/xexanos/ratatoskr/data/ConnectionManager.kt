@@ -8,6 +8,7 @@ package io.github.xexanos.ratatoskr.data
 import io.github.xexanos.ratatoskr.network.api.RatatoskrClient
 import io.github.xexanos.ratatoskr.network.api.RatatoskrClientFactory
 import io.github.xexanos.ratatoskr.network.persist.ConnectionStore
+import io.github.xexanos.ratatoskr.network.persist.CredentialStore
 import io.github.xexanos.ratatoskr.network.persist.TokenAccess
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -17,7 +18,23 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.util.concurrent.atomic.AtomicBoolean
+
+/**
+ * Why the next visit to the sign-in screen deserves an explanatory notice (SPEC section 5). Its
+ * presence means the user did not choose to sign in - a dead token or the /v1 -> /v2 update sent
+ * them there. It varies only the notice's copy, never the sign-in behaviour; absent on an
+ * ordinary visit.
+ */
+sealed interface SignInPrompt {
+    /**
+     * Returned to sign-in by a 401; [code] is the body's machine-readable reason, kept only to
+     * vary the notice's copy and null when the 401 carried none.
+     */
+    data class Reauth(val code: String?) : SignInPrompt
+
+    /** First launch after the /v1 -> /v2 update: the one-time re-login (SPEC section 5). */
+    data object AppUpdated : SignInPrompt
+}
 
 /**
  * Owns the current [RatatoskrClient], rebuilding it whenever the trusted server or its
@@ -26,17 +43,20 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 class ConnectionManager(
     val connectionStore: ConnectionStore,
+    // The token-shaped network handle: passed to the factory (which attaches the bearer) and
+    // used by the tests. App code goes through [credentials], never the token itself.
     val tokenStore: TokenAccess,
 ) {
-    // While a playback session is active the server owns refresh-token rotation, so the
-    // client must not refresh independently (SPEC section 5).
-    private val sessionActive = AtomicBoolean(false)
+    /**
+     * The credential-shaped seam app code uses for auth state (SPEC section 5): a presence check
+     * and a clear, nothing token-shaped. Backed by [tokenStore].
+     */
+    val credentials: CredentialStore get() = tokenStore
 
     // Guards client construction so concurrent callers (e.g. the poll loop and a screen right
-    // after sign-in) cannot each build a client. Two OkHttp stacks would each hold their own
-    // single-flight refresh lock and could refresh the same rotating token twice, invalidating
-    // the pair and signing the user out (SPEC section 5). @Volatile makes the fast-path read
-    // see the winner's write.
+    // after sign-in) cannot each build a client: two OkHttp stacks would each hold their own
+    // dispatcher and connection pool for the same server, wasting sockets and threads until GC.
+    // @Volatile makes the fast-path read see the winner's write.
     private val buildMutex = Mutex()
 
     // The client and the key it was built for, held as one object so the lock-free fast path
@@ -45,26 +65,32 @@ class ConnectionManager(
 
     @Volatile private var cached: Cached? = null
 
-    // Set when a call surfaces an Unauthorized the app cannot silently recover from: the access
-    // token lapsed while a session was active, so the poll's getCurrentSession 401'd before the
-    // server could return a rotated pair, and the refresh token the app still holds has been
-    // rotated away - /auth/refresh would only loop (SPEC section 5). The nav host observes this
-    // and routes to the sign-in screen so the user re-enters credentials (SPEC section 5's
-    // irreducible residual), instead of being stranded on a dead-end error whose retry never
-    // recovers. The trusted server and its certificate are kept; only the tokens are cleared.
+    // Set when a call surfaces an Unauthorized the app cannot recover from: the stored Ratatoskr
+    // token no longer works against this server (revoked, or the server's upstream session died),
+    // and there is no refresh to fall back on (SPEC section 5). The nav host observes this and
+    // routes to the sign-in screen so the user re-enters credentials, instead of being stranded
+    // on a dead-end error whose retry never recovers. The trusted server, its certificate, and the
+    // display username are kept; only the token is cleared, so sign-in comes up pre-filled.
     private val _reauthRequired = MutableStateFlow(false)
     val reauthRequired: StateFlow<Boolean> = _reauthRequired.asStateFlow()
 
-    fun setSessionActive(active: Boolean) = sessionActive.set(active)
+    // The prompt that is pending, read once by the sign-in screen to choose its notice copy (SPEC
+    // section 5): a 401 reauth (whose code varies UPSTREAM_SESSION_LOST vs anything else) or the
+    // one-time /v1 -> /v2 re-login. Consumed on read so a later, ordinary visit to sign-in shows
+    // no stale notice. Null means the visit needs no notice.
+    @Volatile private var pendingPrompt: SignInPrompt? = null
 
     /**
-     * Terminal auth failure: stop suppressing refresh, discard the stranded tokens, and signal
-     * the UI to send the user back to sign-in. Idempotent - safe to call from several failing
-     * calls at once. Cleared by [acknowledgeReauth] once the nav host has routed.
+     * Terminal auth failure: discard the stranded token (keeping the username for the sign-in
+     * pre-fill) and signal the UI to send the user back to sign-in. [code] is the 401 body's code,
+     * kept only to vary the sign-in notice. Idempotent - safe to call from several failing calls at
+     * once. Cleared by [acknowledgeReauth] once the nav host has routed.
      */
-    suspend fun requireReauth() {
-        sessionActive.set(false)
-        tokenStore.clear()
+    suspend fun requireReauth(code: String?) {
+        tokenStore.clearToken()
+        // Set the prompt before raising the flag: the nav host routes on the flag and the sign-in
+        // screen then reads the prompt, so it must already be in place.
+        pendingPrompt = SignInPrompt.Reauth(code)
         _reauthRequired.value = true
     }
 
@@ -74,6 +100,30 @@ class ConnectionManager(
     }
 
     /**
+     * The one-time /v1 -> /v2 migration (SPEC section 5), run on every launch before the routing
+     * credential check: discards the Audiobookshelf token pair a pre-update install left behind
+     * and queues the "app updated" sign-in notice. The trusted server, its certificate, and the
+     * username are untouched, so that launch routes to a pre-filled sign-in on its own - no
+     * navigation signal needed. Every launch but the first after the update finds nothing and
+     * changes nothing.
+     */
+    suspend fun migrateFromV1() {
+        if (tokenStore.discardLegacyTokens()) {
+            pendingPrompt = SignInPrompt.AppUpdated
+        }
+    }
+
+    /**
+     * The pending sign-in prompt, consumed on read (returns it once, then null). The sign-in
+     * screen calls this to decide whether - and which - explanatory notice to show. Null when the
+     * user reached sign-in by an ordinary route.
+     */
+    fun consumeSignInPrompt(): SignInPrompt? = pendingPrompt.also { pendingPrompt = null }
+
+    /** The remembered display username for the sign-in pre-fill, or null if none is stored. */
+    suspend fun prefillUsername(): String? = tokenStore.username()
+
+    /**
      * The already-built client, without building one: a lock-free volatile read. Cover-image
      * loads resolve their Call.Factory through this per request - by the time any cover URL
      * exists on screen, the library data that carried it was fetched through [client], so the
@@ -81,9 +131,6 @@ class ConnectionManager(
      * placeholder state.
      */
     fun peekClient(): RatatoskrClient? = cached?.client
-
-    /** Whether a playback session is currently active - gates client-side token refresh (SPEC section 5). */
-    fun isSessionActive(): Boolean = sessionActive.get()
 
     /** The client for the currently trusted server, or null if none is configured yet. */
     suspend fun client(): RatatoskrClient? {
@@ -100,7 +147,6 @@ class ConnectionManager(
                 baseUrl = config.baseUrl,
                 fingerprint = fingerprint,
                 tokenStore = tokenStore,
-                sessionActive = { sessionActive.get() },
             ).also {
                 cached = Cached(key, it)
             }
