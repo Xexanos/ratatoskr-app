@@ -1,0 +1,1 @@
+The error message on the connect screen now leads with a warning symbol, the way the sign-in screen and your library already do. A failed connection is recognizable as an error at a glance, instead of relying on the color of the box alone.

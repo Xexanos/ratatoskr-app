@@ -1,0 +1,1 @@
+Die Fehlermeldung auf dem Verbinden-Bildschirm beginnt jetzt mit einem Warnsymbol, so wie es der Anmeldebildschirm und deine Bibliothek schon tun. Eine fehlgeschlagene Verbindung ist damit auf einen Blick als Fehler zu erkennen und nicht mehr nur an der Farbe der Fläche.
