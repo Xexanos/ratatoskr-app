@@ -31,11 +31,13 @@ import okhttp3.mockwebserver.MockResponse
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import java.util.concurrent.TimeUnit
 
 class SpeakersViewModelTest {
 
@@ -128,6 +130,36 @@ class SpeakersViewModelTest {
         waitUntil { !viewModel.uiState.value.loading }
 
         assertEquals(UiError.Domain(RatatoskrError.Unauthorized("unauthorized")), viewModel.uiState.value.error)
+    }
+
+    @Test
+    fun `retry re-runs a load that failed`() = runTest(dispatcher) {
+        var attempts = 0
+        server.dispatch {
+            attempts++
+            if (attempts == 1) {
+                MockResponse().setResponseCode(500).setBody("""{"code":"server_error","message":"boom"}""")
+            } else {
+                // Delayed so the assertion below lands while the second call is still in
+                // flight, rather than racing a response that can arrive in microseconds.
+                jsonResponse(WireFixtures.speakerListJson()).setBodyDelay(300, TimeUnit.MILLISECONDS)
+            }
+        }
+
+        val viewModel = speakersViewModel(trustedConnectionManager())
+        waitUntil { !viewModel.uiState.value.loading }
+        assertTrue(viewModel.uiState.value.error != null)
+
+        viewModel.retry()
+
+        // Straight back to loading, so the tapped button doesn't sit on a screen that still
+        // shows the error it was meant to clear.
+        assertTrue(viewModel.uiState.value.loading)
+        assertNull(viewModel.uiState.value.error)
+
+        waitUntil { !viewModel.uiState.value.loading }
+        assertEquals(1, viewModel.uiState.value.speakers.size)
+        assertNull(viewModel.uiState.value.error)
     }
 
     @Test

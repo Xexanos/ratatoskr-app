@@ -35,7 +35,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -47,6 +46,7 @@ import io.github.xexanos.ratatoskr.data.SpeakerManager
 import io.github.xexanos.ratatoskr.network.domain.ApiResult
 import io.github.xexanos.ratatoskr.network.domain.Speaker
 import io.github.xexanos.ratatoskr.ui.EmptyState
+import io.github.xexanos.ratatoskr.ui.ErrorState
 import io.github.xexanos.ratatoskr.ui.KnotLoader
 import io.github.xexanos.ratatoskr.ui.UiTestTags
 import io.github.xexanos.ratatoskr.ui.UiError
@@ -76,6 +76,9 @@ class SpeakersViewModel(
 
     init { loadSpeakers() }
 
+    /** Re-runs the initial load after it failed, or after it found no speakers. */
+    fun retry() = loadSpeakers()
+
     /**
      * Forces a fresh fetch through the shared [SpeakerManager] rather than reading whatever's
      * cached - the user is actively picking a speaker here, so a stale name or membership
@@ -83,6 +86,9 @@ class SpeakersViewModel(
      * side effect (SpeakerManager has no periodic background refresh of its own).
      */
     private fun loadSpeakers() {
+        // Back to loading up front, so a retry replaces the error or empty state immediately
+        // instead of leaving the tapped button sitting on a dead screen until the call lands.
+        _uiState.value = SpeakersUiState(loading = true)
         viewModelScope.launch {
             _uiState.value = when (val result = speakerManager.refresh()) {
                 null -> SpeakersUiState(loading = false, error = UiError.NoServer)
@@ -118,7 +124,7 @@ fun SpeakersScreenHost(
         if (state.started) onStarted()
     }
 
-    SpeakersScreen(state = state, onSelectSpeaker = viewModel::start)
+    SpeakersScreen(state = state, onSelectSpeaker = viewModel::start, onRetry = viewModel::retry)
 }
 
 // The screen itself: a pure function of [state], previewable without a ViewModel or server.
@@ -126,6 +132,7 @@ fun SpeakersScreenHost(
 fun SpeakersScreen(
     state: SpeakersUiState,
     onSelectSpeaker: (String) -> Unit,
+    onRetry: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         Text(
@@ -149,19 +156,19 @@ fun SpeakersScreen(
                 }
             }
 
-            state.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(
-                    state.error.text(),
-                    color = MaterialTheme.colorScheme.error,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(24.dp),
-                )
-            }
+            state.error != null -> ErrorState(
+                title = stringResource(R.string.speakers_error_title),
+                body = state.error.text(),
+                onRetry = onRetry,
+            )
 
+            // Unlike an empty library, "no speakers" mirrors the state of the network and the
+            // server, so it is worth another look (ux-design, EMPTY).
             state.speakers.isEmpty() -> EmptyState(
                 icon = Icons.Default.SpeakerGroup,
                 title = stringResource(R.string.speakers_empty_title),
                 body = stringResource(R.string.speakers_empty_hint),
+                onRetry = onRetry,
             )
 
             else -> LazyColumn(

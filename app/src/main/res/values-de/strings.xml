@@ -1,4 +1,7 @@
 <resources>
+    <!-- Shared -->
+    <string name="action_retry">Erneut versuchen</string>
+
     <!-- Connect -->
     <string name="connect_welcome_title">Willkommen bei Ratatoskr</string>
     <string name="connect_welcome_subtitle">Verbinde dich mit deinem Ratatoskr-Server, um Hörbücher auf deinen Sonos-Lautsprechern abzuspielen.</string>
@@ -36,6 +39,7 @@
     <string name="library_no_results_body">Keine Hörbücher passen zu %1$s. Versuche es mit einer kürzeren Suche.</string>
     <string name="library_shelf_header">Weiterhören</string>
     <string name="library_all_books_header">Alle Bücher</string>
+    <string name="library_error_title">Bibliothek konnte nicht geladen werden</string>
     <string name="library_shelf_error_title">Weiterhören konnte nicht geladen werden</string>
     <string name="library_shelf_error_retry">Zum Wiederholen tippen</string>
     <string name="library_finished">Abgeschlossen</string>
@@ -50,6 +54,7 @@
     <string name="speakers_title">Lautsprecher auswählen</string>
     <string name="speakers_subtitle">Die Wiedergabe startet auf dem ausgewählten Lautsprecher.</string>
     <string name="speakers_starting">Wiedergabe wird gestartet...</string>
+    <string name="speakers_error_title">Lautsprecher konnten nicht geladen werden</string>
     <string name="speakers_empty_title">Keine Lautsprecher gefunden</string>
     <string name="speakers_empty_hint">Stelle sicher, dass deine Sonos-Lautsprecher eingeschaltet und vom Server aus erreichbar sind.</string>
     <string name="speakers_group">Gruppe</string>
