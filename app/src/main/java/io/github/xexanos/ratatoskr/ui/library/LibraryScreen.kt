@@ -82,6 +82,7 @@ import io.github.xexanos.ratatoskr.ui.BannerAction
 import io.github.xexanos.ratatoskr.ui.BannerKind
 import io.github.xexanos.ratatoskr.ui.BannerPlacement
 import io.github.xexanos.ratatoskr.ui.EmptyState
+import io.github.xexanos.ratatoskr.ui.ErrorState
 import io.github.xexanos.ratatoskr.ui.InlineBanner
 import io.github.xexanos.ratatoskr.ui.KnotLoader
 import io.github.xexanos.ratatoskr.ui.LocalBannerPlacement
@@ -657,22 +658,11 @@ private fun LibraryContent(
                 if (rememberDelayedVisible(state.loading)) KnotLoader()
             }
 
-            state.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(24.dp),
-                ) {
-                    Text(
-                        state.error.text(),
-                        color = MaterialTheme.colorScheme.error,
-                        textAlign = TextAlign.Center,
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    Button(onClick = onRefresh) {
-                        Text(stringResource(R.string.library_retry))
-                    }
-                }
-            }
+            state.error != null -> ErrorState(
+                title = stringResource(R.string.library_error_title),
+                body = state.error.text(),
+                onRetry = onRefresh,
+            )
 
             state.items.isEmpty() -> EmptyLibrary(query)
 
