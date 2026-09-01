@@ -77,3 +77,19 @@ cover URL or a 404 from the cover proxy. A deliberate "this book has no artwork"
 same for every coverless book: repeated identical marks read as a pattern, not a bug
 (decided in issue #78, replacing the title-initial tile).
 _Avoid_: placeholder tile (the pre-#78 term), fallback image, initials
+
+### Notices and errors
+
+**Notice**:
+A heads-up about a state the user did not choose - an expired sign-in, or the one-time
+re-login after an app update. Neither a success nor a failure the user caused, so it is
+carried by a neutral surface rather than an error one, and it is never announced: a notice
+is already on screen when the screen opens.
+_Avoid_: warning, error, info message
+
+**Error banner**:
+The inline report that an action or a load failed, shown where the action was. Announced
+when it appears, because unlike a notice it arrives mid-session. Retry follows the failure's
+scope: a failure confined to one section is retried by tapping the banner itself, a failure
+that blocks the flow gets its own button below it.
+_Avoid_: alert, toast, dialog (an error is never global)
