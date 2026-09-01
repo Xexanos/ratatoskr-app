@@ -15,6 +15,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import io.github.xexanos.ratatoskr.ui.theme.RatatoskrTheme
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -74,6 +75,6 @@ class InlineBannerTest {
 
         compose.onNodeWithText("the shelf failed").assertHasClickAction().performClick()
 
-        assert(taps == 1) { "expected the banner surface itself to be the retry target" }
+        assertEquals("expected the banner surface itself to be the retry target", 1, taps)
     }
 }

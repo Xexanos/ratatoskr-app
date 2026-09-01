@@ -655,7 +655,7 @@
     </div>
     <p style="max-width:680px; color:#4A3C33; margin:16px 0;">Both kinds share the same assembly: a tonal <code>Surface</code>, a leading 24&nbsp;dp glyph, a 12&nbsp;dp gap, <code>bodyMedium</code> copy, and 16&nbsp;dp padding at top level against 14/12&nbsp;dp nested. The glyph is a <b>redundant</b> carrier, not the only one: in the light palette <code>surfaceVariant</code> and <code>errorContainer</code> are both warm tints, so colour alone could not tell the two kinds apart — and colour must never carry meaning by itself regardless.</p>
     <p style="max-width:680px; color:#4A3C33; margin:0 0 16px;"><b>Retry follows the failure’s scope.</b> A failure that blocks the flow gets its own full-width button below the banner — Connect’s certificate failure is the case: there is nothing else on the screen to do. A failure confined to one section makes the banner itself the tap target, with the action label as a second line, so the rest of the screen keeps working — the shelf-error banner is the case, and retrying refetches only the shelf. The visible action label stays visible: without it there is no sign that the surface can be tapped at all.</p>
-    <p style="max-width:680px; color:#4A3C33; margin:0 0 16px;">An error surface is told apart <b>by how colourful it is</b>, not by which red it is. Measured in CIELCh chroma against the neutral notice card beside it, the error container carries 23.9 against 9.4 in light and 55.8 against 8.5 in dark. That is the axis to preserve when the palette is revisited: shifting the hue instead was tried and rejected, because a cool crimson separates by leaving the brand rather than by using it (issue #135).</p>
+    <p style="max-width:680px; color:#4A3C33; margin:0 0 16px;">An error surface is told apart <b>by how colourful it is</b>, not by which red it is. Measured in CIELCh chroma against the neutral notice card beside it, the error container carries 24.4 against 9.4 in light and 55.8 against 8.5 in dark. That is the axis to preserve when the palette is revisited: shifting the hue instead was tried and rejected, because a cool crimson separates by leaving the brand rather than by using it (issue #135).</p>
   </section>
 
   <!-- ============ 01 connect ============ -->
@@ -1157,7 +1157,7 @@
       <div class="decisions">
         <h3>Decisions</h3>
         <ol>
-          <li><span class="dnum">1</span><span><b>Destructive actions are copper list rows with a subtitle</b> naming the consequence (“Removes the stored tokens…”) — instead of two equally loud buttons. Both additionally get a confirmation dialog.</span></li>
+          <li><span class="dnum">1</span><span><b>Destructive actions are copper list rows with a subtitle</b> naming the consequence (“Removes the stored tokens…”) — instead of two equally loud buttons. Copper rather than the error tint, because signing out is an action the user deliberately chose, not a failure being reported to them. Whether they <em>additionally</em> need a confirmation dialog is deliberately still open: the copper and the subtitle carry the warning today, and a dialog on a deliberate action can read as friction rather than safety.</span></li>
           <li><span class="dnum">2</span><span><b>The certificate is inspectable:</b> the row shows the fingerprint prefix and trust date; tapping opens the full view (same layout as Connect’s confirm step — recognition, not relearning).</span></li>
           <li><span class="dnum">3</span><span><b>“Signed in as alex” explains the architecture in passing</b> (“Audiobookshelf, via your Ratatoskr server”) — the one place where the app states its role.</span></li>
           <li><span class="dnum">4</span><span><b>Version + license are table stakes for the F-Droid audience:</b> GPL and a source-code link belong visibly in the app, not just in the repo.</span></li>
@@ -1165,7 +1165,7 @@
         <div class="delta">
           <span class="dt">Δ vs. current implementation</span>
           <ul>
-            <li>Two free-standing buttons become grouped rows with icons, subtitles and confirmation dialogs.</li>
+            <li>The three free-standing buttons become grouped rows with icons. Their copper tint and consequence subtitles are in place; the grouping is not, and the confirmation dialog is undecided (see decision 1).</li>
             <li>Certificate detail view and the About group (version, license, source) are new.</li>
           </ul>
         </div>

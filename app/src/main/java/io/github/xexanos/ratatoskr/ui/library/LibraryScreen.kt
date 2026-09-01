@@ -5,6 +5,7 @@
  */
 package io.github.xexanos.ratatoskr.ui.library
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,6 +46,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -78,10 +80,11 @@ import io.github.xexanos.ratatoskr.network.domain.Progress
 import io.github.xexanos.ratatoskr.network.domain.Session
 import io.github.xexanos.ratatoskr.ui.BannerAction
 import io.github.xexanos.ratatoskr.ui.BannerKind
+import io.github.xexanos.ratatoskr.ui.BannerPlacement
 import io.github.xexanos.ratatoskr.ui.EmptyState
 import io.github.xexanos.ratatoskr.ui.InlineBanner
 import io.github.xexanos.ratatoskr.ui.KnotLoader
-import io.github.xexanos.ratatoskr.ui.ShelfBand
+import io.github.xexanos.ratatoskr.ui.LocalBannerPlacement
 import io.github.xexanos.ratatoskr.ui.UiError
 import io.github.xexanos.ratatoskr.ui.UiTestTags
 import io.github.xexanos.ratatoskr.ui.common.CoverImage
@@ -536,6 +539,33 @@ private const val LOAD_MORE_THRESHOLD = 8
 // Row spacing inside the shelf band is each row's own bottom padding, not an arrangement gap:
 // the band has to stay continuous where a gap would slice it.
 private val SHELF_ROW_PADDING = PaddingValues(start = 16.dp, end = 16.dp, bottom = 8.dp)
+
+/**
+ * The continue-listening shelf's tonal band. Owns the band tone and the nested banner placement
+ * together, so nothing can land in the band with the band's background but a top-level banner's
+ * metrics. The shelf is a stack of separate LazyColumn items with no shared parent, so each item
+ * wraps itself - which is exactly why the two have to travel in one composable.
+ *
+ * [contentPadding] is applied inside the background on purpose: the band has to fill the gaps
+ * between its rows, which it cannot do if the caller pads from the outside.
+ */
+@Composable
+private fun ShelfBand(
+    contentPadding: PaddingValues = PaddingValues(),
+    content: @Composable () -> Unit,
+) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .padding(contentPadding),
+    ) {
+        CompositionLocalProvider(
+            LocalBannerPlacement provides BannerPlacement.Nested,
+            content = content,
+        )
+    }
+}
 
 // The screen itself: a pure function of [state] and [query], previewable without a ViewModel or
 // server. [query] is a parameter (not local state) because the search text is preview-relevant:

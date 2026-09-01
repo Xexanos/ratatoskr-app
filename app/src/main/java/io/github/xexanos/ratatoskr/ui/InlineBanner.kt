@@ -5,9 +5,7 @@
  */
 package io.github.xexanos.ratatoskr.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -21,10 +19,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -63,9 +61,23 @@ internal enum class BannerPlacement { TopLevel, Nested }
  */
 internal val LocalBannerPlacement = staticCompositionLocalOf { BannerPlacement.TopLevel }
 
+/** The radius and padding a placement gets; the two always travel together. */
+private data class BannerMetrics(val shape: Shape, val contentPadding: PaddingValues)
+
+@Composable
+private fun metricsFor(placement: BannerPlacement): BannerMetrics = when (placement) {
+    BannerPlacement.TopLevel ->
+        BannerMetrics(MaterialTheme.shapes.large, PaddingValues(16.dp))
+
+    BannerPlacement.Nested ->
+        BannerMetrics(MaterialTheme.shapes.medium, PaddingValues(horizontal = 14.dp, vertical = 12.dp))
+}
+
 /**
- * The app's one inline report surface: a tonal card with a leading glyph and a message, used
- * wherever the user has to be told something about the state they are in.
+ * The **banner** report surface: a tonal card with a leading glyph and a message, used where a
+ * notice or a failure has to be reported next to the thing it concerns. Not every error in the app
+ * is a banner - a whole screen that failed to load stays a centred message with its own retry,
+ * which is a different shape and deliberately outside this component.
  *
  * Colour alone cannot carry the notice/error distinction - the light palette's `surfaceVariant`
  * and `errorContainer` are both warm tints - so each kind leads with its own glyph, and the glyph
@@ -90,14 +102,7 @@ internal fun InlineBanner(
         BannerKind.NOTICE -> Icons.Outlined.Info
         BannerKind.ERROR -> Icons.Outlined.Warning
     }
-    val shape = when (LocalBannerPlacement.current) {
-        BannerPlacement.TopLevel -> MaterialTheme.shapes.large
-        BannerPlacement.Nested -> MaterialTheme.shapes.medium
-    }
-    val contentPadding = when (LocalBannerPlacement.current) {
-        BannerPlacement.TopLevel -> PaddingValues(16.dp)
-        BannerPlacement.Nested -> PaddingValues(horizontal = 14.dp, vertical = 12.dp)
-    }
+    val (shape, contentPadding) = metricsFor(LocalBannerPlacement.current)
     // An error is added to the screen after the user acted, so it has to say so; a notice is
     // already there when the screen opens and is reached in normal traversal order.
     val announce = if (kind == BannerKind.ERROR) {
@@ -147,32 +152,6 @@ internal fun InlineBanner(
             color = container,
             modifier = surfaceModifier,
             content = body,
-        )
-    }
-}
-
-/**
- * The continue-listening shelf's tonal band. Owns the band tone and the nested placement
- * together, so nothing can land in the band with the band's background but a top-level banner's
- * metrics.
- *
- * [contentPadding] is applied inside the background on purpose: the band has to fill the gaps
- * between its rows, which it cannot do if the caller pads from the outside.
- */
-@Composable
-internal fun ShelfBand(
-    contentPadding: PaddingValues = PaddingValues(),
-    content: @Composable () -> Unit,
-) {
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceContainer)
-            .padding(contentPadding),
-    ) {
-        CompositionLocalProvider(
-            LocalBannerPlacement provides BannerPlacement.Nested,
-            content = content,
         )
     }
 }

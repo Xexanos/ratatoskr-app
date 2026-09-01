@@ -37,7 +37,7 @@ class ColorRoleDocsTest {
         val wiredLight = wiredRoles("lightColorScheme")
         val wiredDark = wiredRoles("darkColorScheme")
 
-        assertTrue("Color.kt yielded no constants - the parser is broken, not the palette", constants().isNotEmpty())
+        assertTrue("Color.kt yielded no constants - the parser is broken, not the palette", constants.isNotEmpty())
         assertTrue("no roles parsed out of the doc's #color-roles table", documented.isNotEmpty())
         assertEquals(
             "the two schemes wire different role sets",
@@ -58,13 +58,13 @@ class ColorRoleDocsTest {
         assertEquals("docs/ux-design.html disagrees with Color.kt", emptyList<String>(), mismatches)
     }
 
-    private fun constants(): Map<String, String> =
+    private val constants: Map<String, String> =
         Regex("""val\s+(\w+)\s*=\s*Color\(0x[fF][fF]([0-9a-fA-F]{6})\)""")
             .findAll(colorKt)
             .associate { it.groupValues[1] to "#" + it.groupValues[2].uppercase() }
 
     private fun hexOf(constant: String): String =
-        constants()[constant] ?: error("Theme.kt wires $constant, which Color.kt does not define")
+        constants[constant] ?: error("Theme.kt wires $constant, which Color.kt does not define")
 
     // The argument list of `= lightColorScheme(...)` / `= darkColorScheme(...)`, read to its
     // matching paren so the dynamic-colour calls elsewhere in the file cannot be picked up.
@@ -81,8 +81,11 @@ class ColorRoleDocsTest {
             }
             if (depth > 0) end++
         }
+        // The trailing comma is appended rather than required: a last argument written without one
+        // would otherwise drop out of the guard silently, which is the one failure a guard may not
+        // have.
         return Regex("""(\w+)\s*=\s*(\w+)\s*,""")
-            .findAll(themeKt.substring(open, end))
+            .findAll(themeKt.substring(open, end).trimEnd() + ",")
             .associate { it.groupValues[1] to it.groupValues[2] }
     }
 

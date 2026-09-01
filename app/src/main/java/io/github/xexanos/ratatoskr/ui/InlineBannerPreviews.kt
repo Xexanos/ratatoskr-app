@@ -5,11 +5,14 @@
  */
 package io.github.xexanos.ratatoskr.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -36,13 +39,24 @@ private fun TopLevelBannerPreview(dark: Boolean, content: @Composable () -> Unit
     }
 }
 
-// The band's padding here is a preview frame so the surrounding tone is visible at all; what the
-// golden pins is the banner's own metrics inside it.
+// Provides the nesting itself rather than borrowing the library screen's ShelfBand: what this
+// golden pins is the banner's own metrics, and the band tone around it is only a frame so the
+// surrounding surface is visible at all.
 @Composable
 private fun NestedBannerPreview(dark: Boolean, content: @Composable () -> Unit) {
     RatatoskrTheme(darkTheme = dark) {
         Surface {
-            ShelfBand(PaddingValues(horizontal = 16.dp, vertical = 12.dp)) { content() }
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+            ) {
+                CompositionLocalProvider(
+                    LocalBannerPlacement provides BannerPlacement.Nested,
+                    content = content,
+                )
+            }
         }
     }
 }

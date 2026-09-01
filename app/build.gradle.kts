@@ -1,6 +1,4 @@
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
-import org.gradle.api.tasks.PathSensitivity
-import org.gradle.api.tasks.testing.Test
 
 plugins {
     alias(libs.plugins.android.application)
