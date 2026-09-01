@@ -5,7 +5,6 @@
  */
 package io.github.xexanos.ratatoskr.ui.library
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,7 +29,6 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -78,8 +76,12 @@ import io.github.xexanos.ratatoskr.network.domain.LibraryItemSummary
 import io.github.xexanos.ratatoskr.network.domain.PlaybackState
 import io.github.xexanos.ratatoskr.network.domain.Progress
 import io.github.xexanos.ratatoskr.network.domain.Session
+import io.github.xexanos.ratatoskr.ui.BannerAction
+import io.github.xexanos.ratatoskr.ui.BannerKind
 import io.github.xexanos.ratatoskr.ui.EmptyState
+import io.github.xexanos.ratatoskr.ui.InlineBanner
 import io.github.xexanos.ratatoskr.ui.KnotLoader
+import io.github.xexanos.ratatoskr.ui.ShelfBand
 import io.github.xexanos.ratatoskr.ui.UiError
 import io.github.xexanos.ratatoskr.ui.UiTestTags
 import io.github.xexanos.ratatoskr.ui.common.CoverImage
@@ -531,6 +533,10 @@ fun LibraryScreenHost(
 // How many rows before the end of the list the next page is requested.
 private const val LOAD_MORE_THRESHOLD = 8
 
+// Row spacing inside the shelf band is each row's own bottom padding, not an arrangement gap:
+// the band has to stay continuous where a gap would slice it.
+private val SHELF_ROW_PADDING = PaddingValues(start = 16.dp, end = 16.dp, bottom = 8.dp)
+
 // The screen itself: a pure function of [state] and [query], previewable without a ViewModel or
 // server. [query] is a parameter (not local state) because the search text is preview-relevant:
 // a non-blank query hides the shelf, and that rule is pinned by the goldens.
@@ -683,34 +689,29 @@ private fun LibraryContent(
                             // also keep their place in the browse list below (no deduplication),
                             // so a bare item id could occur twice in one LazyColumn.
                             item(key = "shelf-header") {
-                                LibrarySectionHeader(
-                                    stringResource(R.string.library_shelf_header),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .background(MaterialTheme.colorScheme.surfaceContainer),
-                                )
+                                ShelfBand {
+                                    LibrarySectionHeader(stringResource(R.string.library_shelf_header))
+                                }
                             }
                             items(state.shelfItems, key = { "shelf:${it.id}" }) { item ->
-                                Box(
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .background(MaterialTheme.colorScheme.surfaceContainer)
-                                        .padding(horizontal = 16.dp)
-                                        .padding(bottom = 8.dp),
-                                ) {
+                                ShelfBand(SHELF_ROW_PADDING) {
                                     LibraryRow(item, onClick = { onOpenItem(item.id) })
                                 }
                             }
                             if (shelfErrorVisible) {
+                                // The shelf slot's failure state (screen 03): one tappable banner
+                                // in the place the shelf's books would occupy. Retrying refetches
+                                // ONLY the shelf - the browse list below keeps working.
                                 item(key = "shelf-error") {
-                                    Box(
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .background(MaterialTheme.colorScheme.surfaceContainer)
-                                            .padding(horizontal = 16.dp)
-                                            .padding(bottom = 8.dp),
-                                    ) {
-                                        ShelfErrorRow(onRetry = onRetryShelf)
+                                    ShelfBand(SHELF_ROW_PADDING) {
+                                        InlineBanner(
+                                            kind = BannerKind.ERROR,
+                                            text = stringResource(R.string.library_shelf_error_title),
+                                            action = BannerAction(
+                                                label = stringResource(R.string.library_shelf_error_retry),
+                                                onClick = onRetryShelf,
+                                            ),
+                                        )
                                     }
                                 }
                             }
@@ -896,54 +897,16 @@ private fun EmptyLibrary(query: String) {
 // Marked as a heading so the shelf/browse boundary is navigable non-visually, mirroring what
 // the tonal band does for sighted users.
 @Composable
-private fun LibrarySectionHeader(text: String, modifier: Modifier = Modifier) {
+private fun LibrarySectionHeader(text: String) {
     Text(
         text,
         style = MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.secondary,
         fontWeight = FontWeight.Medium,
-        modifier = modifier
+        modifier = Modifier
             .semantics { heading() }
             .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 6.dp),
     )
-}
-
-// The shelf slot's failure state (screen 03, .shelf-err): one tappable row in the place the
-// shelf's books would occupy, styled as an error so it cannot be read as content. The whole
-// row retries, and it refetches ONLY the shelf - the browse list below keeps working.
-@Composable
-private fun ShelfErrorRow(onRetry: () -> Unit) {
-    Surface(
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.errorContainer,
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onRetry),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                Icons.Default.WarningAmber,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onErrorContainer,
-            )
-            Spacer(Modifier.width(12.dp))
-            Column {
-                Text(
-                    stringResource(R.string.library_shelf_error_title),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onErrorContainer,
-                )
-                Text(
-                    stringResource(R.string.library_shelf_error_retry),
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-        }
-    }
 }
 
 @Composable

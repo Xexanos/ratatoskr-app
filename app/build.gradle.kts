@@ -1,4 +1,6 @@
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
+import org.gradle.api.tasks.PathSensitivity
+import org.gradle.api.tasks.testing.Test
 
 plugins {
     alias(libs.plugins.android.application)
@@ -101,6 +103,15 @@ android {
             }
         }
     }
+}
+
+// ColorRoleDocsTest reads the design doc, which is not otherwise a test input: without this the
+// unit tests stay UP-TO-DATE when only the doc changes, and the guard sleeps through exactly the
+// drift it exists to catch.
+tasks.withType<Test>().configureEach {
+    inputs.file(rootProject.layout.projectDirectory.file("docs/ux-design.html"))
+        .withPropertyName("uxDesignDoc")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
 dependencies {
