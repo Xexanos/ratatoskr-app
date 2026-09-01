@@ -20,7 +20,6 @@ import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -245,17 +244,24 @@ fun SettingsScreen(
 
         Spacer(Modifier.height(32.dp))
         SectionLabel(stringResource(R.string.settings_section_account))
+        // Copper like the other two destructive rows, not the error tint: signing out is a
+        // deliberate action the user chose, not a failure being reported (ux-design: Settings,
+        // decision 1). The consequence is named in the hint below instead.
         OutlinedButton(
             onClick = onSignOut,
-            colors = ButtonDefaults.outlinedButtonColors(
-                contentColor = MaterialTheme.colorScheme.error,
-            ),
             modifier = Modifier.fillMaxWidth().height(52.dp),
         ) {
             Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             Text(stringResource(R.string.settings_sign_out))
         }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            stringResource(R.string.settings_sign_out_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 4.dp),
+        )
     }
 }
 

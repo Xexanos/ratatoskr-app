@@ -30,7 +30,6 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -47,6 +46,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -78,8 +78,13 @@ import io.github.xexanos.ratatoskr.network.domain.LibraryItemSummary
 import io.github.xexanos.ratatoskr.network.domain.PlaybackState
 import io.github.xexanos.ratatoskr.network.domain.Progress
 import io.github.xexanos.ratatoskr.network.domain.Session
+import io.github.xexanos.ratatoskr.ui.BannerAction
+import io.github.xexanos.ratatoskr.ui.BannerKind
+import io.github.xexanos.ratatoskr.ui.BannerPlacement
 import io.github.xexanos.ratatoskr.ui.EmptyState
+import io.github.xexanos.ratatoskr.ui.InlineBanner
 import io.github.xexanos.ratatoskr.ui.KnotLoader
+import io.github.xexanos.ratatoskr.ui.LocalBannerPlacement
 import io.github.xexanos.ratatoskr.ui.UiError
 import io.github.xexanos.ratatoskr.ui.UiTestTags
 import io.github.xexanos.ratatoskr.ui.common.CoverImage
@@ -531,6 +536,36 @@ fun LibraryScreenHost(
 // How many rows before the end of the list the next page is requested.
 private const val LOAD_MORE_THRESHOLD = 8
 
+// Every item in the list carries its own inset, so the band never has to know what is inside it.
+// The bottom edge is the row gap: an arrangement gap would slice the shelf's tonal band, item-owned
+// padding leaves it continuous. A section label is the one exception and owns a tighter rhythm
+// (see [LibrarySectionHeader]) - it sits closer to the content it labels than rows sit to
+// each other.
+private val LIST_ITEM_INSET = PaddingValues(start = 16.dp, end = 16.dp, bottom = 8.dp)
+
+/**
+ * The continue-listening shelf's tonal band. Owns the band tone and the nested banner placement
+ * together, so nothing can land in the band with the band's background but a top-level banner's
+ * metrics. The shelf is a stack of separate LazyColumn items with no shared parent, so each item
+ * wraps itself - which is exactly why the two have to travel in one composable.
+ *
+ * Deliberately takes no padding: spacing belongs to the item, identically inside the band and
+ * below it, so the band is only a tone and a placement.
+ */
+@Composable
+private fun ShelfBand(content: @Composable () -> Unit) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        CompositionLocalProvider(
+            LocalBannerPlacement provides BannerPlacement.Nested,
+            content = content,
+        )
+    }
+}
+
 // The screen itself: a pure function of [state] and [query], previewable without a ViewModel or
 // server. [query] is a parameter (not local state) because the search text is preview-relevant:
 // a non-blank query hides the shelf, and that rule is pinned by the goldens.
@@ -683,34 +718,31 @@ private fun LibraryContent(
                             // also keep their place in the browse list below (no deduplication),
                             // so a bare item id could occur twice in one LazyColumn.
                             item(key = "shelf-header") {
-                                LibrarySectionHeader(
-                                    stringResource(R.string.library_shelf_header),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .background(MaterialTheme.colorScheme.surfaceContainer),
-                                )
+                                ShelfBand {
+                                    LibrarySectionHeader(stringResource(R.string.library_shelf_header))
+                                }
                             }
                             items(state.shelfItems, key = { "shelf:${it.id}" }) { item ->
-                                Box(
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .background(MaterialTheme.colorScheme.surfaceContainer)
-                                        .padding(horizontal = 16.dp)
-                                        .padding(bottom = 8.dp),
-                                ) {
+                                ShelfBand {
                                     LibraryRow(item, onClick = { onOpenItem(item.id) })
                                 }
                             }
                             if (shelfErrorVisible) {
+                                // The shelf slot's failure state (screen 03): one tappable banner
+                                // in the place the shelf's books would occupy, so it takes the same
+                                // inset a book would. Retrying refetches ONLY the shelf - the
+                                // browse list below keeps working.
                                 item(key = "shelf-error") {
-                                    Box(
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .background(MaterialTheme.colorScheme.surfaceContainer)
-                                            .padding(horizontal = 16.dp)
-                                            .padding(bottom = 8.dp),
-                                    ) {
-                                        ShelfErrorRow(onRetry = onRetryShelf)
+                                    ShelfBand {
+                                        InlineBanner(
+                                            kind = BannerKind.ERROR,
+                                            text = stringResource(R.string.library_shelf_error_title),
+                                            action = BannerAction(
+                                                label = stringResource(R.string.library_shelf_error_retry),
+                                                onClick = onRetryShelf,
+                                            ),
+                                            modifier = Modifier.padding(LIST_ITEM_INSET),
+                                        )
                                     }
                                 }
                             }
@@ -723,9 +755,7 @@ private fun LibraryContent(
                             }
                         }
                         items(state.items, key = { "browse:${it.id}" }) { item ->
-                            Box(Modifier.padding(horizontal = 16.dp).padding(bottom = 8.dp)) {
-                                LibraryRow(item, onClick = { onOpenItem(item.id) })
-                            }
+                            LibraryRow(item, onClick = { onOpenItem(item.id) })
                         }
                         if (state.nextCursor != null) {
                             item(key = "load-more") {
@@ -896,54 +926,19 @@ private fun EmptyLibrary(query: String) {
 // Marked as a heading so the shelf/browse boundary is navigable non-visually, mirroring what
 // the tonal band does for sighted users.
 @Composable
-private fun LibrarySectionHeader(text: String, modifier: Modifier = Modifier) {
+private fun LibrarySectionHeader(text: String) {
     Text(
         text,
         style = MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.secondary,
         fontWeight = FontWeight.Medium,
-        modifier = modifier
+        // Same 16 dp side inset as every other list item, but its own vertical rhythm: a label
+        // belongs to what follows it, so it sits closer below (6 dp) than rows sit to each other
+        // (8 dp) and takes 12 dp of air above to separate it from the section before.
+        modifier = Modifier
             .semantics { heading() }
             .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 6.dp),
     )
-}
-
-// The shelf slot's failure state (screen 03, .shelf-err): one tappable row in the place the
-// shelf's books would occupy, styled as an error so it cannot be read as content. The whole
-// row retries, and it refetches ONLY the shelf - the browse list below keeps working.
-@Composable
-private fun ShelfErrorRow(onRetry: () -> Unit) {
-    Surface(
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.errorContainer,
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onRetry),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                Icons.Default.WarningAmber,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onErrorContainer,
-            )
-            Spacer(Modifier.width(12.dp))
-            Column {
-                Text(
-                    stringResource(R.string.library_shelf_error_title),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onErrorContainer,
-                )
-                Text(
-                    stringResource(R.string.library_shelf_error_retry),
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-        }
-    }
 }
 
 @Composable
@@ -952,7 +947,14 @@ private fun LibraryRow(item: LibraryItemSummary, onClick: () -> Unit) {
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 1.dp,
-        modifier = Modifier.fillMaxWidth().testTag(UiTestTags.LIBRARY_ROW).clickable(onClick = onClick),
+        // The inset is the row's own, so a row looks the same in the shelf band as in the browse
+        // list below it and neither caller has to remember the value. It precedes clickable, so
+        // the gap between rows is not part of the tap target.
+        modifier = Modifier
+            .padding(LIST_ITEM_INSET)
+            .fillMaxWidth()
+            .testTag(UiTestTags.LIBRARY_ROW)
+            .clickable(onClick = onClick),
     ) {
         Row(
             modifier = Modifier.padding(12.dp),

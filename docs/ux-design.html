@@ -155,7 +155,7 @@
   .btn-text { color: #A93B28; height: 44px; }
   .btn svg { width: 18px; height: 18px; }
   .tfield {
-    height: 56px; border: 1px solid #85736C; border-radius: 8px;
+    height: 56px; border: 1px solid #7F6D67; border-radius: 8px;
     display: flex; align-items: center; padding: 0 16px; gap: 10px; position: relative;
     color: #211A17;
   }
@@ -213,17 +213,17 @@
   .shelf-band .divider { background: #EBD9CC; }
   .dark .shelf-band { background: #241914; border-bottom-color: #3A2A22; }
   .dark .shelf-band .divider { background: #453329; }
+  /* errorContainer / onErrorContainer, no border: the fill carries the surface (see Patterns). */
   .shelf-err {
     display: flex; gap: 12px; align-items: center; margin: 6px 16px 4px;
-    padding: 12px 14px; border-radius: 12px; background: #FFF1EC; border: 1px solid #F3C7BB;
-    color: #872F1F; flex: none;
+    padding: 12px 14px; border-radius: 12px; background: #FFC4B6;
+    color: #4A1108; flex: none;
   }
-  .shelf-err svg { width: 22px; height: 22px; flex: none; color: #A93B28; }
+  .shelf-err svg { width: 24px; height: 24px; flex: none; color: currentColor; }
   .shelf-err .se-main { flex: 1; min-width: 0; }
   .shelf-err .se-t { font-size: 13.5px; font-weight: 600; }
-  .shelf-err .se-a { font-size: 12.5px; color: #A93B28; font-weight: 700; margin-top: 1px; }
-  .dark .shelf-err { background: #3A211B; border-color: #5A2E22; color: #FFDAD2; }
-  .dark .shelf-err svg, .dark .shelf-err .se-a { color: #FFB4A3; }
+  .shelf-err .se-a { font-size: 12.5px; font-weight: 700; margin-top: 1px; }
+  .dark .shelf-err { background: #8C1D18; color: #F9DEDC; }
 
   .miniplayer {
     margin: 8px 12px 6px; border-radius: 16px; background: #FFDAD2; color: #3E0400;
@@ -270,7 +270,7 @@
   .srow .sic2 svg { width: 22px; height: 22px; }
   .srow .st { font-size: 14.5px; font-weight: 600; }
   .srow .ssub { font-size: 12px; color: #53433D; margin-top: 1px; }
-  .srow .chev { margin-left: auto; color: #85736C; flex: none; width: 20px; height: 20px; }
+  .srow .chev { margin-left: auto; color: #7F6D67; flex: none; width: 20px; height: 20px; }
   .srow .chev svg { width: 20px; height: 20px; }
   .srow.danger .st { color: #A93B28; }
   .srow.danger .sic2 { color: #A93B28; }
@@ -528,7 +528,9 @@
       <div class="swatch"><div class="chip" style="background:#4F6B35"></div><div class="lbl"><span class="n">Secondary · ash leaf</span><span class="h">#4F6B35</span></div></div>
       <div class="swatch"><div class="chip" style="background:#D1E8B0"></div><div class="lbl"><span class="n">Secondary container</span><span class="h">#D1E8B0</span></div></div>
       <div class="swatch"><div class="chip" style="background:#F4DED5"></div><div class="lbl"><span class="n">Surface variant</span><span class="h">#F4DED5</span></div></div>
-      <div class="swatch"><div class="chip" style="background:#85736C"></div><div class="lbl"><span class="n">Outline</span><span class="h">#85736C</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#7F6D67"></div><div class="lbl"><span class="n">Outline</span><span class="h">#7F6D67</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#8C1D18"></div><div class="lbl"><span class="n">Error</span><span class="h">#8C1D18</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#FFC4B6"></div><div class="lbl"><span class="n">Error container</span><span class="h">#FFC4B6</span></div></div>
     </div>
     <p class="token-sub">Colors · Dark</p>
     <div class="swatch-grid">
@@ -540,7 +542,39 @@
       <div class="swatch"><div class="chip" style="background:#395020"></div><div class="lbl"><span class="n">Secondary container</span><span class="h">#395020</span></div></div>
       <div class="swatch"><div class="chip" style="background:#53433D"></div><div class="lbl"><span class="n">Surface variant</span><span class="h">#53433D</span></div></div>
       <div class="swatch"><div class="chip" style="background:#A08D85"></div><div class="lbl"><span class="n">Outline</span><span class="h">#A08D85</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#F2B8B5"></div><div class="lbl"><span class="n">Error</span><span class="h">#F2B8B5</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#8C1D18"></div><div class="lbl"><span class="n">Error container</span><span class="h">#8C1D18</span></div></div>
     </div>
+
+    <p class="token-sub">Every role, pinned</p>
+    <p style="max-width:680px; color:#4A3C33; margin:0 0 16px;">The swatches above are the tones a design decision was made about. This table is the whole set the theme wires, so the contract is not silent on the rest — a drift-guard test (<code>ColorRoleDocsTest</code>) parses it and fails if any value here stops matching <code>ui/theme/Color.kt</code>. That test exists because the outline tone silently disagreed with the code for one release: the doc said <code>#85736C</code> after Compose 1.12's contrast check forced <code>#7F6D67</code>.</p>
+    <p style="max-width:680px; color:#4A3C33; margin:0 0 16px;">The <b>dark error roles are Material 3's own baseline values, pinned on purpose</b>, not copied by accident and not left to be inherited. Dark already separates the error surface from the neutral notice card beside it by colourfulness (chroma 55.8 against 8.5), so there was nothing to fix — but an inherited ramp shifts silently on a dependency bump, exactly as the outline tone did. Please do not "deduplicate" them.</p>
+    <div class="table-scroll">
+      <table class="tokens" id="color-roles">
+        <tr><th>Role</th><th>Light</th><th>Dark</th></tr>
+        <tr><td><code>primary</code></td><td><code>#A93B28</code></td><td><code>#FFB4A3</code></td></tr>
+        <tr><td><code>onPrimary</code></td><td><code>#FFFFFF</code></td><td><code>#641D0E</code></td></tr>
+        <tr><td><code>primaryContainer</code></td><td><code>#FFDAD2</code></td><td><code>#872F1F</code></td></tr>
+        <tr><td><code>onPrimaryContainer</code></td><td><code>#3E0400</code></td><td><code>#FFDAD2</code></td></tr>
+        <tr><td><code>secondary</code></td><td><code>#4F6B35</code></td><td><code>#B5D18B</code></td></tr>
+        <tr><td><code>secondaryContainer</code></td><td><code>#D1E8B0</code></td><td><code>#395020</code></td></tr>
+        <tr><td><code>onSecondaryContainer</code></td><td><code>#121F04</code></td><td><code>#D1E8B0</code></td></tr>
+        <tr><td><code>background</code></td><td><code>#FFFBF8</code></td><td><code>#1A120F</code></td></tr>
+        <tr><td><code>onBackground</code></td><td><code>#211A17</code></td><td><code>#F1DFD9</code></td></tr>
+        <tr><td><code>surface</code></td><td><code>#FFFBF8</code></td><td><code>#1A120F</code></td></tr>
+        <tr><td><code>onSurface</code></td><td><code>#211A17</code></td><td><code>#F1DFD9</code></td></tr>
+        <tr><td><code>surfaceVariant</code></td><td><code>#F4DED5</code></td><td><code>#53433D</code></td></tr>
+        <tr><td><code>onSurfaceVariant</code></td><td><code>#53433D</code></td><td><code>#D8C2B9</code></td></tr>
+        <tr><td><code>surfaceContainer</code></td><td><code>#F6EAE2</code></td><td><code>#241914</code></td></tr>
+        <tr><td><code>outline</code></td><td><code>#7F6D67</code></td><td><code>#A08D85</code></td></tr>
+        <tr><td><code>outlineVariant</code></td><td><code>#E5D2C4</code></td><td><code>#3A2A22</code></td></tr>
+        <tr><td><code>error</code></td><td><code>#8C1D18</code></td><td><code>#F2B8B5</code></td></tr>
+        <tr><td><code>onError</code></td><td><code>#FFFFFF</code></td><td><code>#601410</code></td></tr>
+        <tr><td><code>errorContainer</code></td><td><code>#FFC4B6</code></td><td><code>#8C1D18</code></td></tr>
+        <tr><td><code>onErrorContainer</code></td><td><code>#4A1108</code></td><td><code>#F9DEDC</code></td></tr>
+      </table>
+    </div>
+    <p style="max-width:680px; color:#8A7A70; font-size:13px; margin:12px 0 0;">Roles the theme does not wire fall through to the Material&nbsp;3 baseline and are deliberately absent here — <code>onSecondary</code> among them, which is unused because <code>secondary</code> only ever appears as a text colour.</p>
 
     <p class="token-sub">Typography — four sizes, two weights</p>
     <div class="table-scroll">
@@ -568,7 +602,7 @@
     </div>
 
     <p class="token-sub">Shape</p>
-    <p style="max-width:640px; color:#4A3C33; margin:0 0 16px;">The radii are Material&nbsp;3’s default shape scale — the theme defines <b>no overrides</b>, so the token column below is what code references. The dp values are listed for review convenience only. Two rules settle the surfaces the scale alone doesn't: a <b>nested surface sits tighter</b> than its container — the in-list shelf-error row drops to <code>medium</code> against a top-level error banner's <code>large</code>, while the read-only fingerprint block takes the text-field <code>small</code> inside its <code>large</code> card — and <b>content tiles are rounded squares</b>, a circle reserved for controls (issue #89).</p>
+    <p style="max-width:640px; color:#4A3C33; margin:0 0 16px;">The radii are Material&nbsp;3’s default shape scale — the theme defines <b>no overrides</b>, so the token column below is what code references. The dp values are listed for review convenience only. One rule settles what the scale alone doesn't: <b>content tiles are rounded squares</b>, a circle reserved for controls (issue #89). The other — which surfaces sit tighter than the one they are nested in — is a component rule rather than a radius, and lives in <a href="#patterns">Patterns</a>.</p>
     <div class="table-scroll">
       <table class="tokens">
         <tr><th>Token</th><th>Radius</th><th>Used for</th></tr>
@@ -595,6 +629,33 @@
         <tr><td colspan="2" style="color:var(--muted); font-size:13px">F-Droid: <code>material-icons-core</code> is Apache-2.0 with no Play Services. Prefer core; if a glyph lives only in <code>-extended</code> (e.g. <code>Replay10</code>), ship it as a small local vector rather than pulling the whole extended set. The UX gate flags emoji glyphs in <code>Text(…)</code> so they can’t creep back in.</td></tr>
       </table>
     </div>
+  </section>
+
+  <!-- ============ patterns ============ -->
+  <section id="patterns">
+    <div class="section-head">
+      <p class="eyebrow">Patterns</p>
+      <h2>Component rules the token scales alone don’t settle</h2>
+      <p>Tokens say which tones and radii exist. These say how a recurring surface is assembled — the level at which two screens drift apart even when both use the right tokens.</p>
+    </div>
+
+    <p class="token-sub">Nesting</p>
+    <p style="max-width:680px; color:#4A3C33; margin:0 0 16px;">A <b>nested surface sits tighter than its container</b>: the in-list shelf-error banner drops to <code>medium</code> against a top-level banner’s <code>large</code>, and the read-only fingerprint block takes the text-field <code>small</code> inside its <code>large</code> card. Tighter means padding too, not only radius.</p>
+    <p style="max-width:680px; color:#4A3C33; margin:0 0 16px;">This is carried in code by the container, never by the call site. <code>ShelfBand</code> owns the shelf’s band tone <em>and</em> the nested placement together, so nothing can land in the band with the band’s background but a top-level banner’s metrics. A call site says what it is reporting; the surface it sits on decides how tight it is.</p>
+
+    <p class="token-sub">Notices and errors</p>
+    <p style="max-width:680px; color:#4A3C33; margin:0 0 16px;">One inline report surface, two kinds. A <b>notice</b> is a heads-up about a state the user did not choose — an expired sign-in, the one-time re-login after an app update. Neither a success nor a failure the user caused, so it takes the neutral surface, not the error one. An <b>error</b> reports that an action or a load failed, where the action was.</p>
+    <div class="table-scroll">
+      <table class="tokens">
+        <tr><th>&nbsp;</th><th>Notice</th><th>Error</th></tr>
+        <tr><td>Container</td><td><code>surfaceVariant</code></td><td><code>errorContainer</code></td></tr>
+        <tr><td>Glyph</td><td><code>Icons.Outlined.Info</code></td><td><code>Icons.Outlined.Warning</code></td></tr>
+        <tr><td>Announced to TalkBack</td><td>No — already on screen when it opens, so it is reached in normal traversal order</td><td>Yes, <code>liveRegion = Polite</code> — it arrives mid-session and would otherwise appear in silence</td></tr>
+      </table>
+    </div>
+    <p style="max-width:680px; color:#4A3C33; margin:16px 0;">Both kinds share the same assembly: a tonal <code>Surface</code>, a leading 24&nbsp;dp glyph, a 12&nbsp;dp gap, <code>bodyMedium</code> copy, and 16&nbsp;dp padding at top level against 14/12&nbsp;dp nested. The glyph is a <b>redundant</b> carrier, not the only one: in the light palette <code>surfaceVariant</code> and <code>errorContainer</code> are both warm tints, so colour alone could not tell the two kinds apart — and colour must never carry meaning by itself regardless.</p>
+    <p style="max-width:680px; color:#4A3C33; margin:0 0 16px;"><b>Retry follows the failure’s scope.</b> A failure that blocks the flow gets its own full-width button below the banner — Connect’s certificate failure is the case: there is nothing else on the screen to do. A failure confined to one section makes the banner itself the tap target, with the action label as a second line, so the rest of the screen keeps working — the shelf-error banner is the case, and retrying refetches only the shelf. The visible action label stays visible: without it there is no sign that the surface can be tapped at all.</p>
+    <p style="max-width:680px; color:#4A3C33; margin:0 0 16px;">An error surface is told apart <b>by how colourful it is</b>, not by which red it is. Measured in CIELCh chroma against the neutral notice card beside it, the error container carries 24.4 against 9.4 in light and 55.8 against 8.5 in dark. That is the axis to preserve when the palette is revisited: shifting the hue instead was tried and rejected, because a cool crimson separates by leaving the brand rather than by using it (issue #135).</p>
   </section>
 
   <!-- ============ 01 connect ============ -->
@@ -1096,7 +1157,7 @@
       <div class="decisions">
         <h3>Decisions</h3>
         <ol>
-          <li><span class="dnum">1</span><span><b>Destructive actions are copper list rows with a subtitle</b> naming the consequence (“Removes the stored tokens…”) — instead of two equally loud buttons. Both additionally get a confirmation dialog.</span></li>
+          <li><span class="dnum">1</span><span><b>Destructive actions are copper list rows with a subtitle</b> naming the consequence (“Removes the stored tokens…”) — instead of two equally loud buttons. Copper rather than the error tint, because signing out is an action the user deliberately chose, not a failure being reported to them. Whether they <em>additionally</em> need a confirmation dialog is deliberately still open: the copper and the subtitle carry the warning today, and a dialog on a deliberate action can read as friction rather than safety.</span></li>
           <li><span class="dnum">2</span><span><b>The certificate is inspectable:</b> the row shows the fingerprint prefix and trust date; tapping opens the full view (same layout as Connect’s confirm step — recognition, not relearning).</span></li>
           <li><span class="dnum">3</span><span><b>“Signed in as alex” explains the architecture in passing</b> (“Audiobookshelf, via your Ratatoskr server”) — the one place where the app states its role.</span></li>
           <li><span class="dnum">4</span><span><b>Version + license are table stakes for the F-Droid audience:</b> GPL and a source-code link belong visibly in the app, not just in the repo.</span></li>
@@ -1104,7 +1165,7 @@
         <div class="delta">
           <span class="dt">Δ vs. current implementation</span>
           <ul>
-            <li>Two free-standing buttons become grouped rows with icons, subtitles and confirmation dialogs.</li>
+            <li>The three free-standing buttons become grouped rows with icons. Their copper tint and consequence subtitles are in place; the grouping is not, and the confirmation dialog is undecided (see decision 1).</li>
             <li>Certificate detail view and the About group (version, license, source) are new.</li>
           </ul>
         </div>
@@ -1185,7 +1246,7 @@
       <div class="principle">
         <span class="pn">ERR</span>
         <h3>Errors stay local</h3>
-        <p>Errors appear where the action was: inline under form fields, as a banner above lists, never as a global dialog. Retry is always the first offered action; an expired sign-in leads cleanly to the sign-in screen.</p>
+        <p>Errors appear where the action was: inline under form fields, as a banner above lists, never as a global dialog. Retry is always the first offered action; an expired sign-in leads cleanly to the sign-in screen. How the banner itself is assembled — and how it differs from a neutral notice — is in <a href="#patterns">Patterns</a>.</p>
       </div>
     </div>
   </section>

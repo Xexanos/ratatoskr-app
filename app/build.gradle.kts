@@ -42,8 +42,8 @@ android {
         targetSdk = 36
         // versionCode = MAJOR * 10000 + MINOR * 100 + PATCH, derived from versionName;
         // releases are v<versionName> git tags (SPEC section 8).
-        versionCode = 20001
-        versionName = "2.0.1"
+        versionCode = 20100
+        versionName = "2.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // R8 rules for the instrumented-test APK. Only take effect when the androidTest APK is
@@ -101,6 +101,15 @@ android {
             }
         }
     }
+}
+
+// ColorRoleDocsTest reads the design doc, which is not otherwise a test input: without this the
+// unit tests stay UP-TO-DATE when only the doc changes, and the guard sleeps through exactly the
+// drift it exists to catch.
+tasks.withType<Test>().configureEach {
+    inputs.file(rootProject.layout.projectDirectory.file("docs/ux-design.html"))
+        .withPropertyName("uxDesignDoc")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
 dependencies {

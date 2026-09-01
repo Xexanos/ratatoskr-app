@@ -11,6 +11,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.tooling.preview.Preview
 import io.github.xexanos.ratatoskr.network.domain.Speaker
 import io.github.xexanos.ratatoskr.ui.LocalImmediateLoading
+import io.github.xexanos.ratatoskr.ui.UiError
 import io.github.xexanos.ratatoskr.ui.theme.RatatoskrTheme
 
 // Previews / screenshot goldens for the speaker picker (render in Android Studio without a
@@ -40,4 +41,12 @@ internal fun SpeakersLoadingPreview() = RatatoskrTheme {
     CompositionLocalProvider(LocalImmediateLoading provides true) {
         Surface { SpeakersScreen(SpeakersUiState(loading = true)) {} }
     }
+}
+
+// The speaker list's failure state. Goldened because the screen reports it in the bare `error`
+// role with no surface behind it, so a change to that role lands here unguarded otherwise.
+@Preview(name = "Speakers - error", widthDp = 360, heightDp = 800)
+@Composable
+internal fun SpeakersErrorPreview() = RatatoskrTheme {
+    Surface { SpeakersScreen(SpeakersUiState(loading = false, error = UiError.NoServer)) {} }
 }
