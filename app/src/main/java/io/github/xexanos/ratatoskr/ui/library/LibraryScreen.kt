@@ -536,9 +536,12 @@ fun LibraryScreenHost(
 // How many rows before the end of the list the next page is requested.
 private const val LOAD_MORE_THRESHOLD = 8
 
-// Row spacing inside the shelf band is each row's own bottom padding, not an arrangement gap:
-// the band has to stay continuous where a gap would slice it.
-private val SHELF_ROW_PADDING = PaddingValues(start = 16.dp, end = 16.dp, bottom = 8.dp)
+// Every item in the list carries its own inset, so the band never has to know what is inside it.
+// The bottom edge is the row gap: an arrangement gap would slice the shelf's tonal band, item-owned
+// padding leaves it continuous. A section label is the one exception and owns a tighter rhythm
+// (see [LibrarySectionHeader]) - it sits closer to the content it labels than rows sit to
+// each other.
+private val LIST_ITEM_INSET = PaddingValues(start = 16.dp, end = 16.dp, bottom = 8.dp)
 
 /**
  * The continue-listening shelf's tonal band. Owns the band tone and the nested banner placement
@@ -546,19 +549,15 @@ private val SHELF_ROW_PADDING = PaddingValues(start = 16.dp, end = 16.dp, bottom
  * metrics. The shelf is a stack of separate LazyColumn items with no shared parent, so each item
  * wraps itself - which is exactly why the two have to travel in one composable.
  *
- * [contentPadding] is applied inside the background on purpose: the band has to fill the gaps
- * between its rows, which it cannot do if the caller pads from the outside.
+ * Deliberately takes no padding: spacing belongs to the item, identically inside the band and
+ * below it, so the band is only a tone and a placement.
  */
 @Composable
-private fun ShelfBand(
-    contentPadding: PaddingValues = PaddingValues(),
-    content: @Composable () -> Unit,
-) {
+private fun ShelfBand(content: @Composable () -> Unit) {
     Box(
         Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceContainer)
-            .padding(contentPadding),
+            .background(MaterialTheme.colorScheme.surfaceContainer),
     ) {
         CompositionLocalProvider(
             LocalBannerPlacement provides BannerPlacement.Nested,
@@ -724,16 +723,17 @@ private fun LibraryContent(
                                 }
                             }
                             items(state.shelfItems, key = { "shelf:${it.id}" }) { item ->
-                                ShelfBand(SHELF_ROW_PADDING) {
+                                ShelfBand {
                                     LibraryRow(item, onClick = { onOpenItem(item.id) })
                                 }
                             }
                             if (shelfErrorVisible) {
                                 // The shelf slot's failure state (screen 03): one tappable banner
-                                // in the place the shelf's books would occupy. Retrying refetches
-                                // ONLY the shelf - the browse list below keeps working.
+                                // in the place the shelf's books would occupy, so it takes the same
+                                // inset a book would. Retrying refetches ONLY the shelf - the
+                                // browse list below keeps working.
                                 item(key = "shelf-error") {
-                                    ShelfBand(SHELF_ROW_PADDING) {
+                                    ShelfBand {
                                         InlineBanner(
                                             kind = BannerKind.ERROR,
                                             text = stringResource(R.string.library_shelf_error_title),
@@ -741,6 +741,7 @@ private fun LibraryContent(
                                                 label = stringResource(R.string.library_shelf_error_retry),
                                                 onClick = onRetryShelf,
                                             ),
+                                            modifier = Modifier.padding(LIST_ITEM_INSET),
                                         )
                                     }
                                 }
@@ -754,9 +755,7 @@ private fun LibraryContent(
                             }
                         }
                         items(state.items, key = { "browse:${it.id}" }) { item ->
-                            Box(Modifier.padding(horizontal = 16.dp).padding(bottom = 8.dp)) {
-                                LibraryRow(item, onClick = { onOpenItem(item.id) })
-                            }
+                            LibraryRow(item, onClick = { onOpenItem(item.id) })
                         }
                         if (state.nextCursor != null) {
                             item(key = "load-more") {
@@ -933,6 +932,9 @@ private fun LibrarySectionHeader(text: String) {
         style = MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.secondary,
         fontWeight = FontWeight.Medium,
+        // Same 16 dp side inset as every other list item, but its own vertical rhythm: a label
+        // belongs to what follows it, so it sits closer below (6 dp) than rows sit to each other
+        // (8 dp) and takes 12 dp of air above to separate it from the section before.
         modifier = Modifier
             .semantics { heading() }
             .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 6.dp),
@@ -945,7 +947,14 @@ private fun LibraryRow(item: LibraryItemSummary, onClick: () -> Unit) {
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 1.dp,
-        modifier = Modifier.fillMaxWidth().testTag(UiTestTags.LIBRARY_ROW).clickable(onClick = onClick),
+        // The inset is the row's own, so a row looks the same in the shelf band as in the browse
+        // list below it and neither caller has to remember the value. It precedes clickable, so
+        // the gap between rows is not part of the tap target.
+        modifier = Modifier
+            .padding(LIST_ITEM_INSET)
+            .fillMaxWidth()
+            .testTag(UiTestTags.LIBRARY_ROW)
+            .clickable(onClick = onClick),
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
