@@ -5,7 +5,6 @@
  */
 package io.github.xexanos.ratatoskr.ui.nowplaying
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,7 +16,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -55,8 +53,11 @@ import io.github.xexanos.ratatoskr.network.domain.ApiResult
 import io.github.xexanos.ratatoskr.network.domain.PlaybackState
 import io.github.xexanos.ratatoskr.network.domain.Session
 import io.github.xexanos.ratatoskr.ui.BannerKind
+import io.github.xexanos.ratatoskr.ui.ChipDot
+import io.github.xexanos.ratatoskr.ui.ChipLeading
 import io.github.xexanos.ratatoskr.ui.InlineBanner
 import io.github.xexanos.ratatoskr.ui.KnotLoader
+import io.github.xexanos.ratatoskr.ui.StatusChip
 import io.github.xexanos.ratatoskr.ui.UiError
 import io.github.xexanos.ratatoskr.ui.UiTestTags
 import io.github.xexanos.ratatoskr.ui.common.CoverImage
@@ -338,33 +339,22 @@ private fun CoverArt(coverUrl: String?) {
     }
 }
 
+// Which state playback is in, as copy and as an emphasis - which is all the screen decides. The
+// pill itself is [StatusChip]'s (ux-design: Patterns), so this cannot drift from the sign-in
+// screen's chip the way the two hand-rolled ones did (issue #156).
 @Composable
 private fun StateChip(state: PlaybackState) {
-    val (labelRes, dot) = when (state) {
-        PlaybackState.PLAYING -> R.string.nowplaying_state_playing to MaterialTheme.colorScheme.primary
-        PlaybackState.PAUSED -> R.string.nowplaying_state_paused to MaterialTheme.colorScheme.onSurfaceVariant
-        PlaybackState.BUFFERING -> R.string.nowplaying_state_buffering to MaterialTheme.colorScheme.onSurfaceVariant
-        PlaybackState.FINISHED -> R.string.nowplaying_state_finished to MaterialTheme.colorScheme.primary
-        PlaybackState.STOPPED -> R.string.nowplaying_state_stopped to MaterialTheme.colorScheme.onSurfaceVariant
-        PlaybackState.UNKNOWN -> R.string.nowplaying_state_unknown to MaterialTheme.colorScheme.onSurfaceVariant
+    val (labelRes, emphasis) = when (state) {
+        // The copper dot these two carried before the pill was shared: one says the session is
+        // live, the other that the book reached its end.
+        PlaybackState.PLAYING -> R.string.nowplaying_state_playing to ChipDot.ACCENT
+        PlaybackState.FINISHED -> R.string.nowplaying_state_finished to ChipDot.ACCENT
+        PlaybackState.PAUSED -> R.string.nowplaying_state_paused to ChipDot.MUTED
+        PlaybackState.BUFFERING -> R.string.nowplaying_state_buffering to ChipDot.MUTED
+        PlaybackState.STOPPED -> R.string.nowplaying_state_stopped to ChipDot.MUTED
+        PlaybackState.UNKNOWN -> R.string.nowplaying_state_unknown to ChipDot.MUTED
     }
-    Surface(
-        shape = RoundedCornerShape(50),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(Modifier.size(8.dp).background(dot, CircleShape))
-            Text(
-                stringResource(labelRes),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
+    StatusChip(label = stringResource(labelRes), leading = ChipLeading.Dot(emphasis))
 }
 
 @Composable
