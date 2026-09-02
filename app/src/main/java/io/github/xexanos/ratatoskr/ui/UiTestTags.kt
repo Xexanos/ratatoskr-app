@@ -19,6 +19,7 @@ object UiTestTags {
     const val LIBRARY_MINIPLAYER = "library_miniplayer"
     const val SPEAKER_ROW = "speaker_row"
     const val NOWPLAYING_SEEK = "nowplaying_seek"
+    const val SCROLL_BOUNDARY = "scroll_boundary"
     const val COVER_LOADING = "cover_loading"
     const val COVER_NO_COVER = "cover_no_cover"
 }

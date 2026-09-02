@@ -98,8 +98,10 @@ internal fun SignInNoticeVsErrorDarkPreview() = NoticeVsErrorPreview(dark = true
 // The two cases the 800 dp previews above cannot show, both of which the pinned action and the
 // chip depend on.
 
-// Short enough that the form genuinely has to scroll under the pinned button, so the boundary
-// between the scroll region and the action is in the frame.
+// Short enough that the form genuinely has to scroll behind the pinned button. The failure is
+// brought into view as it appears (issue #154), which scrolls the form to its end - so this is
+// the frame that shows the error reachable, and by the same token the one where the boundary is
+// correctly absent: there is nothing left behind the action.
 @Preview(name = "Sign in - scrolled", widthDp = 360, heightDp = 600)
 @Composable
 internal fun SignInScrolledPreview() = RatatoskrTheme {
@@ -112,6 +114,29 @@ internal fun SignInScrolledPreview() = RatatoskrTheme {
         ) { _, _ -> }
     }
 }
+
+// The same short viewport with nothing scrolling it: the form overflows and the boundary hairline
+// closes it. Both themes, because the hairline is the one element here carrying meaning on a
+// single low-contrast tone, and it is drawn from a role that differs between them.
+@Composable
+private fun ShortViewportPreview(dark: Boolean) = RatatoskrTheme(darkTheme = dark) {
+    Surface {
+        SignInScreen(
+            state = SignInUiState.Idle,
+            initialUsername = "alex",
+            notice = SignInNotice.SESSION_ENDED,
+            serverHost = PREVIEW_HOST,
+        ) { _, _ -> }
+    }
+}
+
+@Preview(name = "Sign in - boundary light", widthDp = 360, heightDp = 600)
+@Composable
+internal fun SignInBoundaryLightPreview() = ShortViewportPreview(dark = false)
+
+@Preview(name = "Sign in - boundary dark", widthDp = 360, heightDp = 600)
+@Composable
+internal fun SignInBoundaryDarkPreview() = ShortViewportPreview(dark = true)
 
 // The chip's worst case for width (ux-design: "layouts survive +30% text"): the German label and
 // a host that carries its port.

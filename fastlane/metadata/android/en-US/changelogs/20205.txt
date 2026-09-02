@@ -1,0 +1,1 @@
+A failed sign-in now always says so. On a short screen, or with the keyboard open, the "Wrong username or password." message could sit below the visible part of the form, so a rejected attempt looked as though nothing had happened. The message is now brought into view the moment it appears, and a thin line above "Sign in" shows when the form carries on behind the button.
