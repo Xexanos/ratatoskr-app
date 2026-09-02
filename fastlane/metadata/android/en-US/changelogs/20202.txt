@@ -1,0 +1,1 @@
+On the playback screen, the badge that shows whether a book is playing or paused now sits on the same green pill the app uses elsewhere for status, and at the same size as those. Nothing else on the screen moves.
