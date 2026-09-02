@@ -124,6 +124,12 @@ class ConnectionManager(
     suspend fun prefillUsername(): String? = tokenStore.username()
 
     /**
+     * The trusted server's base URL, or null before one is configured. The one read the screens
+     * that name the server share, so neither walks the store itself.
+     */
+    suspend fun serverBaseUrl(): String? = connectionStore.currentServerConfig()?.baseUrl
+
+    /**
      * The already-built client, without building one: a lock-free volatile read. Cover-image
      * loads resolve their Call.Factory through this per request - by the time any cover URL
      * exists on screen, the library data that carried it was fetched through [client], so the

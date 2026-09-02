@@ -69,7 +69,7 @@ class SettingsViewModel(
     init {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(
-                serverUrl = connectionManager.connectionStore.currentServerConfig()?.baseUrl,
+                serverUrl = connectionManager.serverBaseUrl(),
             )
         }
     }

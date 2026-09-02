@@ -14,22 +14,34 @@ import io.github.xexanos.ratatoskr.ui.theme.RatatoskrTheme
 // Previews / screenshot goldens for the sign-in screen (render in Android Studio without a
 // running server), driving the public [SignInScreen] off a fixed state (ADR 0001).
 
+// Every visit to sign-in has a trusted server behind it - launch routing only lands here once one
+// exists, and the 401 path clears the token while keeping it - so every preview carries a host and
+// shows the trust chip. The chip's absence is a defensive case with no screen of its own; the
+// screen tests own it.
+private const val PREVIEW_HOST = "ratatoskr.home.arpa"
+
+// The longest label the chip can be asked to carry: a self-hosted server on a non-default port,
+// in the locale whose word for "trusted" is the longer one.
+private const val PREVIEW_HOST_WITH_PORT = "ratatoskr.home.arpa:8443"
+
 @Preview(name = "Sign in - idle", widthDp = 360, heightDp = 800)
 @Composable
 internal fun SignInIdlePreview() = RatatoskrTheme {
-    Surface { SignInScreen(SignInUiState.Idle) { _, _ -> } }
+    Surface { SignInScreen(SignInUiState.Idle, serverHost = PREVIEW_HOST) { _, _ -> } }
 }
 
 @Preview(name = "Sign in - error", widthDp = 360, heightDp = 800)
 @Composable
 internal fun SignInErrorPreview() = RatatoskrTheme {
-    Surface { SignInScreen(SignInUiState.Error(UiError.WrongCredentials)) { _, _ -> } }
+    Surface {
+        SignInScreen(SignInUiState.Error(UiError.WrongCredentials), serverHost = PREVIEW_HOST) { _, _ -> }
+    }
 }
 
 @Preview(name = "Sign in - submitting", widthDp = 360, heightDp = 800)
 @Composable
 internal fun SignInSubmittingPreview() = RatatoskrTheme {
-    Surface { SignInScreen(SignInUiState.Submitting) { _, _ -> } }
+    Surface { SignInScreen(SignInUiState.Submitting, serverHost = PREVIEW_HOST) { _, _ -> } }
 }
 
 // The 401 re-authentication path (SPEC section 5): pre-filled username, an explanatory notice, and
@@ -42,6 +54,7 @@ internal fun SignInReauthNoticePreview() = RatatoskrTheme {
             state = SignInUiState.Idle,
             initialUsername = "alex",
             notice = SignInNotice.MEDIA_SERVER_EXPIRED,
+            serverHost = PREVIEW_HOST,
         ) { _, _ -> }
     }
 }
@@ -55,6 +68,7 @@ internal fun SignInAppUpdatedNoticePreview() = RatatoskrTheme {
             state = SignInUiState.Idle,
             initialUsername = "alex",
             notice = SignInNotice.APP_UPDATED,
+            serverHost = PREVIEW_HOST,
         ) { _, _ -> }
     }
 }
@@ -68,6 +82,7 @@ private fun NoticeVsErrorPreview(dark: Boolean) = RatatoskrTheme(darkTheme = dar
             state = SignInUiState.Error(UiError.WrongCredentials),
             initialUsername = "alex",
             notice = SignInNotice.SESSION_ENDED,
+            serverHost = PREVIEW_HOST,
         ) { _, _ -> }
     }
 }
@@ -79,3 +94,31 @@ internal fun SignInNoticeVsErrorLightPreview() = NoticeVsErrorPreview(dark = fal
 @Preview(name = "Sign in - notice vs error dark", widthDp = 360, heightDp = 800)
 @Composable
 internal fun SignInNoticeVsErrorDarkPreview() = NoticeVsErrorPreview(dark = true)
+
+// The two cases the 800 dp previews above cannot show, both of which the pinned action and the
+// chip depend on.
+
+// Short enough that the form genuinely has to scroll under the pinned button, so the boundary
+// between the scroll region and the action is in the frame.
+@Preview(name = "Sign in - scrolled", widthDp = 360, heightDp = 600)
+@Composable
+internal fun SignInScrolledPreview() = RatatoskrTheme {
+    Surface {
+        SignInScreen(
+            state = SignInUiState.Error(UiError.WrongCredentials),
+            initialUsername = "alex",
+            notice = SignInNotice.SESSION_ENDED,
+            serverHost = PREVIEW_HOST,
+        ) { _, _ -> }
+    }
+}
+
+// The chip's worst case for width (ux-design: "layouts survive +30% text"): the German label and
+// a host that carries its port.
+@Preview(name = "Sign in - long host, de", widthDp = 360, heightDp = 800, locale = "de")
+@Composable
+internal fun SignInLongHostGermanPreview() = RatatoskrTheme {
+    Surface {
+        SignInScreen(SignInUiState.Idle, serverHost = PREVIEW_HOST_WITH_PORT) { _, _ -> }
+    }
+}

@@ -1,0 +1,1 @@
+Signing in now shows which server your credentials go to: the trusted server is named at the top of the screen, and the screen states that you will stay signed in on this device. The password field can now show what you typed, so a long generated password no longer has to be entered blind. "Sign in" has moved to the bottom of the screen, in thumb reach and clear of the keyboard.
