@@ -40,11 +40,12 @@ private fun previewSession(state: PlaybackState) = Session(
 )
 
 @Composable
-private fun NowPlayingPreview(state: NowPlayingUiState) = RatatoskrTheme {
-    Surface {
-        NowPlayingScreen(state = state, onPause = {}, onResume = {}, onSeek = {}, onStop = {})
+private fun NowPlayingPreview(state: NowPlayingUiState, dark: Boolean = false) =
+    RatatoskrTheme(darkTheme = dark) {
+        Surface {
+            NowPlayingScreen(state = state, onPause = {}, onResume = {}, onSeek = {}, onStop = {})
+        }
     }
-}
 
 @Preview(name = "Now playing - playing", widthDp = 360, heightDp = 800)
 @Composable
@@ -55,6 +56,16 @@ internal fun NowPlayingPlayingPreview() =
 @Composable
 internal fun NowPlayingPausedPreview() =
     NowPlayingPreview(NowPlayingUiState(loading = false, session = previewSession(PlaybackState.PAUSED)))
+
+// The one dark screen golden. The design showcases this screen in dark ("often in low light"),
+// and it is where the state chip's copper dot sits closest in lightness to a muted one - so the
+// composition the chip lands in, not just the chip, is pinned there too.
+@Preview(name = "Now playing - playing dark", widthDp = 360, heightDp = 800)
+@Composable
+internal fun NowPlayingPlayingDarkPreview() = NowPlayingPreview(
+    NowPlayingUiState(loading = false, session = previewSession(PlaybackState.PLAYING)),
+    dark = true,
+)
 
 @Preview(name = "Now playing - nothing playing", widthDp = 360, heightDp = 800)
 @Composable

@@ -37,7 +37,15 @@ internal enum class ChipDot {
     MUTED,
 }
 
-/** What leads a chip's label: exactly one of the two, never both and never neither. */
+// The dot is emphasis on top of a carrier, never the carrier: the two tones sit at nearly the
+// same lightness in dark (1.3:1) and separate by hue alone, so the label has to name the state in
+// words - which it does, and which is also all TalkBack reads (ux-design: Patterns).
+
+/**
+ * What leads a chip's label: exactly one of the two, never both and never neither. The design's
+ * unbuilt Speakers "Last used" chip is a third case with no leading at all; it gets a variant when
+ * it is built, not before.
+ */
 internal sealed interface ChipLeading {
     /** A glyph, for a chip stating a fact about the world - the server whose certificate we hold. */
     data class Glyph(val icon: ImageVector) : ChipLeading
