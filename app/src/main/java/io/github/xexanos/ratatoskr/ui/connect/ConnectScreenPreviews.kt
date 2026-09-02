@@ -17,6 +17,8 @@ import java.time.OffsetDateTime
 // Previews / screenshot goldens for the connect-and-trust screen (render in Android Studio
 // without a running server), driving the public [ConnectScreen] off a fixed state (ADR 0001).
 
+private const val PREVIEW_BASE_URL = "https://ratatoskr.home:8080"
+
 private val previewCert = CertificateInfo(
     subject = "CN=ratatoskr.home",
     issuer = "CN=ratatoskr.home",
@@ -35,7 +37,27 @@ internal fun ConnectIdlePreview() = RatatoskrTheme {
 @Preview(name = "Connect - confirm certificate", widthDp = 360, heightDp = 800)
 @Composable
 internal fun ConnectConfirmPreview() = RatatoskrTheme {
-    Surface { ConnectScreen(ConnectUiState.Confirm("https://ratatoskr.home:8080", previewCert), {}, { _, _ -> }, {}) }
+    Surface { ConnectScreen(ConnectUiState.Confirm(PREVIEW_BASE_URL, previewCert), {}, { _, _ -> }, {}) }
+}
+
+// The smallest height the design draws for, and the case the 800 dp previews cannot show: the
+// whole certificate - fingerprint and the instruction to compare it - on screen at the same time
+// as the copper action that acts on it. Both used to fall below the fold here, the actions
+// because they rode inside the card and the compare hint because the welcome block was still
+// above it.
+@Preview(name = "Connect - confirm, short screen", widthDp = 360, heightDp = 600)
+@Composable
+internal fun ConnectConfirmShortScreenPreview() = RatatoskrTheme {
+    Surface { ConnectScreen(ConnectUiState.Confirm(PREVIEW_BASE_URL, previewCert), {}, { _, _ -> }, {}) }
+}
+
+// The pinned slot's worst case for width and height at once (ux-design: "layouts survive +30%
+// text"): the confirm step in the locale whose labels for both actions are the longer ones, on
+// the short screen. Sign-in carries the same guard for its chip.
+@Preview(name = "Connect - confirm, de", widthDp = 360, heightDp = 600, locale = "de")
+@Composable
+internal fun ConnectConfirmGermanPreview() = RatatoskrTheme {
+    Surface { ConnectScreen(ConnectUiState.Confirm(PREVIEW_BASE_URL, previewCert), {}, { _, _ -> }, {}) }
 }
 
 @Preview(name = "Connect - error", widthDp = 360, heightDp = 800)

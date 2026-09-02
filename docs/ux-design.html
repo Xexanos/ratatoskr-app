@@ -752,8 +752,10 @@
         <div class="delta">
           <span class="dt">Δ vs. current implementation</span>
           <ul>
-            <li>Fingerprint grouped instead of one long string; certificate data as a card with key-value rows.</li>
-            <li>Pinning explanation with shield icon added; a visible Cancel action (today only “Try again” in the error state).</li>
+            <li>The bottom-pinned action is built (issue #155), and the slot carries whichever action the state offers: Connect when idle, “Trust and continue” plus Cancel once the certificate shows — both lifted out of the card, which now holds facts alone — and “Try again” after a failure. Nothing while the certificate is read: the knot loader carries that wait, and a disabled button in the slot would fail the contrast floor.</li>
+            <li>The certificate card with key-value rows and a visible Cancel are built; the fingerprint is still one wrapped string rather than four groups of eight.</li>
+            <li>Decision 4 is built as far as the brand goes: the logo, title and subtitle drop away once the certificate shows, which is what keeps the card’s closing instruction — compare the fingerprint before trusting it, the copy decision 2 rests on — on screen now that the actions are pinned below it. The rest of the mock’s confirm layout is not built: the URL field stays instead of the mock’s top app bar and its “First connection to &lt;host&gt;” intro line, so the host is named by the locked field rather than in prose.</li>
+            <li>The idle mock also pins the URL field and a “Host and port, HTTPS only.” helper inside the same bottom block, centring logo, title and subtitle in the space above. The field stays in the scroll region, as sign-in’s fields do, and there is no helper line — so idle reads as two blocks with a gap between them where the mock reads as one composition. Centring the intro block is worth doing on both first-run screens together rather than on Connect alone.</li>
           </ul>
         </div>
       </div>

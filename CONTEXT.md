@@ -93,3 +93,17 @@ when it appears, because unlike a notice it arrives mid-session. Retry follows t
 scope: a failure confined to one section is retried by tapping the banner itself, a failure
 that blocks the flow gets its own button below it.
 _Avoid_: alert, toast, dialog (an error is never global)
+
+### Actions
+
+**Pinned action**:
+A screen's action held in the bottom thumb zone, outside the scroll region, so it stays under
+the thumb however far the content above grows. The slot belongs to the screen rather than to
+one of its states: it carries whichever action the current state offers, including a retry for
+a failure that blocks the whole flow. What a state does while it waits depends on whose wait
+it is. A wait that *is* the action keeps its button and puts the progress indicator inside it
+(sign-in submitting). A wait the knot loader owns gives the slot up entirely (Connect reading
+the certificate): two progress signals on one screen is one too many, and a disabled button
+left in the slot fails the contrast floor, because M3 renders a disabled label at 38% alpha.
+Connect and sign-in, the two first-run screens, take one branch each (issues #133 and #155).
+_Avoid_: sticky footer, bottom bar (that is navigation), CTA

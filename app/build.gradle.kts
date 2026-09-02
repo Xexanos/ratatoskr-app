@@ -42,8 +42,8 @@ android {
         targetSdk = 36
         // versionCode = MAJOR * 10000 + MINOR * 100 + PATCH, derived from versionName;
         // releases are v<versionName> git tags (SPEC section 8).
-        versionCode = 20203
-        versionName = "2.2.3"
+        versionCode = 20204
+        versionName = "2.2.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // R8 rules for the instrumented-test APK. Only take effect when the androidTest APK is
