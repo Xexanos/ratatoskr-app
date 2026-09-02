@@ -32,6 +32,7 @@ import io.github.xexanos.ratatoskr.ui.auth.SignInIdlePreview
 import io.github.xexanos.ratatoskr.ui.auth.SignInScrolledPreview
 import io.github.xexanos.ratatoskr.ui.auth.SignInSubmittingPreview
 import io.github.xexanos.ratatoskr.ui.connect.ConnectConfirmPreview
+import io.github.xexanos.ratatoskr.ui.connect.ConnectConfirmShortScreenPreview
 import io.github.xexanos.ratatoskr.ui.connect.ConnectErrorPreview
 import io.github.xexanos.ratatoskr.ui.connect.ConnectIdlePreview
 import io.github.xexanos.ratatoskr.ui.connect.ConnectInspectingPreview
@@ -134,6 +135,8 @@ class AccessibilityChecksTest {
 
     @Test fun connectIdle() = runChecks { ConnectIdlePreview() }
     @Test fun connectConfirmCertificate() = runChecks { ConnectConfirmPreview() }
+    // The cramped variant: the whole card plus the pinned pair of actions, at 360x600.
+    @Test fun connectConfirmShortScreen() = runChecks { ConnectConfirmShortScreenPreview() }
     @Test fun connectError() = runChecks { ConnectErrorPreview() }
     @Test fun connectInspecting() =
         runChecksAfterLoaderDelay(labelRes = R.string.connect_inspecting) { ConnectInspectingPreview() }
