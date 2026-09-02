@@ -6,9 +6,7 @@
 package io.github.xexanos.ratatoskr.ui.auth
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,7 +15,6 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -31,7 +28,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -60,7 +56,9 @@ import io.github.xexanos.ratatoskr.data.SignInPrompt
 import io.github.xexanos.ratatoskr.network.domain.ApiResult
 import io.github.xexanos.ratatoskr.network.domain.RatatoskrError
 import io.github.xexanos.ratatoskr.ui.BannerKind
+import io.github.xexanos.ratatoskr.ui.ChipLeading
 import io.github.xexanos.ratatoskr.ui.InlineBanner
+import io.github.xexanos.ratatoskr.ui.StatusChip
 import io.github.xexanos.ratatoskr.ui.UiError
 import io.github.xexanos.ratatoskr.ui.text
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -236,8 +234,13 @@ fun SignInScreen(
         // the form above scrolls far enough to carry a scrolling chip off screen. Absent when no
         // server config could be read; there is no honest placeholder for a host we don't have.
         if (serverHost != null) {
-            ServerTrustChip(
-                host = serverHost,
+            // The trust chip (ux-design: Sign in, decision 1): links the credentials about to be
+            // typed to the certificate confirmed one step earlier, so the form is not anonymous.
+            // It leads with the same lock glyph the certificate card does; the pill's tone, shape
+            // and metrics belong to [StatusChip], not here.
+            StatusChip(
+                label = stringResource(R.string.signin_server_trusted, serverHost),
+                leading = ChipLeading.Glyph(Icons.Outlined.Lock),
                 modifier = Modifier
                     .align(Alignment.CenterHorizontally)
                     .padding(top = 24.dp),
@@ -377,41 +380,6 @@ fun SignInScreen(
             } else {
                 Text(stringResource(R.string.signin_action))
             }
-        }
-    }
-}
-
-// The server trust chip (ux-design: Sign in, decision 1): links the credentials about to be typed
-// to the certificate confirmed one step earlier, so the form is not anonymous. It leads with the
-// same lock glyph the certificate card does, on ash green - the secondary role the design reserves
-// for status. labelMedium at SemiBold is the design's own chip label - 12.5 px / 600, inside the
-// 11-12 sp the typography table gives this row - and it is the size at which the longest label the
-// chip can carry, a German locale with a port in the host, still fits the pill on one line.
-@Composable
-private fun ServerTrustChip(host: String, modifier: Modifier = Modifier) {
-    Surface(
-        // Full pill - the design's chip shape (ux-design: Shape tokens).
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        modifier = modifier,
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                Icons.Outlined.Lock,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                modifier = Modifier.size(16.dp),
-            )
-            Text(
-                stringResource(R.string.signin_server_trusted, host),
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
-            )
         }
     }
 }
