@@ -347,10 +347,34 @@ across the assembled user flow. Any overlap between them is deliberately thin.
 
 ### 1. Unit tests (JVM)
 
-Pure logic with the platform pieces faked. JVM (`testDebugUnitTest`), no device, fast; most
-tests live here. In place: the auth/token logic (bearer attachment, 401 handling by `code`,
-secure-storage read/write with the platform faked) and the mapping between generated contract
-types and the domain/UI models (including unknown-field tolerance).
+JVM (`testDebugUnitTest`), no device, fast; most tests live here. Two kinds share the layer.
+
+Pure logic with the platform pieces faked is the bulk of it: the auth/token logic (bearer
+attachment, 401 handling by `code`, secure-storage read/write with the platform faked), the
+mapping between generated contract types and the domain/UI models (including unknown-field
+tolerance), and the per-screen ViewModel state transitions.
+
+Non-visual Compose behaviour is the rest. A Robolectric-backed compose rule renders one
+stateless `XScreen(state, ...)` or shared component (section 13) from a hand-made UI state and
+asserts against the semantics tree — `InlineBannerTest` and the per-screen `*ScreenTest`s
+(`SignInScreenTest`). It runs on the same JVM/Robolectric renderer as the screenshot goldens,
+asked a different question: a golden pins what a frame *looks* like, these pin what it *does*.
+
+They exist because nothing else in the suite can see this. A live region is invisible to a
+golden and — being behaviour rather than a structural violation — invisible to the instrumented
+Accessibility Test Framework checks too, which cannot run here at all: they need a live
+accessibility service and silently pass on Robolectric. A golden also freezes one frame, so it
+says nothing about *which* frame a screen chooses: whether the trust chip is there at all,
+whether the visibility toggle swaps a masked password for a revealed one, whether the banner
+surface itself is the retry target rather than a nested label. That is what belongs here —
+semantics that are behaviour rather than structure, and the choice between states.
+
+This is deliberately not a small copy of layer 3. One composable is driven directly with a
+state handed to it: no navigation graph, no ViewModel, no `ConnectionManager`, no
+`MockWebServer`, so nothing about the assembled flow is under test — "integration test" here
+means layer 3's whole app through its UI, and nothing else. Behaviour that needs the app wired
+together belongs there; conformance that needs a real accessibility node tree belongs
+instrumented.
 
 ### 2. Component tests (instrumented)
 
