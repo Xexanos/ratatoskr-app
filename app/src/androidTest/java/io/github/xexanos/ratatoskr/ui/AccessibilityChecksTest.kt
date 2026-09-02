@@ -29,6 +29,7 @@ import com.google.android.apps.common.testing.accessibility.framework.integratio
 import io.github.xexanos.ratatoskr.R
 import io.github.xexanos.ratatoskr.ui.auth.SignInErrorPreview
 import io.github.xexanos.ratatoskr.ui.auth.SignInIdlePreview
+import io.github.xexanos.ratatoskr.ui.auth.SignInScrolledPreview
 import io.github.xexanos.ratatoskr.ui.auth.SignInSubmittingPreview
 import io.github.xexanos.ratatoskr.ui.connect.ConnectConfirmPreview
 import io.github.xexanos.ratatoskr.ui.connect.ConnectErrorPreview
@@ -139,6 +140,9 @@ class AccessibilityChecksTest {
     @Test fun signInIdle() = runChecks { SignInIdlePreview() }
     @Test fun signInError() = runChecks { SignInErrorPreview() }
     @Test fun signInSubmitting() = runChecks { SignInSubmittingPreview() }
+    // The cramped variant: the form scrolls under the pinned action, which is where a clipped
+    // target or a traversal order that jumps the boundary would show up.
+    @Test fun signInScrolled() = runChecks { SignInScrolledPreview() }
     @Test fun libraryLoaded() = runChecks { LibraryLoadedPreview() }
     @Test fun libraryEmpty() = runChecks { LibraryEmptyPreview() }
     @Test fun libraryLoading() = runChecksAfterLoaderDelay { LibraryLoadingPreview() }

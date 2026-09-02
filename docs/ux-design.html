@@ -780,8 +780,9 @@
         <div class="delta">
           <span class="dt">Δ vs. current implementation</span>
           <ul>
-            <li>Server context chip and stay-signed-in helper are new; password toggle is new.</li>
-            <li>The button moves from the end of the form into the thumb zone (pinned at the bottom).</li>
+            <li>The trust chip, the stay-signed-in helper, the password toggle and the bottom-pinned button are built (issue #133).</li>
+            <li>The screen keeps the logo as sender and centres chip, title and subtitle, where the mock has no logo and aligns them left. The chip is fixed above the scroll region rather than scrolling with the form, so it stays readable while the credentials are typed.</li>
+            <li>The headline reads “Sign in to Audiobookshelf”, not the mock’s “Sign in”: the trust chip now names the Ratatoskr server on the same screen, so the headline is where the credential’s own domain gets said.</li>
           </ul>
         </div>
       </div>

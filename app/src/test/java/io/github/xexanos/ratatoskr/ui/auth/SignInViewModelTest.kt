@@ -186,6 +186,31 @@ class SignInViewModelTest {
         }
 
     @Test
+    fun `the trusted server's host travels with the prefill`() = runTest(dispatcher) {
+        // The chip states that the server behind this form is trusted, so the host comes from
+        // the same stored config the client is built from - never re-derived by the screen.
+        val store = connectionStore()
+        store.saveTrustedServer("https://ratatoskr.home.arpa:8443", "aa:bb:cc")
+        val viewModel = SignInViewModel(ConnectionManager(store, FakeTokenAccess()))
+
+        waitUntil { viewModel.prefill.value.serverHost != null }
+
+        assertEquals("ratatoskr.home.arpa:8443", viewModel.prefill.value.serverHost)
+    }
+
+    @Test
+    fun `an unconfigured server leaves the host absent`() = runTest(dispatcher) {
+        // Nothing to state, so the screen shows no chip rather than a placeholder host. The
+        // remembered username is the signal that the prefill has actually been loaded.
+        val connectionManager = ConnectionManager(connectionStore(), FakeTokenAccess(user = AuthUser("7", "alex")))
+
+        val viewModel = SignInViewModel(connectionManager)
+        waitUntil { viewModel.prefill.value.username == "alex" }
+
+        assertNull(viewModel.prefill.value.serverHost)
+    }
+
+    @Test
     fun `an ordinary sign-in visit shows no notice`() = runTest(dispatcher) {
         // No reauth is pending: the username may still pre-fill (a remembered user), but there is no
         // explanatory notice.

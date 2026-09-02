@@ -10,6 +10,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
@@ -53,7 +54,14 @@ class MainActivity : ComponentActivity() {
                             // locate the same elements the Compose UI tests find by testTag.
                             .semantics { testTagsAsResourceId = true },
                     ) { innerPadding ->
-                        Surface(modifier = Modifier.padding(innerPadding)) {
+                        Surface(
+                            modifier = Modifier
+                                .padding(innerPadding)
+                                // Marks the system-bar insets as spent, so a screen that applies
+                                // one of its own (sign-in lifts its pinned action with
+                                // imePadding) adds only what is left rather than the bars twice.
+                                .consumeWindowInsets(innerPadding),
+                        ) {
                             // Resolve the start route off the main thread (see decideStartDestination),
                             // showing a brief loader instead of blocking onCreate.
                             var startDestination by remember { mutableStateOf<Route?>(null) }
