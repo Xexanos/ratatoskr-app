@@ -1,0 +1,1 @@
+Auf dem Wiedergabe-Bildschirm nutzt die Anzeige, ob ein Buch läuft oder pausiert, jetzt dasselbe grüne Feld und dieselbe Größe wie die übrigen Statusanzeigen der App. Sonst ändert sich auf dem Bildschirm nichts.

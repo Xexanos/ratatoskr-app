@@ -97,7 +97,7 @@ internal fun BannerErrorNestedLightPreview() = NestedBannerPreview(dark = false)
     InlineBanner(
         kind = BannerKind.ERROR,
         text = stringResource(R.string.library_shelf_error_title),
-        action = BannerAction(label = stringResource(R.string.library_shelf_error_retry), onClick = {}),
+        action = BannerAction(label = stringResource(R.string.action_tap_to_retry), onClick = {}),
     )
 }
 
@@ -107,6 +107,6 @@ internal fun BannerErrorNestedDarkPreview() = NestedBannerPreview(dark = true) {
     InlineBanner(
         kind = BannerKind.ERROR,
         text = stringResource(R.string.library_shelf_error_title),
-        action = BannerAction(label = stringResource(R.string.library_shelf_error_retry), onClick = {}),
+        action = BannerAction(label = stringResource(R.string.action_tap_to_retry), onClick = {}),
     )
 }
