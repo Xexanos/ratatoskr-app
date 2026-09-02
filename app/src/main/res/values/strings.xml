@@ -3,6 +3,8 @@
 
     <!-- Shared -->
     <string name="action_retry">Try again</string>
+    <!-- The banner action label wherever a failure is retried by tapping the banner. -->
+    <string name="action_tap_to_retry">Tap to retry</string>
 
     <!-- Connect -->
     <string name="connect_welcome_title">Welcome to Ratatoskr</string>
@@ -49,11 +51,10 @@
     <string name="library_all_books_header">All books</string>
     <string name="library_error_title">Couldn\'t load your library</string>
     <string name="library_shelf_error_title">Couldn\'t load your shelf</string>
-    <string name="library_shelf_error_retry">Tap to retry</string>
     <string name="library_finished">Finished</string>
     <string name="library_percent">%1$d%%</string>
     <string name="library_loading_more">Loading more audiobooks</string>
-    <string name="library_load_more_failed">Couldn\'t load more audiobooks. Tap to retry.</string>
+    <string name="library_load_more_failed">Couldn\'t load more audiobooks</string>
     <string name="library_retry">Try again</string>
     <!-- Mini player (issue #101): %1$s state (Playing/Paused/...), %2$s speaker, %3$s position.
          The no-speaker variant is plain "state - position" with no translatable word in it -

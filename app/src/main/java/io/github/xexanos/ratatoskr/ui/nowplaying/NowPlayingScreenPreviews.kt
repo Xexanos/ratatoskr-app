@@ -11,8 +11,10 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.tooling.preview.Preview
 import io.github.xexanos.ratatoskr.network.domain.LibraryItemSummary
 import io.github.xexanos.ratatoskr.network.domain.PlaybackState
+import io.github.xexanos.ratatoskr.network.domain.RatatoskrError
 import io.github.xexanos.ratatoskr.network.domain.Session
 import io.github.xexanos.ratatoskr.ui.LocalImmediateLoading
+import io.github.xexanos.ratatoskr.ui.UiError
 import io.github.xexanos.ratatoskr.ui.theme.RatatoskrTheme
 import java.time.OffsetDateTime
 
@@ -55,6 +57,18 @@ internal fun NowPlayingPlayingPreview() =
 @Composable
 internal fun NowPlayingPausedPreview() =
     NowPlayingPreview(NowPlayingUiState(loading = false, session = previewSession(PlaybackState.PAUSED)))
+
+// A transport command that failed: the session is still on screen and the failure is reported
+// through the announced error banner below the controls (issue #132).
+@Preview(name = "Now playing - command failed", widthDp = 360, heightDp = 800)
+@Composable
+internal fun NowPlayingCommandFailedPreview() = NowPlayingPreview(
+    NowPlayingUiState(
+        loading = false,
+        session = previewSession(PlaybackState.PAUSED),
+        error = UiError.Domain(RatatoskrError.Upstream(code = null, message = "Sonos rejected the command.")),
+    ),
+)
 
 @Preview(name = "Now playing - nothing playing", widthDp = 360, heightDp = 800)
 @Composable
