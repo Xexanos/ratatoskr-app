@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -62,7 +61,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -728,7 +726,7 @@ private fun LibraryContent(
                                             kind = BannerKind.ERROR,
                                             text = stringResource(R.string.library_shelf_error_title),
                                             action = BannerAction(
-                                                label = stringResource(R.string.library_shelf_error_retry),
+                                                label = stringResource(R.string.action_tap_to_retry),
                                                 onClick = onRetryShelf,
                                             ),
                                             modifier = Modifier.padding(LIST_ITEM_INSET),
@@ -750,21 +748,18 @@ private fun LibraryContent(
                         if (state.nextCursor != null) {
                             item(key = "load-more") {
                                 if (state.loadMoreError) {
-                                    Box(
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .heightIn(min = 48.dp)
-                                            .clickable(onClick = onLoadMore)
-                                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                                        contentAlignment = Alignment.Center,
-                                    ) {
-                                        Text(
-                                            stringResource(R.string.library_load_more_failed),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            textAlign = TextAlign.Center,
-                                        )
-                                    }
+                                    // The banner's own action carries the tap-anywhere retry, so
+                                    // the footer stays one target - and being a banner, it is
+                                    // announced when the page fails.
+                                    InlineBanner(
+                                        kind = BannerKind.ERROR,
+                                        text = stringResource(R.string.library_load_more_failed),
+                                        action = BannerAction(
+                                            label = stringResource(R.string.action_tap_to_retry),
+                                            onClick = onLoadMore,
+                                        ),
+                                        modifier = Modifier.padding(LIST_ITEM_INSET),
+                                    )
                                 } else {
                                     val loadingDesc = stringResource(R.string.library_loading_more)
                                     Box(

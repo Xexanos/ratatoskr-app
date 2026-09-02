@@ -54,10 +54,12 @@ import io.github.xexanos.ratatoskr.data.SessionManager
 import io.github.xexanos.ratatoskr.network.domain.ApiResult
 import io.github.xexanos.ratatoskr.network.domain.PlaybackState
 import io.github.xexanos.ratatoskr.network.domain.Session
-import io.github.xexanos.ratatoskr.ui.common.CoverImage
+import io.github.xexanos.ratatoskr.ui.BannerKind
+import io.github.xexanos.ratatoskr.ui.InlineBanner
 import io.github.xexanos.ratatoskr.ui.KnotLoader
 import io.github.xexanos.ratatoskr.ui.UiError
 import io.github.xexanos.ratatoskr.ui.UiTestTags
+import io.github.xexanos.ratatoskr.ui.common.CoverImage
 import io.github.xexanos.ratatoskr.ui.common.formatPlaybackTime
 import io.github.xexanos.ratatoskr.ui.common.rememberTickingPositionSeconds
 import io.github.xexanos.ratatoskr.ui.rememberDelayedVisible
@@ -313,13 +315,9 @@ private fun androidx.compose.foundation.layout.ColumnScope.NowPlayingContent(
 
     error?.let {
         Spacer(Modifier.height(12.dp))
-        Text(
-            it.text(),
-            color = MaterialTheme.colorScheme.error,
-            style = MaterialTheme.typography.bodyMedium,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth(),
-        )
+        // No action: re-issuing the transport command above IS the retry, so a retry affordance
+        // here would only duplicate the control the user just pressed.
+        InlineBanner(kind = BannerKind.ERROR, text = it.text())
     }
     Spacer(Modifier.height(8.dp))
 }

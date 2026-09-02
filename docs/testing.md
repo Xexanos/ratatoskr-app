@@ -23,10 +23,25 @@ server + ABS + Sonos together are **E2E** and live in the central repo, not here
 - single-flight token refresh logic
 - TLS fingerprint comparison / trust-on-first-use decision
 - per-screen ViewModel state transitions
+- non-visual Compose behaviour of one stateless screen or shared component:
+  live regions, which frame a screen chooses, semantics that are behaviour
+  rather than structure
+- screenshot goldens for every UI `@Preview` (Roborazzi, `verifyRoborazziDebug`)
 
 Runner: **JUnit4** (chosen for one framework across all levels — the instrumented
 layers below are JUnit4-bound anyway). Networking-adjacent units use OkHttp
-**MockWebServer**.
+**MockWebServer**. The two Compose-rendering kinds need a real Compose runtime
+rather than a fake, so they add **Robolectric**: the behaviour tests drive one
+`XScreen(state, ...)` from a hand-made state through the junit4 v2 compose rule
+and assert on the semantics tree, the goldens render the same way and compare
+pixels. Same renderer, different question — what a frame *does* versus what it
+looks like.
+
+Neither is a small whole-app suite: no navigation, no ViewModel, no mock server.
+An **integration test** here always means the whole app driven through its UI
+(below). Nor do they replace the instrumented accessibility checks, which need a
+live accessibility service and silently pass on Robolectric. Full rationale and
+the boundary between the layers: SPEC section 9, layer 1.
 
 ### Component — instrumented on emulator, real TLS + Keystore
 `core-network` against MockWebServer over HTTPS with a held certificate. This is
@@ -68,6 +83,7 @@ black-box. See the central concept's open points.
 
 ```sh
 ./gradlew testDebugUnitTest         # unit (JVM), all modules
+./gradlew verifyRoborazziDebug      # the same JVM run, with the goldens in verify mode
 ./gradlew connectedDebugAndroidTest # component + integration + a11y on an emulator;
                                     # run from the root, it covers :core-network and :app
 ./gradlew -PminifiedTests :app:connectedMinifiedAndroidTest \
@@ -82,7 +98,9 @@ The strategy above is the target. Current state:
 - **Present:** `core-network` unit tests (JUnit4 + MockWebServer), including the
   TLS fingerprint/TOFU decision logic (`Fingerprints`, `PinnedTrustManager`);
   per-screen ViewModel state-transition unit tests (`:app`, JUnit4, against a real
-  `ConnectionStore`/DataStore on the JVM and `HttpsMockServer`); instrumented
+  `ConnectionStore`/DataStore on the JVM and `HttpsMockServer`); JVM Compose behaviour
+  tests for the shared banner and the sign-in screen (`InlineBannerTest`,
+  `SignInScreenTest`) and the Roborazzi preview goldens, both on Robolectric; instrumented
   component tests (auth, deserialization, error mapping, session rotation, TLS
   pinning); the whole-app Compose integration flow (`AppFlowTest`); accessibility
   checks across every screen (ATF, WARNING threshold incl. contrast) in **both**
