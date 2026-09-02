@@ -21,8 +21,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Speaker
-import androidx.compose.material.icons.filled.SpeakerGroup
+import androidx.compose.material.icons.outlined.Speaker
+import androidx.compose.material.icons.outlined.SpeakerGroup
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -165,7 +165,7 @@ fun SpeakersScreen(
             // Unlike an empty library, "no speakers" mirrors the state of the network and the
             // server, so it is worth another look (ux-design, EMPTY).
             state.speakers.isEmpty() -> EmptyState(
-                icon = Icons.Default.SpeakerGroup,
+                icon = Icons.Outlined.SpeakerGroup,
                 title = stringResource(R.string.speakers_empty_title),
                 body = stringResource(R.string.speakers_empty_hint),
                 onRetry = onRetry,
@@ -209,7 +209,7 @@ private fun SpeakerRow(speaker: Speaker, onClick: () -> Unit) {
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
-                        if (speaker.isGroup) Icons.Default.SpeakerGroup else Icons.Default.Speaker,
+                        if (speaker.isGroup) Icons.Outlined.SpeakerGroup else Icons.Outlined.Speaker,
                         contentDescription = null,
                         tint = if (speaker.isGroup) {
                             MaterialTheme.colorScheme.onSecondaryContainer
