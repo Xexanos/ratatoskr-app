@@ -5,8 +5,8 @@
 # drift that never needs a human eye. Run locally with `bash scripts/check-ux.sh`; CI runs
 # it on every push/PR.
 #
-# All five rules are FATAL: the codebase was migrated to theme tokens (colors + shapes),
-# strings.xml, Material icons, and ASCII-only source. The STRICT_* env vars remain only so a
+# All six rules are FATAL: the codebase was migrated to theme tokens (colors + shapes),
+# strings.xml, Material icons (outlined outside the transport set), and ASCII-only source. The STRICT_* env vars remain only so a
 # work-in-progress branch can temporarily downgrade a rule (e.g. STRICT_STRINGS=0) mid-refactor.
 #
 set -uo pipefail
@@ -56,6 +56,23 @@ if [ -n "$ascii_hits" ]; then
   echo "$ascii_hits"
   if [ "$STRICT_ASCII" = 1 ]; then echo "  FAIL: keep source ASCII (arrows -> '->', em-dash -> '-', ...); non-ASCII text belongs in a translation."; fail=1
   else echo "  warn: non-ASCII found; keep source ASCII."; fi
+else echo "  ok"; fi
+
+echo "== 6. Filled icons outside the transport set (outlined elsewhere) [FATAL] =="
+# ux-design, Iconography: "filled for primary/active affordances (transport), outlined
+# elsewhere - one weight per surface". Transport being the only filled set is what makes the
+# fill itself mean "this is the primary control"; every other glyph shares a surface with the
+# outlined report glyphs sooner or later, because any screen can fail (issue #153). Matching
+# per occurrence, not per line, so a transport icon cannot vouch for a neighbour on the same
+# line; Rounded/Sharp/TwoTone are a different family and are flagged whatever they depict.
+TRANSPORT='PlayArrow|Pause|Stop|Replay10|Forward10|SkipPrevious|SkipNext'
+icon_hits="$(grep -rEon --include='*.kt' \
+  'Icons\.(Default|Filled|Rounded|Sharp|TwoTone)\.[A-Za-z0-9_]+|Icons\.AutoMirrored\.(Filled|Rounded|Sharp|TwoTone)\.[A-Za-z0-9_]+|icons\.(automirrored\.)?(filled|rounded|sharp|twotone)\.[A-Za-z0-9_]+' \
+  "$UI" | grep -vE "\.(Default|Filled|filled)\.($TRANSPORT)\$" || true)"
+if [ -n "$icon_hits" ]; then
+  echo "$icon_hits"
+  echo "  FAIL: use Icons.Outlined.* (Icons.AutoMirrored.Outlined.* where mirrored); filled is"
+  echo "        reserved for the transport set ($TRANSPORT)."; fail=1
 else echo "  ok"; fi
 
 if [ "$fail" -ne 0 ]; then

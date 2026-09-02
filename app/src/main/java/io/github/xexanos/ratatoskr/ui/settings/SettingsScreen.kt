@@ -16,10 +16,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ExitToApp
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.automirrored.outlined.ExitToApp
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -179,7 +179,7 @@ fun SettingsScreen(
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
-                            Icons.Default.Home,
+                            Icons.Outlined.Home,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSecondaryContainer,
                         )
@@ -212,7 +212,7 @@ fun SettingsScreen(
             onClick = onForgetCertificate,
             modifier = Modifier.fillMaxWidth().height(52.dp),
         ) {
-            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+            Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             Text(stringResource(R.string.settings_forget_cert))
         }
@@ -230,7 +230,7 @@ fun SettingsScreen(
             onClick = onClearImageCache,
             modifier = Modifier.fillMaxWidth().height(52.dp),
         ) {
-            Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+            Icon(Icons.Outlined.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             Text(stringResource(R.string.settings_clear_image_cache))
         }
@@ -251,7 +251,7 @@ fun SettingsScreen(
             onClick = onSignOut,
             modifier = Modifier.fillMaxWidth().height(52.dp),
         ) {
-            Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null, modifier = Modifier.size(18.dp))
+            Icon(Icons.AutoMirrored.Outlined.ExitToApp, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             Text(stringResource(R.string.settings_sign_out))
         }

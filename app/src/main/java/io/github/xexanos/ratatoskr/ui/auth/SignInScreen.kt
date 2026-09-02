@@ -21,10 +21,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -288,7 +288,7 @@ fun SignInScreen(
                 label = { Text(stringResource(R.string.signin_username_label)) },
                 leadingIcon = {
                     Icon(
-                        Icons.Default.Person,
+                        Icons.Outlined.Person,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -306,7 +306,7 @@ fun SignInScreen(
                 label = { Text(stringResource(R.string.signin_password_label)) },
                 leadingIcon = {
                     Icon(
-                        Icons.Default.Lock,
+                        Icons.Outlined.Lock,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -317,7 +317,7 @@ fun SignInScreen(
                 trailingIcon = {
                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
                         Icon(
-                            if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                            if (passwordVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
                             // Names the action this tap performs, not the state the field is in:
                             // the button is what the user is standing on when TalkBack reads it.
                             contentDescription = stringResource(
@@ -401,7 +401,7 @@ private fun ServerTrustChip(host: String, modifier: Modifier = Modifier) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                Icons.Default.Lock,
+                Icons.Outlined.Lock,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSecondaryContainer,
                 modifier = Modifier.size(16.dp),
