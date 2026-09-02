@@ -24,12 +24,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.SearchOff
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.SearchOff
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -602,7 +602,7 @@ fun LibraryScreen(
             // path to Now Playing without one (the speaker flow is the other path).
             IconButton(onClick = onOpenSettings) {
                 Icon(
-                    Icons.Default.Settings,
+                    Icons.Outlined.Settings,
                     contentDescription = stringResource(R.string.library_settings),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -615,7 +615,7 @@ fun LibraryScreen(
             placeholder = { Text(stringResource(R.string.library_search_placeholder)) },
             leadingIcon = {
                 Icon(
-                    Icons.Default.Search,
+                    Icons.Outlined.Search,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -901,7 +901,7 @@ private fun miniPlayerSubtitle(state: PlaybackState, speakerName: String?, posit
 private fun EmptyLibrary(query: String) {
 
     EmptyState(
-        icon = if (query.isBlank()) Icons.AutoMirrored.Filled.MenuBook else Icons.Default.SearchOff,
+        icon = if (query.isBlank()) Icons.AutoMirrored.Outlined.MenuBook else Icons.Outlined.SearchOff,
         title = stringResource(
             if (query.isBlank()) R.string.library_empty_title else R.string.library_no_results_title,
         ),

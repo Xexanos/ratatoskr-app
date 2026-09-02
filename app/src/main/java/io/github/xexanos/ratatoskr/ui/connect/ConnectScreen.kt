@@ -21,7 +21,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -196,7 +196,7 @@ fun ConnectScreen(
                 trailingIcon = if (urlLocked) {
                     {
                         Icon(
-                            Icons.Default.Lock,
+                            Icons.Outlined.Lock,
                             contentDescription = stringResource(R.string.connect_url_locked_desc),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -329,7 +329,7 @@ private fun CertificateCard(info: CertificateInfo) {
         Column(modifier = Modifier.padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    Icons.Default.Lock,
+                    Icons.Outlined.Lock,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.secondary,
                 )
