@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -58,6 +60,7 @@ import io.github.xexanos.ratatoskr.network.domain.RatatoskrError
 import io.github.xexanos.ratatoskr.ui.BannerKind
 import io.github.xexanos.ratatoskr.ui.ChipLeading
 import io.github.xexanos.ratatoskr.ui.InlineBanner
+import io.github.xexanos.ratatoskr.ui.ScrollBoundary
 import io.github.xexanos.ratatoskr.ui.StatusChip
 import io.github.xexanos.ratatoskr.ui.UiError
 import io.github.xexanos.ratatoskr.ui.text
@@ -225,9 +228,13 @@ fun SignInScreen(
     // room the user may since have walked away from.
     var passwordVisible by remember { mutableStateOf(false) }
 
+    val formScroll = rememberScrollState()
+
     // The form scrolls; the action does not. The button sits in the bottom thumb zone
     // (ux-design: Sign in), and imePadding lifts it clear of the software keyboard - under
     // enableEdgeToEdge the window is not resized for the IME, so the inset is applied here.
+    // Note that the IME inset shortens this column while the chip and the button keep their
+    // heights, so the whole loss is taken out of the scrolling form.
     Column(modifier = Modifier.fillMaxSize().imePadding()) {
         // Outside the scroll region on purpose: the chip answers "where are these credentials
         // going", which is a question the user has while typing them - and with the keyboard open
@@ -249,9 +256,14 @@ fun SignInScreen(
         Column(
             modifier = Modifier
                 .weight(1f)
-                .verticalScroll(rememberScrollState())
+                // Outside the scroll on purpose, where the other two are inside it: padding
+                // applied after verticalScroll is scrollable content, so a trailing 8 dp in
+                // there would keep canScrollForward true - the boundary promising more below
+                // when only whitespace is left - and leave the last card flush against the line.
+                .padding(bottom = 8.dp)
+                .verticalScroll(formScroll)
                 .padding(horizontal = 24.dp)
-                .padding(top = 16.dp, bottom = 8.dp),
+                .padding(top = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Image(
@@ -356,9 +368,26 @@ fun SignInScreen(
 
             if (state is SignInUiState.Error) {
                 Spacer(Modifier.height(24.dp))
-                InlineBanner(kind = BannerKind.ERROR, text = state.error.text())
+                // A scrolling button would have dragged the banner into view just by being
+                // reached; a pinned one never does, so on a short viewport - a small screen, an
+                // open keyboard, a large font scale - the failure would be reported off screen
+                // and the tap would look like it did nothing (issue #154). TalkBack already hears
+                // it through the banner's live region; this is the sighted half.
+                //
+                // Scoped to the banner's own composition rather than keyed on the state, so it
+                // reads as "when this banner appears, show it" - and a second failed attempt,
+                // which leaves this branch through Submitting and re-enters, is brought back too.
+                val bringIntoView = remember { BringIntoViewRequester() }
+                LaunchedEffect(Unit) { bringIntoView.bringIntoView() }
+                InlineBanner(
+                    kind = BannerKind.ERROR,
+                    text = state.error.text(),
+                    modifier = Modifier.bringIntoViewRequester(bringIntoView),
+                )
             }
         }
+
+        ScrollBoundary(formScroll)
 
         // Pinned, so it stays under the thumb however long the form above grows. Enabled while an
         // error is showing: the input is still there to correct and resubmit.
