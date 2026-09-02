@@ -576,14 +576,20 @@
     </div>
     <p style="max-width:680px; color:#8A7A70; font-size:13px; margin:12px 0 0;">Roles the theme does not wire fall through to the Material&nbsp;3 baseline and are deliberately absent here — <code>onSecondary</code> among them, which is unused because <code>secondary</code> only ever appears as a text colour.</p>
 
-    <p class="token-sub">Typography — four sizes, two weights</p>
+    <p class="token-sub">Typography — every role the app uses</p>
+    <p style="max-width:640px; color:#4A3C33; margin:0 0 16px;">Material&nbsp;3’s scale, unmodified except for <code>bodyLarge</code> — so the <b>sp column is the role’s own size</b>, not a value the theme sets. Weight is applied at the call site: the M3 baseline is Regular for headline/title/body and Medium for the label roles, and where the table says Semibold or Bold that is a <code>fontWeight</code> on the <code>Text</code>. <code>TypographyDocsTest</code> holds this table and the code to each other, the same way <code>ColorRoleDocsTest</code> holds the palette.</p>
     <div class="table-scroll">
-      <table class="tokens">
+      <table class="tokens" id="typography">
         <tr><th>Role (M3)</th><th>Size / weight</th><th>Used for</th></tr>
-        <tr><td><code>headlineSmall</code></td><td>24 sp · Semibold</td><td>Screen headlines (Connect, Sign in)</td></tr>
-        <tr><td><code>titleMedium</code></td><td>16 sp · Semibold</td><td>Book titles, row titles, buttons</td></tr>
-        <tr><td><code>bodyMedium</code></td><td>14 sp · Regular</td><td>Body copy, authors, descriptions</td></tr>
-        <tr><td><code>labelSmall</code></td><td>11–12 sp · Semibold, +0.5–2 sp tracking</td><td>Eyebrows (“PLAYING ON”), chips, time labels</td></tr>
+        <tr><td><code>headlineMedium</code></td><td>28 sp · Semibold</td><td>The title of a screen you arrive at (Library, Speakers, Settings)</td></tr>
+        <tr><td><code>headlineSmall</code></td><td>24 sp · Semibold</td><td>Headlines on the two one-decision screens (Connect, Sign in), and the now-playing book title</td></tr>
+        <tr><td><code>titleMedium</code></td><td>16 sp · Regular</td><td>Card and row titles (certificate card, library rows, speaker names), centred empty- and error-state titles</td></tr>
+        <tr><td><code>bodyLarge</code></td><td>16 sp · Regular</td><td>The now-playing author line and its “nothing playing” message — the one screen read from across the room</td></tr>
+        <tr><td><code>titleSmall</code></td><td>14 sp · Bold / Regular</td><td>Dense row titles: the mini player’s book, the settings server row</td></tr>
+        <tr><td><code>bodyMedium</code></td><td>14 sp · Regular</td><td>Body copy, authors, descriptions, banner messages, the mini-player subtitle</td></tr>
+        <tr><td><code>labelLarge</code></td><td>14 sp · Medium</td><td>Section labels (library shelf, settings sections) and the now-playing time labels (monospace)</td></tr>
+        <tr><td><code>bodySmall</code></td><td>12 sp · Regular</td><td>Helper and hint lines under fields and buttons, the certificate fingerprint (monospace)</td></tr>
+        <tr><td><code>labelMedium</code></td><td>12 sp · Medium; Semibold on chips, +2 sp tracking on eyebrows</td><td>Eyebrows (“PLAYING ON”), <a href="#patterns">chips</a>, progress percentages, a banner’s action label</td></tr>
         <tr><td colspan="3" style="color:var(--muted); font-size:13px">Numbers (positions, durations, fingerprints) are always tabular or monospace so nothing jitters. Typeface: system (Roboto), no bundled font — keeps the F-Droid build small.</td></tr>
       </table>
     </div>
@@ -655,6 +661,21 @@
     </div>
     <p style="max-width:680px; color:#4A3C33; margin:16px 0;">Both kinds share the same assembly: a tonal <code>Surface</code>, a leading 24&nbsp;dp glyph, a 12&nbsp;dp gap, <code>bodyMedium</code> copy, and 16&nbsp;dp padding at top level against 14/12&nbsp;dp nested. The glyph is a <b>redundant</b> carrier, not the only one: in the light palette <code>surfaceVariant</code> and <code>errorContainer</code> are both warm tints, so colour alone could not tell the two kinds apart — and colour must never carry meaning by itself regardless.</p>
     <p style="max-width:680px; color:#4A3C33; margin:0 0 16px;"><b>Retry follows the failure’s scope.</b> A failure that blocks the flow gets its own full-width button below the banner — Connect’s certificate failure is the case: there is nothing else on the screen to do. A failure confined to one section makes the banner itself the tap target, with the action label as a second line, so the rest of the screen keeps working — the shelf-error banner is the case, and retrying refetches only the shelf. The visible action label stays visible: without it there is no sign that the surface can be tapped at all.</p>
+    <p class="token-sub">Chips</p>
+    <p style="max-width:680px; color:#4A3C33; margin:0 0 16px;">One chip surface, two things to lead it with. A <b>chip</b> carries a single settled fact in a pill — which server the app trusts, which state playback is in — and is never interactive: a pill you can tap is a button, which is a different component and deliberately not this one. A <b>glyph</b> leads a chip stating a fact about the world (the lock on the sign-in trust chip, the same glyph the certificate card carries). A <b>dot</b> leads a chip stating which of several states one thing is currently in.</p>
+    <div class="table-scroll">
+      <table class="tokens">
+        <tr><th>&nbsp;</th><th>Value</th></tr>
+        <tr><td>Container</td><td><code>secondaryContainer</code> / <code>onSecondaryContainer</code></td></tr>
+        <tr><td>Shape</td><td><code>full</code> — a pill, at any label length</td></tr>
+        <tr><td>Leading</td><td>a 16&nbsp;dp glyph, or an 8&nbsp;dp dot</td></tr>
+        <tr><td>Metrics</td><td>12&nbsp;dp horizontal and 6&nbsp;dp vertical padding, 8&nbsp;dp gap to the label</td></tr>
+        <tr><td>Label</td><td><code>labelMedium</code> at Semibold</td></tr>
+        <tr><td>Dot tone</td><td><code>primary</code> for the accented state, otherwise the label’s own ink</td></tr>
+      </table>
+    </div>
+    <p style="max-width:680px; color:#4A3C33; margin:16px 0;">Ash green, not <code>surfaceVariant</code>: status is what the secondary is for (Principles, P3), and <code>surfaceVariant</code> is already spoken for above — a status chip on the notice tone would read as a muted notice. The dot’s two tones are an <em>emphasis</em>, never a colour a call site picks: the accented state takes the copper <code>primary</code>, and every other state takes whatever ink the label is set in, so the two cannot drift apart. Copper is the one tone that keeps them apart by hue in both themes, which a static dot has to do on its own until the design’s pulsing dot exists.</p>
+    <p style="max-width:680px; color:#4A3C33; margin:0 0 16px;">Carried in code by the component, never by the call site. <code>StatusChip</code> owns the tone, the shape, the metrics and the label role together; a call site passes the copy and says whether a glyph or a dot leads it. Before it there were two of them — sign-in’s trust chip and now-playing’s state chip — assembled separately and already apart on tone, radius and label size, with a code comment as the only thing holding them together (issue #156).</p>
     <p style="max-width:680px; color:#4A3C33; margin:0 0 16px;">An error surface is told apart <b>by how colourful it is</b>, not by which red it is. Measured in CIELCh chroma against the neutral notice card beside it, the error container carries 24.4 against 9.4 in light and 55.8 against 8.5 in dark. That is the axis to preserve when the palette is revisited: shifting the hue instead was tried and rejected, because a cool crimson separates by leaving the brand rather than by using it (issue #135).</p>
   </section>
 
@@ -1097,6 +1118,7 @@
           <ul>
             <li>Speaker name in the header, chapter slider + book bar, and chapter skip buttons are new. <b>Chapter navigation requires a SPEC §2 revision (currently listed as out of scope) and an additive contract change (chapter marks on item/session)</b> — flagged in the implementation table.</li>
             <li>±10 s jumps are new (via existing <code>seekSession</code>); Stop moves out of the transport row into a labeled chip; the current single book slider becomes the thin secondary bar.</li>
+            <li>The status chip is built and now sits on the shared chip surface (see <a href="#patterns">Patterns</a>), which moved it onto ash green and its label to 12 sp (issue #156). Its dot is a <b>static</b> copper accent, not the mock’s pulsing ash one: the pulse is still to come, and until it exists colour is the only thing separating the playing dot from the paused one.</li>
           </ul>
         </div>
       </div>
