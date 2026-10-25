@@ -1,39 +1,27 @@
 # Ratatoskr app - specification and implementation brief
 
-This document is the ground truth for implementing the Ratatoskr Android app. It captures
-the goal, the scope of the first version, and the decisions that are already fixed by the
-server and its API contract, so they do not have to be rediscovered.
+This document is the ground truth for implementing the Ratatoskr Android app. It captures the goal, the scope of the first version, and the decisions that are already fixed by the server and its API contract, so they do not have to be rediscovered.
 
-The app is the client end of the Ratatoskr project. The server's brief and API contract
-are the authoritative descriptions of the other side:
+The app is the client end of the Ratatoskr project. The server's brief and API contract are the authoritative descriptions of the other side:
 
 - Server spec: `ratatoskr-server/docs/SPEC.md` (referenced below as "server section N").
-- API contract: `ratatoskr-server/contract/openapi.yaml` (OpenAPI 3.0.3). This is the
-  single source of truth for all client/server communication.
+- API contract: `ratatoskr-server/contract/openapi.yaml` (OpenAPI 3.0.3). This is the single source of truth for all client/server communication.
 
-Note: the technology stack and the screen/module structure were intentionally left open
-in the original brief. They have now been decided together with the implementing agent
-and are recorded in sections 12 and 13.
+Note: the technology stack and the screen/module structure were intentionally left open in the original brief. They have now been decided together with the implementing agent and are recorded in sections 12 and 13.
 
 ## 1. Goal
 
-Give an Android user a simple remote for playing Audiobookshelf audiobooks on their Sonos
-speakers through the Ratatoskr server, with the listening progress synced back to
-Audiobookshelf. The app is deliberately thin: it holds no audio, no library logic, and no
-Sonos knowledge. It sends commands and shows state.
+Give an Android user a simple remote for playing Audiobookshelf audiobooks on their Sonos speakers through the Ratatoskr server, with the listening progress synced back to Audiobookshelf. The app is deliberately thin: it holds no audio, no library logic, and no Sonos knowledge. It sends commands and shows state.
 
 ## 2. Scope
 
 ### In scope for v1
-- Connect to a Ratatoskr server by URL, establishing trust in its certificate
-  (see section 6).
-- Sign in with Audiobookshelf credentials via the server, and stay signed in across app
-  restarts using the stored credential (section 5).
+- Connect to a Ratatoskr server by URL, establishing trust in its certificate (see section 6).
+- Sign in with Audiobookshelf credentials via the server, and stay signed in across app restarts using the stored credential (section 5).
 - Browse and search the library (the server's per-user projection).
 - List the Sonos speakers and groups the server discovered, and pick one.
 - Start a book on the chosen speaker; it resumes from the stored position automatically.
-- A now-playing view with play/pause, seek (absolute position within the book), and stop,
-  showing the current position and duration.
+- A now-playing view with play/pause, seek (absolute position within the book), and stop, showing the current position and duration.
 - Reflect that there is exactly one active session at a time (server section 8).
 - Sign out (revoke server-side and clear the stored credential).
 
@@ -41,430 +29,134 @@ Sonos knowledge. It sends commands and shows state.
 - Playing audio on the phone itself. The app is a remote; audio is server-to-speaker only.
 - Offline use, downloads, or any local library cache beyond what a screen needs while open.
 - Chapter navigation UI, bookmarks, playback-speed control, sleep timers.
-- Podcasts, multiple simultaneous sessions, Ratatoskr-controlled multiroom grouping
-  (all out of scope on the server side too).
-- Widgets, Android Auto, Wear, media-session/notification transport controls. These are
-  natural later additions; do not build them now, but do not architect against them.
+- Podcasts, multiple simultaneous sessions, Ratatoskr-controlled multiroom grouping (all out of scope on the server side too).
+- Widgets, Android Auto, Wear, media-session/notification transport controls. These are natural later additions; do not build them now, but do not architect against them.
 
 ## 3. Architecture and how it fits
 
-- The app talks ONLY to the Ratatoskr server, over HTTPS, using the API in the contract.
-  It never talks to Audiobookshelf or to the Sonos speakers directly.
-- All domain logic (position mapping, the sync loop, Sonos control) lives in the server.
-  The app maps server responses to what the screens show, and user actions to API calls.
-- Playback state is owned by the server. The app is not the source of truth for position;
-  it displays the session the server reports and may advance the displayed position locally
-  between polls for smoothness, correcting to the server's value when it arrives.
-- Single active session: the UI treats "what is playing" as one server-owned session,
-  fetched from `/v1/sessions/current` (which is 404 when nothing plays).
+- The app talks ONLY to the Ratatoskr server, over HTTPS, using the API in the contract. It never talks to Audiobookshelf or to the Sonos speakers directly.
+- All domain logic (position mapping, the sync loop, Sonos control) lives in the server. The app maps server responses to what the screens show, and user actions to API calls.
+- Playback state is owned by the server. The app is not the source of truth for position; it displays the session the server reports and may advance the displayed position locally between polls for smoothness, correcting to the server's value when it arrives.
+- Single active session: the UI treats "what is playing" as one server-owned session, fetched from `/v1/sessions/current` (which is 404 when nothing plays).
 
 ## 4. API client
 
-- The Kotlin client is generated from `contract/openapi.yaml` with openapi-generator. It is
-  never hand-edited, and the domain/UI layer depends on a thin wrapper over it, not on the
-  generated types directly, so a contract change is absorbed in one place.
-- The contract is consumed via a git submodule of the server repository
-  (`https://github.com/Xexanos/ratatoskr-server`), pinned to a tag or commit, and the
-  client is generated from it at Gradle build time. F-Droid's build server supports
-  submodules (`submodules: yes` in the fdroiddata recipe), which keeps the build hermetic
-  and deterministic - unlike jitpack, which F-Droid's inclusion policy rejects. The
-  submodule pointer is only ever moved deliberately (reviewing the contract diff), never
-  automatically during a build. Do not depend on a private or authenticated package
-  registry (that breaks F-Droid's build server). A human-readable rendering of the
-  contract on the server repo's GitHub Pages is welcome documentation but is not part of
-  the build.
-- The generated client's HTTP stack must be free software; the decision is Retrofit on
-  OkHttp (section 12). No proprietary dependencies, no Google Play Services (server
-  section 12, F-Droid).
-- Treat unknown response fields leniently: an older app must keep working against a newer
-  server (server section 6). Do not fail deserialization on unexpected fields.
+- The Kotlin client is generated from `contract/openapi.yaml` with openapi-generator. It is never hand-edited, and the domain/UI layer depends on a thin wrapper over it, not on the generated types directly, so a contract change is absorbed in one place.
+- The contract is consumed via a git submodule of the server repository (`https://github.com/Xexanos/ratatoskr-server`), pinned to a tag or commit, and the client is generated from it at Gradle build time. F-Droid's build server supports submodules (`submodules: yes` in the fdroiddata recipe), which keeps the build hermetic and deterministic - unlike jitpack, which F-Droid's inclusion policy rejects. The submodule pointer is only ever moved deliberately (reviewing the contract diff), never automatically during a build. Do not depend on a private or authenticated package registry (that breaks F-Droid's build server). A human-readable rendering of the contract on the server repo's GitHub Pages is welcome documentation but is not part of the build.
+- The generated client's HTTP stack must be free software; the decision is Retrofit on OkHttp (section 12). No proprietary dependencies, no Google Play Services (server section 12, F-Droid).
+- Treat unknown response fields leniently: an older app must keep working against a newer server (server section 6). Do not fail deserialization on unexpected fields.
 
 ## 5. Authentication
 
-Auth is per-user and backed by Audiobookshelf, proxied through Ratatoskr — but the app's
-credential is **Ratatoskr-issued**: the server is the sole holder of Audiobookshelf
-tokens, and the app never sees them. Decided in the server's
-[ADR-0001](https://github.com/Xexanos/ratatoskr-server/blob/main/docs/adr/0001-client-auth-ratatoskr-native-sessions.md)
-(mirrored in server SPEC section 8). This section describes the target model for
-contract 2.0.0 under `/v2`; the previous shared-token model (contract 1.1.0–1.4.x,
-including the entire refresh-token rotation-adoption protocol this section used to
-specify) stays implemented against the frozen `/v1` surface until the `/v2` migration
-lands, and its specification lives in the server contract's 1.4.0 tag.
+Auth is per-user and backed by Audiobookshelf, proxied through Ratatoskr — but the app's credential is **Ratatoskr-issued**: the server is the sole holder of Audiobookshelf tokens, and the app never sees them. Decided in the server's [ADR-0001](https://github.com/Xexanos/ratatoskr-server/blob/main/docs/adr/0001-client-auth-ratatoskr-native-sessions.md) (mirrored in server SPEC section 8). This section describes the target model for contract 2.0.0 under `/v2`; the previous shared-token model (contract 1.1.0–1.4.x, including the entire refresh-token rotation-adoption protocol this section used to specify) stays implemented against the frozen `/v1` surface until the `/v2` migration lands, and its specification lives in the server contract's 1.4.0 tag.
 
-The guarantee this model gives the user: **signed in until explicit sign-out** — server
-restarts and arbitrarily long pauses never force a re-login.
+The guarantee this model gives the user: **signed in until explicit sign-out** — server restarts and arbitrarily long pauses never force a re-login.
 
-- Sign-in collects the Audiobookshelf username and password and posts them to
-  `POST /v2/auth/login`. The server returns an opaque **Ratatoskr token** and the
-  identified user. The password is never stored; Audiobookshelf access/refresh tokens
-  never reach the app.
-- The Ratatoskr token is sent as a bearer token on every request. It does not expire and
-  is never rotated — there is no refresh endpoint, no proactive renewal, no token
-  lifecycle on the app side at all.
-- The token is stored encrypted at rest (Android Keystore-backed storage), never in plain
-  preferences or logs — same bar as before, now for one value instead of two.
-- **401 handling** (one path, not two): any 401 means the stored credential no longer works
-  against this server — whether the server's Audiobookshelf session for this device has died
-  (`code: "UPSTREAM_SESSION_LOST"`, rare — e.g. the server was separated from Audiobookshelf
-  for longer than the refresh window) or the token was revoked server-side. The recovery is
-  identical in both cases: the app discards the token and returns the user to the **sign-in
-  screen, pre-filled** — server URL, certificate trust, and username all survive, only the
-  password is blank. This is not a dedicated screen, just the sign-in screen with an
-  explanatory notice; the `code` varies only that notice's copy ("your media-server sign-in
-  expired" vs a session ended elsewhere), never the behaviour. Re-login issues a fresh token.
-- Sign-out calls `POST /v2/auth/logout` (best-effort — the call is idempotent and a 204 is
-  guaranteed even if Audiobookshelf is unreachable; an unreachable *server* still clears
-  locally) and clears the stored token. The server revokes the token immediately and kills
-  this device's Audiobookshelf session; other devices are untouched.
+- Sign-in collects the Audiobookshelf username and password and posts them to `POST /v2/auth/login`. The server returns an opaque **Ratatoskr token** and the identified user. The password is never stored; Audiobookshelf access/refresh tokens never reach the app.
+- The Ratatoskr token is sent as a bearer token on every request. It does not expire and is never rotated — there is no refresh endpoint, no proactive renewal, no token lifecycle on the app side at all.
+- The token is stored encrypted at rest (Android Keystore-backed storage), never in plain preferences or logs — same bar as before, now for one value instead of two.
+- **401 handling** (one path, not two): any 401 means the stored credential no longer works against this server — whether the server's Audiobookshelf session for this device has died (`code: "UPSTREAM_SESSION_LOST"`, rare — e.g. the server was separated from Audiobookshelf for longer than the refresh window) or the token was revoked server-side. The recovery is identical in both cases: the app discards the token and returns the user to the **sign-in screen, pre-filled** — server URL, certificate trust, and username all survive, only the password is blank. This is not a dedicated screen, just the sign-in screen with an explanatory notice; the `code` varies only that notice's copy ("your media-server sign-in expired" vs a session ended elsewhere), never the behaviour. Re-login issues a fresh token.
+- Sign-out calls `POST /v2/auth/logout` (best-effort — the call is idempotent and a 204 is guaranteed even if Audiobookshelf is unreachable; an unreachable *server* still clears locally) and clears the stored token. The server revokes the token immediately and kills this device's Audiobookshelf session; other devices are untouched.
 
 ### Migration from `/v1` (one-time re-login)
 
-- The `/v2` app is `/v2`-only — no `/v1` fallback, no dual-stack; the rotation-adoption
-  logic and its test matrix are deleted, not kept dormant.
-- On first start after the update, stored Audiobookshelf tokens are discarded and the user
-  authenticates once with their password ("this update requires a one-time re-login").
-  Server URL, certificate fingerprint, and username survive.
-- Rollout order is server first, then app, enforced softly: a 404 against `/v2` routes (a
-  server too old to speak `/v2` answers with a bare 404 — no contract error body, so the
-  guidance is entirely client-side) shows a targeted "please update your server" prompt (the
-  graceful-degradation direction of section 4), and for a user who cannot update the server
-  right now it also offers the fallback of installing an earlier, `/v1`-capable version of
-  the app (phrased generically, no hardcoded version number). The old app keeps working
-  against the frozen `/v1` surface until its sunset, after which `/v1` answers 410
-  `UPGRADE_REQUIRED` — which the old app surfaces as its generic sign-in failure.
+- The `/v2` app is `/v2`-only — no `/v1` fallback, no dual-stack; the rotation-adoption logic and its test matrix are deleted, not kept dormant.
+- On first start after the update, stored Audiobookshelf tokens are discarded and the user authenticates once with their password ("this update requires a one-time re-login"). Server URL, certificate fingerprint, and username survive.
+- Rollout order is server first, then app, enforced softly: a 404 against `/v2` routes (a server too old to speak `/v2` answers with a bare 404 — no contract error body, so the guidance is entirely client-side) shows a targeted "please update your server" prompt (the graceful-degradation direction of section 4), and for a user who cannot update the server right now it also offers the fallback of installing an earlier, `/v1`-capable version of the app (phrased generically, no hardcoded version number). The old app keeps working against the frozen `/v1` surface until its sunset, after which `/v1` answers 410 `UPGRADE_REQUIRED` — which the old app surfaces as its generic sign-in failure.
 
 ## 6. Server connection and certificate trust
 
-The server serves HTTPS with a self-signed certificate or a local CA (server section 14).
-There is no public CA in the chain, and each user's server has its own certificate, so the
-certificate cannot be pinned at build time.
+The server serves HTTPS with a self-signed certificate or a local CA (server section 14). There is no public CA in the chain, and each user's server has its own certificate, so the certificate cannot be pinned at build time.
 
 - The user enters the server's URL (host and port). There is no discovery in v1.
-- Establish trust on first connection: fetch the server certificate, show its fingerprint,
-  and ask the user to confirm it (trust-on-first-use). Persist the confirmed fingerprint
-  and pin it for all later connections; warn loudly if it ever changes (with the scope
-  caveat below).
-- Decided mechanics: the connect screen fetches the certificate chain with a short-lived
-  OkHttp client whose trust manager accepts anything but is used ONLY to read the chain -
-  never for real requests. It shows the leaf certificate's SHA-256 fingerprint plus
-  subject, issuer, and validity; on confirmation the app persists
-  `{host, port, sha256 fingerprint}`. All real requests go through a custom
-  `X509TrustManager` (in `core-network`) that first tries the platform trust chain - which
-  covers the reverse-proxy-with-public-CA case - and only on its failure compares the leaf
-  fingerprint against the stored pin. Matching neither is a hard failure with a loud
-  "certificate changed" warning and an explicit re-trust flow (settings → forget
-  certificate).
-- Hostname verification is pin-aware: when the served leaf matches the confirmed
-  fingerprint, the hostname is not checked - the user confirmed that exact certificate, so
-  it is trustworthy at any address (typically a LAN IP that appears in no certificate SAN).
-  In every other case - the platform-trusted path, or no confirmed fingerprint - the
-  standard hostname verification applies unchanged; on the platform path it is the only
-  host binding, since the pin is consulted only after platform validation fails.
-- Scope of the change guarantee (deliberate trade-off): the "warn loudly if it changes"
-  guarantee applies to the self-signed / local-CA deployment, which is the primary one and
-  where the platform chain fails so the stored pin is always the deciding factor. When the
-  server instead presents a **publicly trusted** certificate (e.g. TLS terminated at a
-  reverse proxy), the platform chain validates and the pin is not consulted - so a different
-  but validly issued certificate for the same host is accepted without re-confirmation. That
-  is an accepted consequence of putting platform validation first: in that deployment trust
-  is delegated to the public CA, and requiring the pin to match as well would reject every
-  routine certificate renewal (e.g. Let's Encrypt's ~90-day rotation) and force a manual
-  re-trust each time. Strict leaf-pinning against publicly trusted certificates was
-  considered and rejected on those grounds.
-- This runtime, user-confirmed pinning is implemented with the platform TLS stack and
-  OkHttp only, so it survives a reproducible F-Droid build. A build-time
-  network-security-config pin cannot express a per-user certificate and must not be relied
-  on as the mechanism.
+- Establish trust on first connection: fetch the server certificate, show its fingerprint, and ask the user to confirm it (trust-on-first-use). Persist the confirmed fingerprint and pin it for all later connections; warn loudly if it ever changes (with the scope caveat below).
+- Decided mechanics: the connect screen fetches the certificate chain with a short-lived OkHttp client whose trust manager accepts anything but is used ONLY to read the chain - never for real requests. It shows the leaf certificate's SHA-256 fingerprint plus subject, issuer, and validity; on confirmation the app persists `{host, port, sha256 fingerprint}`. All real requests go through a custom `X509TrustManager` (in `core-network`) that first tries the platform trust chain - which covers the reverse-proxy-with-public-CA case - and only on its failure compares the leaf fingerprint against the stored pin. Matching neither is a hard failure with a loud "certificate changed" warning and an explicit re-trust flow (settings → forget certificate).
+- Hostname verification is pin-aware: when the served leaf matches the confirmed fingerprint, the hostname is not checked - the user confirmed that exact certificate, so it is trustworthy at any address (typically a LAN IP that appears in no certificate SAN). In every other case - the platform-trusted path, or no confirmed fingerprint - the standard hostname verification applies unchanged; on the platform path it is the only host binding, since the pin is consulted only after platform validation fails.
+- Scope of the change guarantee (deliberate trade-off): the "warn loudly if it changes" guarantee applies to the self-signed / local-CA deployment, which is the primary one and where the platform chain fails so the stored pin is always the deciding factor. When the server instead presents a **publicly trusted** certificate (e.g. TLS terminated at a reverse proxy), the platform chain validates and the pin is not consulted - so a different but validly issued certificate for the same host is accepted without re-confirmation. That is an accepted consequence of putting platform validation first: in that deployment trust is delegated to the public CA, and requiring the pin to match as well would reject every routine certificate renewal (e.g. Let's Encrypt's ~90-day rotation) and force a manual re-trust each time. Strict leaf-pinning against publicly trusted certificates was considered and rejected on those grounds.
+- This runtime, user-confirmed pinning is implemented with the platform TLS stack and OkHttp only, so it survives a reproducible F-Droid build. A build-time network-security-config pin cannot express a per-user certificate and must not be relied on as the mechanism.
 
 ## 7. User-provided configuration
 
-The app stores, per install: the server URL, the confirmed server-certificate fingerprint,
-the Ratatoskr auth token (encrypted; under `/v1`, until the section-5 migration, the ABS
-access/refresh pair), and the display username. It does not store the Audiobookshelf
-password. A settings screen exposes the server URL, a re-trust/forget action for the
-certificate, and sign-out.
+The app stores, per install: the server URL, the confirmed server-certificate fingerprint, the Ratatoskr auth token (encrypted; under `/v1`, until the section-5 migration, the ABS access/refresh pair), and the display username. It does not store the Audiobookshelf password. A settings screen exposes the server URL, a re-trust/forget action for the certificate, and sign-out.
 
-Backups are disabled (`android:allowBackup="false"`, no backup/data-extraction rules).
-Everything the app stores is either per-install by design (the certificate trust decision
-belongs to the device that confirmed it) or useless after a restore anyway: the token is
-encrypted with an Android-Keystore key that never leaves the device, so a restored blob
-cannot be decrypted on new hardware and would only force a re-login. Disabling backup makes
-that explicit — a restored or transferred install starts clean at the connect screen — and
-keeps token ciphertext out of cloud backups entirely.
+Backups are disabled (`android:allowBackup="false"`, no backup/data-extraction rules). Everything the app stores is either per-install by design (the certificate trust decision belongs to the device that confirmed it) or useless after a restore anyway: the token is encrypted with an Android-Keystore key that never leaves the device, so a restored blob cannot be decrypted on new hardware and would only force a re-login. Disabling backup makes that explicit — a restored or transferred install starts clean at the connect screen — and keeps token ciphertext out of cloud backups entirely.
 
 ## 8. Distribution constraints (F-Droid and Play Store)
 
 - License is GPL-3.0-or-later (matches the whole project).
 - `applicationId` is `io.github.xexanos.ratatoskr`.
-- Free-software dependencies only: no Google Play Services, no proprietary SDKs, no
-  analytics or tracking libraries. F-Droid will reject non-free dependencies and flag
-  anti-features.
-- Aim for a reproducible build. Keep the dependency set small and the build free of
-  non-deterministic steps.
-- Provide F-Droid metadata under `fastlane/metadata/android/<locale>/` (title, short and
-  full description, changelogs, images). The F-Droid build recipe itself lives in F-Droid's
-  `fdroiddata` repository, not here.
-  - Images: `en-US/images/icon.png` (512×512) and `en-US/images/featureGraphic.png`
-    (1024×500) are rendered from the SVG sources in `docs/logo/` (see the README there for
-    how); `en-US/images/phoneScreenshots/` is captured on an emulator against mock data,
-    with generic example content only. Images live under `en-US` alone — F-Droid falls back
-    to it for other locales, and duplicating binaries per locale only invites drift.
-  - The feature graphic uses the committed wordmark outlines
-    (`docs/logo/ratatoskr-wordmark.svg`). That raises no `NonFreeAssets` concern: the
-    anti-feature is about assets shipped in the app, and the APK contains only the picture
-    mark; the Norse font file itself is neither in the repository nor in any artifact (its
-    freeware license permits rendered-outline use but forbids redistributing the font
-    file — `docs/logo/README.md`).
-- **Versioning.** `versionName` is semantic versioning, `MAJOR.MINOR.PATCH`, and
-  `versionCode` is derived from it mechanically as `MAJOR * 10000 + MINOR * 100 + PATCH`
-  (`0.1.0` → `100`, `1.2.3` → `10203`): monotonic, gapless in meaning, and reconstructible
-  from the version name alone, so the two can never disagree. Both live only in
-  `app/build.gradle.kts`. Changelog files are named after the version code
-  (`fastlane/.../changelogs/<versionCode>.txt`), as fastlane requires. CI enforces the bump
-  so it is never forgotten: `pr-release-guards.yml` fails any PR whose commits are
-  release-worthy (feat/fix/perf/breaking, per Conventional Commits — themselves linted by a
-  commitlint job mirrored from the server) unless it raises `versionName`/`versionCode` by at
-  least the implied semver level, keeps `versionCode` consistent with the formula above, and
-  adds the matching `en-US` changelog. Non-release commits (docs/chore/ci/deps/…) require no
-  bump. This is the continuous-versioning half of the flow: because every release-worthy merge
-  bumps, every such green `main` commit is a fresh version the tag gate below can cut.
-  - **Merges to `main` must preserve the branch's Conventional Commits** — use merge-commit or
-    rebase, **not squash** (disable squash merges in the repository settings). The per-PR guard
-    reads the branch's own `base..head` commits and so is robust to the strategy, but the
-    tag gate's post-hoc "missed a bump?" diagnostic (`promote.yml`) classifies `main`'s history,
-    where a squash would substitute the unlinted PR title for the real commit subjects and could
-    mislabel a missed release-worthy change as benign. Keeping commits intact on `main` also
-    mirrors how the server derives its version.
-- **Releases are git tags, cut automatically once E2E is green.** A release is an
-  annotated tag `v<versionName>` (e.g. `v0.1.0`) on a `main` commit whose full validation
-  has passed. The fdroiddata recipe uses `UpdateCheckMode: Tags` against that pattern. The
-  version itself is never computed by CI — `versionName` in `app/build.gradle.kts` is the
-  single source of truth and a human bumps it; CI only automates the *wait-for-green,
-  then-tag* half. The release process, in order: bump `versionCode`/`versionName`, add the
-  `changelogs/<versionCode>.txt` files (at least `en-US`), and merge to `main`. From there
-  CI takes over: `release-validation.yml` validates the shrunk build post-merge, publishes
-  it to a per-commit `testing-<sha>` pre-release, and dispatches the cross-component E2E
-  suite (`Xexanos/ratatoskr-e2e`, run as server@release-`:latest` × app@this-build); on a
-  green run E2E dispatches `app-e2e-passed` back, and `promote.yml` cuts the `v<versionName>`
-  tag at the validated commit and creates a GitHub release carrying the E2E-validated
-  APK bytes (copied from the pre-release, not rebuilt): the unsigned APK plus a
-  developer-signed copy for sideloading (see the signing bullet below). The tag is cut only when that
-  `versionName` is not already tagged: the gate is idempotent, so landing further commits at
-  an unchanged version cuts nothing new, and the tag lands on the first E2E-green commit that
-  carries a not-yet-released version (normally the bump commit). A red E2E run cuts no
-  release — the tag can only ever point at a commit that passed. GitHub releases are optional
-  extras; the tag is what F-Droid consumes. Manual promotion of a known-good `testing-<sha>`
-  pre-release stays available via `promote.yml`'s `workflow_dispatch`. This mirrors the
-  server's `container.yml` → E2E → `promote.yml` flow, one direction per component.
-- **Why the version must be set before the build.** Unlike an OCI image — whose version is
-  a registry tag pointing at already-built, digest-addressed bytes, applied (and changed)
-  after the fact without a rebuild — an APK's `versionName`/`versionCode` are compiled into
-  `AndroidManifest.xml` and covered by the APK signature, so they are part of the artifact
-  bytes. There is therefore no "build once, choose the version later by re-tagging" for the
-  app: the version lives in source, and F-Droid rebuilds from the tag regardless. The git
-  tag, not a re-tag of a built artifact, is what carries the version.
-- **Signing: two install channels, two keys.** F-Droid remains the primary channel: its
-  build server builds from the `v<versionName>` tag and signs the result with the F-Droid
-  key — it consumes nothing but the tag. In addition, the GitHub release explicitly offers
-  sideloading as an alternative: `promote.yml` signs the E2E-validated unsigned APK (the
-  exact bytes that passed, never a rebuild) with a developer release key and attaches it
-  as `ratatoskr-v<versionName>.apk`, alongside the `ratatoskr-release-unsigned.apk` it is
-  derived from (kept as the provenance artifact — an unsigned APK is not installable). The
-  key is a PKCS12 keystore held in GitHub Actions secrets (`RELEASE_KEYSTORE`,
-  base64-encoded, and `RELEASE_KEYSTORE_PASSWORD`; alias `ratatoskr-release`), with an
-  offline backup outside CI. The signing certificate's SHA-256 fingerprint, for
-  `apksigner verify --print-certs` checks, is
-  `1B:4D:89:B7:B6:CF:20:70:22:A2:38:25:E5:65:1B:F5:6B:4F:CF:CA:EC:BB:35:10:97:72:30:42:66:F0:11:B1`.
-  Trade-offs, recorded: (a) Android signature continuity makes the two channels mutually
-  exclusive per install — a device cannot move between an F-Droid install and a sideload
-  install without uninstall + reinstall (and the data loss that implies); release notes
-  must say so. (b) There is now a secret to manage: the keystore must stay backed up, and
-  losing it orphans every sideload install (F-Droid installs are unaffected). There is
-  still no `Binaries:`/`AllowedAPKSigningKeys` reproducibility contract to keep — the
-  sideload APK is a parallel channel, not an F-Droid input. The "aim for a reproducible
-  build" bullet above stays as build hygiene (deterministic inputs, minimal toolchain),
-  not as a signing strategy.
-- Choose a reasonable `minSdk` that covers the encrypted-storage and TLS requirements; the
-  agent proposes the exact value.
+- Free-software dependencies only: no Google Play Services, no proprietary SDKs, no analytics or tracking libraries. F-Droid will reject non-free dependencies and flag anti-features.
+- Aim for a reproducible build. Keep the dependency set small and the build free of non-deterministic steps.
+- Provide F-Droid metadata under `fastlane/metadata/android/<locale>/` (title, short and full description, changelogs, images). The F-Droid build recipe itself lives in F-Droid's `fdroiddata` repository, not here.
+  - Images: `en-US/images/icon.png` (512×512) and `en-US/images/featureGraphic.png` (1024×500) are rendered from the SVG sources in `docs/logo/` (see the README there for how); `en-US/images/phoneScreenshots/` is captured on an emulator against mock data, with generic example content only. Images live under `en-US` alone — F-Droid falls back to it for other locales, and duplicating binaries per locale only invites drift.
+  - The feature graphic uses the committed wordmark outlines (`docs/logo/ratatoskr-wordmark.svg`). That raises no `NonFreeAssets` concern: the anti-feature is about assets shipped in the app, and the APK contains only the picture mark; the Norse font file itself is neither in the repository nor in any artifact (its freeware license permits rendered-outline use but forbids redistributing the font file — `docs/logo/README.md`).
+- **Versioning.** `versionName` is semantic versioning, `MAJOR.MINOR.PATCH`, and `versionCode` is derived from it mechanically as `MAJOR * 10000 + MINOR * 100 + PATCH` (`0.1.0` → `100`, `1.2.3` → `10203`): monotonic, gapless in meaning, and reconstructible from the version name alone, so the two can never disagree. Both live only in `app/build.gradle.kts`. Changelog files are named after the version code (`fastlane/.../changelogs/<versionCode>.txt`), as fastlane requires. CI enforces the bump so it is never forgotten: `pr-release-guards.yml` fails any PR whose commits are release-worthy (feat/fix/perf/breaking, per Conventional Commits — themselves linted by a commitlint job mirrored from the server) unless it raises `versionName`/`versionCode` by at least the implied semver level, keeps `versionCode` consistent with the formula above, and adds the matching `en-US` changelog. Non-release commits (docs/chore/ci/deps/…) require no bump. This is the continuous-versioning half of the flow: because every release-worthy merge bumps, every such green `main` commit is a fresh version the tag gate below can cut.
+  - **Merges to `main` must preserve the branch's Conventional Commits** — use merge-commit or rebase, **not squash** (disable squash merges in the repository settings). The per-PR guard reads the branch's own `base..head` commits and so is robust to the strategy, but the tag gate's post-hoc "missed a bump?" diagnostic (`promote.yml`) classifies `main`'s history, where a squash would substitute the unlinted PR title for the real commit subjects and could mislabel a missed release-worthy change as benign. Keeping commits intact on `main` also mirrors how the server derives its version.
+- **Releases are git tags, cut automatically once E2E is green.** A release is an annotated tag `v<versionName>` (e.g. `v0.1.0`) on a `main` commit whose full validation has passed. The fdroiddata recipe uses `UpdateCheckMode: Tags` against that pattern. The version itself is never computed by CI — `versionName` in `app/build.gradle.kts` is the single source of truth and a human bumps it; CI only automates the *wait-for-green, then-tag* half. The release process, in order: bump `versionCode`/`versionName`, add the `changelogs/<versionCode>.txt` files (at least `en-US`), and merge to `main`. From there CI takes over: `release-validation.yml` validates the shrunk build post-merge, publishes it to a per-commit `testing-<sha>` pre-release, and dispatches the cross-component E2E suite (`Xexanos/ratatoskr-e2e`, run as server@release-`:latest` × app@this-build); on a green run E2E dispatches `app-e2e-passed` back, and `promote.yml` cuts the `v<versionName>` tag at the validated commit and creates a GitHub release carrying the E2E-validated APK bytes (copied from the pre-release, not rebuilt): the unsigned APK plus a developer-signed copy for sideloading (see the signing bullet below). The tag is cut only when that `versionName` is not already tagged: the gate is idempotent, so landing further commits at an unchanged version cuts nothing new, and the tag lands on the first E2E-green commit that carries a not-yet-released version (normally the bump commit). A red E2E run cuts no release — the tag can only ever point at a commit that passed. GitHub releases are optional extras; the tag is what F-Droid consumes. Manual promotion of a known-good `testing-<sha>` pre-release stays available via `promote.yml`'s `workflow_dispatch`. This mirrors the server's `container.yml` → E2E → `promote.yml` flow, one direction per component.
+- **Why the version must be set before the build.** Unlike an OCI image — whose version is a registry tag pointing at already-built, digest-addressed bytes, applied (and changed) after the fact without a rebuild — an APK's `versionName`/`versionCode` are compiled into `AndroidManifest.xml` and covered by the APK signature, so they are part of the artifact bytes. There is therefore no "build once, choose the version later by re-tagging" for the app: the version lives in source, and F-Droid rebuilds from the tag regardless. The git tag, not a re-tag of a built artifact, is what carries the version.
+- **Signing: two install channels, two keys.** F-Droid remains the primary channel: its build server builds from the `v<versionName>` tag and signs the result with the F-Droid key — it consumes nothing but the tag. In addition, the GitHub release explicitly offers sideloading as an alternative: `promote.yml` signs the E2E-validated unsigned APK (the exact bytes that passed, never a rebuild) with a developer release key and attaches it as `ratatoskr-v<versionName>.apk`, alongside the `ratatoskr-release-unsigned.apk` it is derived from (kept as the provenance artifact — an unsigned APK is not installable). The key is a PKCS12 keystore held in GitHub Actions secrets (`RELEASE_KEYSTORE`, base64-encoded, and `RELEASE_KEYSTORE_PASSWORD`; alias `ratatoskr-release`), with an offline backup outside CI. The signing certificate's SHA-256 fingerprint, for `apksigner verify --print-certs` checks, is `1B:4D:89:B7:B6:CF:20:70:22:A2:38:25:E5:65:1B:F5:6B:4F:CF:CA:EC:BB:35:10:97:72:30:42:66:F0:11:B1`. Trade-offs, recorded: (a) Android signature continuity makes the two channels mutually exclusive per install — a device cannot move between an F-Droid install and a sideload install without uninstall + reinstall (and the data loss that implies); release notes must say so. (b) There is now a secret to manage: the keystore must stay backed up, and losing it orphans every sideload install (F-Droid installs are unaffected). There is still no `Binaries:`/`AllowedAPKSigningKeys` reproducibility contract to keep — the sideload APK is a parallel channel, not an F-Droid input. The "aim for a reproducible build" bullet above stays as build hygiene (deterministic inputs, minimal toolchain), not as a signing strategy.
+- Choose a reasonable `minSdk` that covers the encrypted-storage and TLS requirements; the agent proposes the exact value.
 - Release shrinking (R8) is **enabled**, and the conditions that once blocked it are resolved:
-  - The generated API client uses Moshi **codegen** adapters (`moshiCodeGen=true` in the
-    generator config, processed by KSP/`moshi-kotlin-codegen`), so no reflective Kotlin
-    adapter — and no `kotlin-reflect` — ships at all. Enums keep Moshi's built-in handling,
-    so the unknown-`PlaybackState` fallback (section 4) is unaffected.
-  - Keep rules are deliberately minimal: the libraries' own consumer rules (Retrofit, OkHttp,
-    Moshi) plus the rules moshi-kotlin-codegen generates per model — the adapter keeps *and*
-    the models' synthetic defaults constructors, which the adapters look up reflectively when
-    a payload omits a property with a default value. Both are mirrored explicitly in
-    `app/src/main/keepRules/rules.keep`, and that mirror is **load-bearing, not insurance**:
-    the on-device validation proved the codegen's resource-borne rules do not propagate from
-    `core-network` into the app's R8 run (the stripped defaults constructor failed
-    `MinifiedWireSmokeTest` with `NoSuchMethodException` — a real release-APK bug).
-  - The `minified` variant (below) additionally keeps, wholesale, the shared libraries the
-    instrumented-test APK resolves from the app APK (`app/src/minified/keepRules/tests.keep`):
-    AGP filters every dependency the app already ships out of the androidTest APK, so the test
-    frameworks' own needs — kotlin stdlib facades for androidx.test, espresso's androidx.core
-    view helpers, compose-ui-test's compose ui/runtime internals, mockwebserver's okhttp
-    internals — must survive the app-side shrinker or instrumentation crashes at startup
-    (AGP has no test-aware keep generation: issuetracker.google.com/126429384; Slack's Keeper
-    plugin predates AGP 9 and is unmaintained). This is a documented deviation of the
-    validation variant only: the release APK keeps its minimal rules, and everything the
-    validation exists to prove — the app's own code, the generated client, retrofit2/moshi,
-    androidx.navigation, compose material3/foundation and the icon vectors — still shrinks
-    exactly as in release.
-  - **No obfuscation** (`-dontobfuscate`): shrinking and optimization stay fully active, but
-    names are kept readable. F-Droid users never receive a mapping file, so crash reports
-    must stay legible; unobfuscated output is also easier to verify for the reproducible
-    build and keeps the minified instrumented run free of test-APK mapping fragility.
-  - Validation is on-device and post-merge (section 9): every push to `main` builds the
-    `minified` variant — the release R8 configuration, debug-signed and debuggable so
-    instrumentation can attach (R8 in a debuggable variant still enforces shrinking and keep
-    rules fully; only code optimizations are reduced) — and drives the whole-app integration
-    flow plus a wire-level smoke mirror against it. On success the workflow publishes the
-    tested APKs to a per-commit `testing-<short-sha>` pre-release (pruned by a scheduled
-    cleanup job) and (once the `ratatoskr-e2e` repository exists) triggers the cross-component
-    E2E suite. The per-PR gate is layered: `assembleRelease` and
-    `assembleMinifiedAndroidTest` in CI catch keep-rule/shrinker *config* errors cheaply on
-    the JVM without an emulator (the latter runs R8 on both the minified app APK and the
-    instrumented-test APK), and `MinifiedWireSmokeTest` runs on-device against the minified
-    variant in the instrumented-tests workflow, because a JVM build cannot see *runtime*
-    resolution gaps — a keep-rule set that builds cleanly can still leave the test process
-    unable to start (both post-merge failures that preceded this gate were of that class).
-    The full integration flow against the shrunk build stays post-merge: a deliberate cost
-    split, since its failure modes overlap heavily with the wire smoke.
-  - Measured impact (unsigned release APK, CI): **13.3 MB** unshrunk → **2.2 MB** with code
-    shrinking → **1.8 MB** with code + resource shrinking. Code shrinking accounts for the bulk
-    (it strips `kotlin-reflect` and the unused `material-icons-extended` vectors, which are
-    Compose `ImageVector` *code*, not `res/` drawables). Resource shrinking (`isShrinkResources`)
-    adds ~385 KB (~18 %) on top; F-Droid's reproducible-build guidance cautions against the
-    resource shrinker "unless it decreases the APK file size significantly", and ~18 % clears
-    that bar, so it stays on. Re-measure if that margin shrinks.
+  - The generated API client uses Moshi **codegen** adapters (`moshiCodeGen=true` in the generator config, processed by KSP/`moshi-kotlin-codegen`), so no reflective Kotlin adapter — and no `kotlin-reflect` — ships at all. Enums keep Moshi's built-in handling, so the unknown-`PlaybackState` fallback (section 4) is unaffected.
+  - Keep rules are deliberately minimal: the libraries' own consumer rules (Retrofit, OkHttp, Moshi) plus the rules moshi-kotlin-codegen generates per model — the adapter keeps *and* the models' synthetic defaults constructors, which the adapters look up reflectively when a payload omits a property with a default value. Both are mirrored explicitly in `app/src/main/keepRules/rules.keep`, and that mirror is **load-bearing, not insurance**: the on-device validation proved the codegen's resource-borne rules do not propagate from `core-network` into the app's R8 run (the stripped defaults constructor failed `MinifiedWireSmokeTest` with `NoSuchMethodException` — a real release-APK bug).
+  - The `minified` variant (below) additionally keeps, wholesale, the shared libraries the instrumented-test APK resolves from the app APK (`app/src/minified/keepRules/tests.keep`): AGP filters every dependency the app already ships out of the androidTest APK, so the test frameworks' own needs — kotlin stdlib facades for androidx.test, espresso's androidx.core view helpers, compose-ui-test's compose ui/runtime internals, mockwebserver's okhttp internals — must survive the app-side shrinker or instrumentation crashes at startup (AGP has no test-aware keep generation: issuetracker.google.com/126429384; Slack's Keeper plugin predates AGP 9 and is unmaintained). This is a documented deviation of the validation variant only: the release APK keeps its minimal rules, and everything the validation exists to prove — the app's own code, the generated client, retrofit2/moshi, androidx.navigation, compose material3/foundation and the icon vectors — still shrinks exactly as in release.
+  - **No obfuscation** (`-dontobfuscate`): shrinking and optimization stay fully active, but names are kept readable. F-Droid users never receive a mapping file, so crash reports must stay legible; unobfuscated output is also easier to verify for the reproducible build and keeps the minified instrumented run free of test-APK mapping fragility.
+  - Validation is on-device and post-merge (section 9): every push to `main` builds the `minified` variant — the release R8 configuration, debug-signed and debuggable so instrumentation can attach (R8 in a debuggable variant still enforces shrinking and keep rules fully; only code optimizations are reduced) — and drives the whole-app integration flow plus a wire-level smoke mirror against it. On success the workflow publishes the tested APKs to a per-commit `testing-<short-sha>` pre-release (pruned by a scheduled cleanup job) and (once the `ratatoskr-e2e` repository exists) triggers the cross-component E2E suite. The per-PR gate is layered: `assembleRelease` and `assembleMinifiedAndroidTest` in CI catch keep-rule/shrinker *config* errors cheaply on the JVM without an emulator (the latter runs R8 on both the minified app APK and the instrumented-test APK), and `MinifiedWireSmokeTest` runs on-device against the minified variant in the instrumented-tests workflow, because a JVM build cannot see *runtime* resolution gaps — a keep-rule set that builds cleanly can still leave the test process unable to start (both post-merge failures that preceded this gate were of that class). The full integration flow against the shrunk build stays post-merge: a deliberate cost split, since its failure modes overlap heavily with the wire smoke.
+  - Measured impact (unsigned release APK, CI): **13.3 MB** unshrunk → **2.2 MB** with code shrinking → **1.8 MB** with code + resource shrinking. Code shrinking accounts for the bulk (it strips `kotlin-reflect` and the unused `material-icons-extended` vectors, which are Compose `ImageVector` *code*, not `res/` drawables). Resource shrinking (`isShrinkResources`) adds ~385 KB (~18 %) on top; F-Droid's reproducible-build guidance cautions against the resource shrinker "unless it decreases the APK file size significantly", and ~18 % clears that bar, so it stays on. Re-measure if that margin shrinks.
 
 ## 9. Testing
 
-Testing is layered by what each layer can honestly verify. The layers are complementary, not
-redundant: lower layers go deep on mechanics and edge cases, the integration layer goes broad
-across the assembled user flow. Any overlap between them is deliberately thin.
+Testing is layered by what each layer can honestly verify. The layers are complementary, not redundant: lower layers go deep on mechanics and edge cases, the integration layer goes broad across the assembled user flow. Any overlap between them is deliberately thin.
 
 ### 1. Unit tests (JVM)
 
 JVM (`testDebugUnitTest`), no device, fast; most tests live here. Two kinds share the layer.
 
-Pure logic with the platform pieces faked is the bulk of it: the auth/token logic (bearer
-attachment, 401 handling by `code`, secure-storage read/write with the platform faked), the
-mapping between generated contract types and the domain/UI models (including unknown-field
-tolerance), and the per-screen ViewModel state transitions.
+Pure logic with the platform pieces faked is the bulk of it: the auth/token logic (bearer attachment, 401 handling by `code`, secure-storage read/write with the platform faked), the mapping between generated contract types and the domain/UI models (including unknown-field tolerance), and the per-screen ViewModel state transitions.
 
-Non-visual Compose behaviour is the rest. A Robolectric-backed compose rule renders one
-stateless `XScreen(state, ...)` or shared component (section 13) from a hand-made UI state and
-asserts against the semantics tree — `InlineBannerTest` and the per-screen `*ScreenTest`s
-(`SignInScreenTest`). It runs on the same JVM/Robolectric renderer as the screenshot goldens,
-asked a different question: a golden pins what a frame *looks* like, these pin what it *does*.
+Non-visual Compose behaviour is the rest. A Robolectric-backed compose rule renders one stateless `XScreen(state, ...)` or shared component (section 13) from a hand-made UI state and asserts against the semantics tree — `InlineBannerTest` and the per-screen `*ScreenTest`s (`SignInScreenTest`). It runs on the same JVM/Robolectric renderer as the screenshot goldens, asked a different question: a golden pins what a frame *looks* like, these pin what it *does*.
 
-They exist because nothing else in the suite can see this. A live region is invisible to a
-golden and — being behaviour rather than a structural violation — invisible to the instrumented
-Accessibility Test Framework checks too, which cannot run here at all: they need a live
-accessibility service and silently pass on Robolectric. A golden also freezes one frame, so it
-says nothing about *which* frame a screen chooses: whether the trust chip is there at all,
-whether the visibility toggle swaps a masked password for a revealed one, whether the banner
-surface itself is the retry target rather than a nested label. That is what belongs here —
-semantics that are behaviour rather than structure, and the choice between states.
+They exist because nothing else in the suite can see this. A live region is invisible to a golden and — being behaviour rather than a structural violation — invisible to the instrumented Accessibility Test Framework checks too, which cannot run here at all: they need a live accessibility service and silently pass on Robolectric. A golden also freezes one frame, so it says nothing about *which* frame a screen chooses: whether the trust chip is there at all, whether the visibility toggle swaps a masked password for a revealed one, whether the banner surface itself is the retry target rather than a nested label. That is what belongs here — semantics that are behaviour rather than structure, and the choice between states.
 
-This is deliberately not a small copy of layer 3. One composable is driven directly with a
-state handed to it: no navigation graph, no ViewModel, no `ConnectionManager`, no
-`MockWebServer`, so nothing about the assembled flow is under test — "integration test" here
-means layer 3's whole app through its UI, and nothing else. Behaviour that needs the app wired
-together belongs there; conformance that needs a real accessibility node tree belongs
-instrumented.
+This is deliberately not a small copy of layer 3. One composable is driven directly with a state handed to it: no navigation graph, no ViewModel, no `ConnectionManager`, no `MockWebServer`, so nothing about the assembled flow is under test — "integration test" here means layer 3's whole app through its UI, and nothing else. Behaviour that needs the app wired together belongs there; conformance that needs a real accessibility node tree belongs instrumented.
 
 ### 2. Component tests (instrumented)
 
-The network / trust / persistence stack *as it is actually assembled*, driven through
-`RatatoskrClientFactory.create(...)` against an in-process `MockWebServer` over HTTPS. These
-run **instrumented on an emulator**, not on the JVM, because the paths that matter here are
-exactly the ones that diverge between the JVM and Android: TLS trust goes through Android's
-real system trust store and TLS provider (Conscrypt), and token persistence through the real
-Keystore-backed store — a JVM run would validate a stand-in (JDK `cacerts`, an in-memory token
-fake), not what ships.
+The network / trust / persistence stack *as it is actually assembled*, driven through `RatatoskrClientFactory.create(...)` against an in-process `MockWebServer` over HTTPS. These run **instrumented on an emulator**, not on the JVM, because the paths that matter here are exactly the ones that diverge between the JVM and Android: TLS trust goes through Android's real system trust store and TLS provider (Conscrypt), and token persistence through the real Keystore-backed store — a JVM run would validate a stand-in (JDK `cacerts`, an in-memory token fake), not what ships.
 
-They exist because a hand-wired unit test can pass while the real wiring is broken: the
-unknown-enum fallback Moshi was once attached to the client but not to the Retrofit converter
-`RatatoskrClientFactory` builds, so it never ran on real responses, yet a unit test that wired
-its own Moshi stayed green. Driving the real factory closes that gap. In place
-(`core-network`, `Factory*ComponentTest`):
+They exist because a hand-wired unit test can pass while the real wiring is broken: the unknown-enum fallback Moshi was once attached to the client but not to the Retrofit converter `RatatoskrClientFactory` builds, so it never ran on real responses, yet a unit test that wired its own Moshi stayed green. Driving the real factory closes that gap. In place (`core-network`, `Factory*ComponentTest`):
 
-- response deserialization through the factory's own converter — the unknown-`PlaybackState`
-  fallback and unknown-field tolerance on a real response body;
-- the TLS pin (section 6): a matching fingerprint connects and a changed/absent one is
-  rejected, against Android's real trust manager. The primary self-signed / local-CA path is
-  covered (the platform chain fails, so the pin decides). The publicly-trusted-cert branch of
-  the section-6 trade-off (platform validates, pin is skipped) is not reachable from a
-  self-signed `MockWebServer` — a documented gap, not a covered case;
-- bearer attachment, and 401 handling — every 401 discards the token and lands on the
-  pre-filled sign-in, the response `code` selecting only the notice copy (section 5) —
-  against the real Keystore-backed token store;
+- response deserialization through the factory's own converter — the unknown-`PlaybackState` fallback and unknown-field tolerance on a real response body;
+- the TLS pin (section 6): a matching fingerprint connects and a changed/absent one is rejected, against Android's real trust manager. The primary self-signed / local-CA path is covered (the platform chain fails, so the pin decides). The publicly-trusted-cert branch of the section-6 trade-off (platform validates, pin is skipped) is not reachable from a self-signed `MockWebServer` — a documented gap, not a covered case;
+- bearer attachment, and 401 handling — every 401 discards the token and lands on the pre-filled sign-in, the response `code` selecting only the notice copy (section 5) — against the real Keystore-backed token store;
 - error mapping (401 / 404 / 502 / 500 / TLS failure) to the right `RatatoskrError`.
 
 ### 3. Integration tests (instrumented, whole-app UI)
 
-The **complete app driven through its UI** — the Playwright analogue. An instrumented Compose
-UI suite launches the real app (`MainActivity` / the navigation graph) and taps and types
-through the actual screens, so the app itself drives its real navigation → ViewModels →
-`ConnectionManager` → `core-network`, against a `MockWebServer` standing in for the Ratatoskr
-server. It covers the assembled user flow — connect and confirm the certificate, sign in,
-browse the library, pick a speaker, start playback, pause/resume/seek/stop — plus key
-alternates (an unreachable server at connect, a sign-in failure, an empty library).
+The **complete app driven through its UI** — the Playwright analogue. An instrumented Compose UI suite launches the real app (`MainActivity` / the navigation graph) and taps and types through the actual screens, so the app itself drives its real navigation → ViewModels → `ConnectionManager` → `core-network`, against a `MockWebServer` standing in for the Ratatoskr server. It covers the assembled user flow — connect and confirm the certificate, sign in, browse the library, pick a speaker, start playback, pause/resume/seek/stop — plus key alternates (an unreachable server at connect, a sign-in failure, an empty library).
 
-This layer asserts **user-visible outcomes and flow**, and deliberately does *not* re-assert
-the wire-level mechanics the component layer already owns (enum fallback, error taxonomy,
-401-`code` handling). The thin, healthy overlap — a matching pin connects, a
-normal session renders — is checked from each layer's own angle.
+This layer asserts **user-visible outcomes and flow**, and deliberately does *not* re-assert the wire-level mechanics the component layer already owns (enum fallback, error taxonomy, 401-`code` handling). The thin, healthy overlap — a matching pin connects, a normal session renders — is checked from each layer's own angle.
 
 ### 4. End-to-end tests
 
-The app against the *real* stack (Ratatoskr server + Audiobookshelf + the official Sonos
-simulator), no mocks. Out of scope for now; a separate later layer.
+The app against the *real* stack (Ratatoskr server + Audiobookshelf + the official Sonos simulator), no mocks. Out of scope for now; a separate later layer.
 
 ### CI
 
-Component and integration suites run instrumented, not the JVM `testDebugUnitTest` step,
-across several parallel emulator CI jobs (alongside the `AccessibilityChecksTest`
-accessibility suite in light and dark themes), after a shared AVD-warming job populates the
-emulator snapshot cache. The component suite runs on both API 26 (minSdk) and API 36
-(target) — the layer whose behaviour diverges by API level (Conscrypt/TLS, Keystore); the
-whole-app UI and accessibility suites run on API 36 only, as the hosted API-26 emulator
-cannot reliably bring up the full UI / accessibility stack. The shared harness is a reusable
-`MockWebServer`-over-HTTPS fixture (OkHttp's `okhttp-tls` `HeldCertificate`) in `core-network`
-test fixtures. `ConnectionManager`'s caching is thin and orthogonal; a small test for it can
-follow separately.
+Component and integration suites run instrumented, not the JVM `testDebugUnitTest` step, across several parallel emulator CI jobs (alongside the `AccessibilityChecksTest` accessibility suite in light and dark themes), after a shared AVD-warming job populates the emulator snapshot cache. The component suite runs on both API 26 (minSdk) and API 36 (target) — the layer whose behaviour diverges by API level (Conscrypt/TLS, Keystore); the whole-app UI and accessibility suites run on API 36 only, as the hosted API-26 emulator cannot reliably bring up the full UI / accessibility stack. The shared harness is a reusable `MockWebServer`-over-HTTPS fixture (OkHttp's `okhttp-tls` `HeldCertificate`) in `core-network` test fixtures. `ConnectionManager`'s caching is thin and orthogonal; a small test for it can follow separately.
 
-Post-merge, a separate workflow (`release-validation.yml`) validates the **shrunk** build
-(section 8) on every push to `main`: it runs the whole-app integration flow plus
-`MinifiedWireSmokeTest` against the `minified` variant on an API 36 emulator, then publishes
-the tested APKs to a per-commit `testing-<short-sha>` pre-release. `MinifiedWireSmokeTest` lives in
-`app` (not `core-network`) because R8 runs only at the app level, so the component suite can
-never execute against shrunk output; it re-drives just the wire-level behaviours most exposed
-to R8 — the reflectively looked-up Moshi codegen adapters and the unknown-enum fallback —
-through the real factory. This is the same deliberate, thin overlap policy as above, extended
-to the minified context. `MinifiedWireSmokeTest` also runs per PR against the minified
-variant on an API 36 emulator (instrumented-tests workflow), so runtime R8 breakage — which
-the JVM assembly gate cannot see — is caught before merge, not only post-merge (section 8).
+Post-merge, a separate workflow (`release-validation.yml`) validates the **shrunk** build (section 8) on every push to `main`: it runs the whole-app integration flow plus `MinifiedWireSmokeTest` against the `minified` variant on an API 36 emulator, then publishes the tested APKs to a per-commit `testing-<short-sha>` pre-release. `MinifiedWireSmokeTest` lives in `app` (not `core-network`) because R8 runs only at the app level, so the component suite can never execute against shrunk output; it re-drives just the wire-level behaviours most exposed to R8 — the reflectively looked-up Moshi codegen adapters and the unknown-enum fallback — through the real factory. This is the same deliberate, thin overlap policy as above, extended to the minified context. `MinifiedWireSmokeTest` also runs per PR against the minified variant on an API 36 emulator (instrumented-tests workflow), so runtime R8 breakage — which the JVM assembly gate cannot see — is caught before merge, not only post-merge (section 8).
 
 ## 10. Definition of done for v1
 
-- A user can, from a clean install: enter a server URL, confirm its certificate, sign in
-  with Audiobookshelf credentials, search and browse the library, pick a speaker, start a
-  book that resumes at the right spot, pause/resume/seek/stop, and see the reached position
-  reflected in Audiobookshelf afterward.
+- A user can, from a clean install: enter a server URL, confirm its certificate, sign in with Audiobookshelf credentials, search and browse the library, pick a speaker, start a book that resumes at the right spot, pause/resume/seek/stop, and see the reached position reflected in Audiobookshelf afterward.
 - The session survives closing and reopening the app (it is re-fetched from the server).
-- The app stays signed in across restarts: its non-expiring Ratatoskr token is stored
-  encrypted and replayed as-is, with no token lifecycle on the app side (section 5).
-- Builds from source with only free-software dependencies; README and this spec match what
-  was built.
+- The app stays signed in across restarts: its non-expiring Ratatoskr token is stored encrypted and replayed as-is, with no token lifecycle on the app side (section 5).
+- Builds from source with only free-software dependencies; README and this spec match what was built.
 
 ## 11. Coding constraints for the implementing agent
 
-- The app holds no domain logic that belongs on the server. If a feature needs Sonos or
-  Audiobookshelf knowledge, it is a server concern reached through the contract.
+- The app holds no domain logic that belongs on the server. If a feature needs Sonos or Audiobookshelf knowledge, it is a server concern reached through the contract.
 - Do not hand-edit generated client or type code; wrap it.
 - No proprietary dependencies, no Google Play Services, no trackers (section 8).
 - Never log tokens, passwords, or Authorization headers.
@@ -475,47 +167,18 @@ the JVM assembly gate cannot see — is caught before merge, not only post-merge
 Decided with the implementing agent. Rationale in brief, so it is not re-litigated.
 
 - **Language / UI:** Kotlin, Jetpack Compose, Material 3.
-- **Asynchrony and state:** coroutines and Flow; one ViewModel per screen; unidirectional
-  data flow (immutable UI state exposed as a `StateFlow`).
-- **Dependency injection:** manual constructor injection via a single `AppContainer`
-  created in the `Application` class. No Hilt/Koin - the app is too small to pay for a
-  framework, and the container keeps wiring in one visible place.
-- **API client:** openapi-generator with the Kotlin `jvm-retrofit2` template on Retrofit +
-  OkHttp, generated at Gradle build time from the contract git submodule (section 4).
-  Retrofit's Kotlin generator template is the maturest option, supports suspend functions
-  natively, and OkHttp accepts a runtime-configured `X509TrustManager`/`SSLSocketFactory`,
-  which is exactly what the TOFU pinning in section 6 needs - without touching generated
-  code.
-- **JSON:** tolerant deserialization (unknown fields ignored) as section 4 requires; the
-  serialization library is whatever the chosen generator template uses (Moshi for
-  `jvm-retrofit2`), configured leniently.
+- **Asynchrony and state:** coroutines and Flow; one ViewModel per screen; unidirectional data flow (immutable UI state exposed as a `StateFlow`).
+- **Dependency injection:** manual constructor injection via a single `AppContainer` created in the `Application` class. No Hilt/Koin - the app is too small to pay for a framework, and the container keeps wiring in one visible place.
+- **API client:** openapi-generator with the Kotlin `jvm-retrofit2` template on Retrofit + OkHttp, generated at Gradle build time from the contract git submodule (section 4). Retrofit's Kotlin generator template is the maturest option, supports suspend functions natively, and OkHttp accepts a runtime-configured `X509TrustManager`/`SSLSocketFactory`, which is exactly what the TOFU pinning in section 6 needs - without touching generated code.
+- **JSON:** tolerant deserialization (unknown fields ignored) as section 4 requires; the serialization library is whatever the chosen generator template uses (Moshi for `jvm-retrofit2`), configured leniently.
 - **Token storage:** Keystore-backed DataStore (encrypted at rest, section 5).
-- **Cover images:** Coil 3 (`coil-compose` + `coil-network-okhttp`). Apache-2.0 with no
-  Google or proprietary dependencies (F-Droid-safe, section 8); accepts an OkHttp
-  `Call.Factory`, which is exactly the hook for core-network's covers stack (TOFU trust and
-  bearer auth shared with the API client, but a separate dispatcher so image bursts
-  never queue playback commands) - no generated code touched; multiplatform-ready, matching
-  the KMP door kept open below. One app-lifetime `ImageLoader` owned by the AppContainer and
-  provided to the UI via a CompositionLocal (tests inject coil-test's FakeImageLoaderEngine).
-  Covers are requested server-scaled through quantized height buckets (`?h=` 128/256/512/1024,
-  rounded up from the measured layout size, capped at 1024 even for now-playing). Disk cache:
-  50 MB LRU; HTTP cache headers are deliberately ignored - Audiobookshelf sends none on the
-  proxy's request path, so respecting them would disable caching entirely. Stale covers are
-  the accepted trade-off, bounded by LRU eviction and the Settings "clear image cache" action;
-  sign-out and forget-server wipe the caches.
-- **`minSdk` 26** (Android 8.0): safely covers the Keystore-backed encrypted storage and
-  TLS requirements and provides `java.time` (for `Session.updatedAt`) without core-library
-  desugaring. Raising coverage to older devices (minSdk 23 + desugaring) is possible but
-  not planned.
-- Keep the door open for Kotlin Multiplatform later (this repo is `ratatoskr-app`, not
-  `-android`), but no KMP structure in v1.
+- **Cover images:** Coil 3 (`coil-compose` + `coil-network-okhttp`). Apache-2.0 with no Google or proprietary dependencies (F-Droid-safe, section 8); accepts an OkHttp `Call.Factory`, which is exactly the hook for core-network's covers stack (TOFU trust and bearer auth shared with the API client, but a separate dispatcher so image bursts never queue playback commands) - no generated code touched; multiplatform-ready, matching the KMP door kept open below. One app-lifetime `ImageLoader` owned by the AppContainer and provided to the UI via a CompositionLocal (tests inject coil-test's FakeImageLoaderEngine). Covers are requested server-scaled through quantized height buckets (`?h=` 128/256/512/1024, rounded up from the measured layout size, capped at 1024 even for now-playing). Disk cache: 50 MB LRU; HTTP cache headers are deliberately ignored - Audiobookshelf sends none on the proxy's request path, so respecting them would disable caching entirely. Stale covers are the accepted trade-off, bounded by LRU eviction and the Settings "clear image cache" action; sign-out and forget-server wipe the caches.
+- **`minSdk` 26** (Android 8.0): safely covers the Keystore-backed encrypted storage and TLS requirements and provides `java.time` (for `Session.updatedAt`) without core-library desugaring. Raising coverage to older devices (minSdk 23 + desugaring) is possible but not planned.
+- Keep the door open for Kotlin Multiplatform later (this repo is `ratatoskr-app`, not `-android`), but no KMP structure in v1.
 
 ## 13. Screen and module structure
 
-Decided with the implementing agent. Two Gradle modules - the app is too small for more,
-but the "generated client only behind a wrapper" rule (section 4) is enforced
-architecturally, not by convention: UI code cannot import generated types because they
-live in `core-network` and only the wrapper's domain models are exposed.
+Decided with the implementing agent. Two Gradle modules - the app is too small for more, but the "generated client only behind a wrapper" rule (section 4) is enforced architecturally, not by convention: UI code cannot import generated types because they live in `core-network` and only the wrapper's domain models are exposed.
 
 ```
 ratatoskr-app/
@@ -552,31 +215,11 @@ ratatoskr-app/
                              #   server / fingerprint store (sections 5, 6)
 ```
 
-- Single activity; Compose Navigation with a sealed, type-safe route graph — each
-  destination is a `@Serializable` `Route` type, so arguments (e.g. the speaker picker's
-  item id) are carried by the type system rather than stringly-typed keys that could be
-  missing. Start destination is resolved at launch off the main thread: no stored server →
-  connect; no stored tokens → sign-in; otherwise library.
-- One package per screen under `app/`, each with its composable screen, ViewModel, and
-  UI-state type. The now-playing screen polls `getCurrentSession`, advances the displayed
-  position locally between polls, and corrects to the server's value on each response
-  (section 3).
-- Each screen package splits its composable in two (ADR 0001): a public, stateless
-  `XScreen(state, ...)` — a pure function of its UI state, and the surface previews,
-  screenshot goldens, and accessibility checks render — and an `XScreenHost(viewModel, ...)`
-  that owns the ViewModel wiring, navigation effects, snackbars, and polling, rendered only
-  by the navigation graph. (`Host`, not `Route`: `Route` is this section's name for the
-  `@Serializable` navigation destination types.) Previews live in sibling `XScreenPreviews.kt`
-  files in the main source set and reach every state through public seams only — where a
-  state hides behind the 500 ms delayed-loading gate, previews open it via the
-  `LocalImmediateLoading` CompositionLocal instead of test-only visibility.
-- Domain models (library item, speaker, session, the Ratatoskr token) live in `core-network`'s wrapper
-  layer and are the only types the `app` module sees.
+- Single activity; Compose Navigation with a sealed, type-safe route graph — each destination is a `@Serializable` `Route` type, so arguments (e.g. the speaker picker's item id) are carried by the type system rather than stringly-typed keys that could be missing. Start destination is resolved at launch off the main thread: no stored server → connect; no stored tokens → sign-in; otherwise library.
+- One package per screen under `app/`, each with its composable screen, ViewModel, and UI-state type. The now-playing screen polls `getCurrentSession`, advances the displayed position locally between polls, and corrects to the server's value on each response (section 3).
+- Each screen package splits its composable in two (ADR 0001): a public, stateless `XScreen(state, ...)` — a pure function of its UI state, and the surface previews, screenshot goldens, and accessibility checks render — and an `XScreenHost(viewModel, ...)` that owns the ViewModel wiring, navigation effects, snackbars, and polling, rendered only by the navigation graph. (`Host`, not `Route`: `Route` is this section's name for the `@Serializable` navigation destination types.) Previews live in sibling `XScreenPreviews.kt` files in the main source set and reach every state through public seams only — where a state hides behind the 500 ms delayed-loading gate, previews open it via the `LocalImmediateLoading` CompositionLocal instead of test-only visibility.
+- Domain models (library item, speaker, session, the Ratatoskr token) live in `core-network`'s wrapper layer and are the only types the `app` module sees.
 
 ## 14. Planned features (post-v1)
 
-Post-v1 ideas live in the [issue tracker](https://github.com/Xexanos/ratatoskr-app/issues?q=is%3Aissue+is%3Aopen+label%3Aenhancement),
-not in this document, so the backlog sits in one place and each item can be prioritized and
-closed independently. They remain **not commitments** — captured so the reasoning is not lost
-and so the v1 design does not *actively prevent* them (section 2). The server SPEC's section 16
-(Planned features) holds the server-side counterparts.
+Post-v1 ideas live in the [issue tracker](https://github.com/Xexanos/ratatoskr-app/issues?q=is%3Aissue+is%3Aopen+label%3Aenhancement), not in this document, so the backlog sits in one place and each item can be prioritized and closed independently. They remain **not commitments** — captured so the reasoning is not lost and so the v1 design does not *actively prevent* them (section 2). The server SPEC's section 16 (Planned features) holds the server-side counterparts.
