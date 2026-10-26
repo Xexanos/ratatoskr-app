@@ -1,19 +1,12 @@
 # Testing — ratatoskr-app
 
-> Repo-local test strategy for the Ratatoskr **Android app**. The overarching,
-> cross-component strategy — including end-to-end tests across the app, server,
-> Audiobookshelf and a fake Sonos — is defined centrally:
-> → [ratatoskr-e2e/test-concept.md](https://github.com/Xexanos/ratatoskr-e2e/blob/main/test-concept.md)
+> Repo-local test strategy for the Ratatoskr **Android app**. The overarching, cross-component strategy — including end-to-end tests across the app, server, Audiobookshelf and a fake Sonos — is defined centrally: → [ratatoskr-e2e/test-concept.md](https://github.com/Xexanos/ratatoskr-e2e/blob/main/test-concept.md)
 >
-> This describes the **target** strategy; where the current code does not yet
-> match, see [Status](#status--alignment).
+> This describes the **target** strategy; where the current code does not yet match, see [Status](#status--alignment).
 
 ## Scope
 
-The app is a thin remote: it talks **only** to the Ratatoskr server over HTTPS and
-holds no domain logic. Everything here tests the **app in isolation** — on the JVM
-or against a mock server, never a real backend. Tests that exercise the real app +
-server + ABS + Sonos together are **E2E** and live in the central repo, not here.
+The app is a thin remote: it talks **only** to the Ratatoskr server over HTTPS and holds no domain logic. Everything here tests the **app in isolation** — on the JVM or against a mock server, never a real backend. Tests that exercise the real app + server + ABS + Sonos together are **E2E** and live in the central repo, not here.
 
 ## Levels
 
@@ -23,61 +16,31 @@ server + ABS + Sonos together are **E2E** and live in the central repo, not here
 - single-flight token refresh logic
 - TLS fingerprint comparison / trust-on-first-use decision
 - per-screen ViewModel state transitions
-- non-visual Compose behaviour of one stateless screen or shared component:
-  live regions, which frame a screen chooses, semantics that are behaviour
-  rather than structure
+- non-visual Compose behaviour of one stateless screen or shared component: live regions, which frame a screen chooses, semantics that are behaviour rather than structure
 - screenshot goldens for every UI `@Preview` (Roborazzi, `verifyRoborazziDebug`)
 
-Runner: **JUnit4** (chosen for one framework across all levels — the instrumented
-layers below are JUnit4-bound anyway). Networking-adjacent units use OkHttp
-**MockWebServer**. The two Compose-rendering kinds need a real Compose runtime
-rather than a fake, so they add **Robolectric**: the behaviour tests drive one
-`XScreen(state, ...)` from a hand-made state through the junit4 v2 compose rule
-and assert on the semantics tree, the goldens render the same way and compare
-pixels. Same renderer, different question — what a frame *does* versus what it
-looks like.
+Runner: **JUnit4** (chosen for one framework across all levels — the instrumented layers below are JUnit4-bound anyway). Networking-adjacent units use OkHttp **MockWebServer**. The two Compose-rendering kinds need a real Compose runtime rather than a fake, so they add **Robolectric**: the behaviour tests drive one `XScreen(state, ...)` from a hand-made state through the junit4 v2 compose rule and assert on the semantics tree, the goldens render the same way and compare pixels. Same renderer, different question — what a frame *does* versus what it looks like.
 
-Neither is a small whole-app suite: no navigation, no ViewModel, no mock server.
-An **integration test** here always means the whole app driven through its UI
-(below). Nor do they replace the instrumented accessibility checks, which need a
-live accessibility service and silently pass on Robolectric. Full rationale and
-the boundary between the layers: SPEC section 9, layer 1.
+Neither is a small whole-app suite: no navigation, no ViewModel, no mock server. An **integration test** here always means the whole app driven through its UI (below). Nor do they replace the instrumented accessibility checks, which need a live accessibility service and silently pass on Robolectric. Full rationale and the boundary between the layers: SPEC section 9, layer 1.
 
 ### Component — instrumented on emulator, real TLS + Keystore
-`core-network` against MockWebServer over HTTPS with a held certificate. This is
-what the JVM cannot do: it exercises the **real** Android TLS trust-on-first-use
-pinning, the Keystore-backed encrypted token store, and refresh-on-401.
+`core-network` against MockWebServer over HTTPS with a held certificate. This is what the JVM cannot do: it exercises the **real** Android TLS trust-on-first-use pinning, the Keystore-backed encrypted token store, and refresh-on-401.
 
 ### Integration — instrumented, whole app
-Drive `MainActivity` through the real Compose screens against a MockWebServer
-backend (no real server): the full flow connect → login → browse → now-playing.
-Tools: **Compose UI Test** + Espresso.
+Drive `MainActivity` through the real Compose screens against a MockWebServer backend (no real server): the full flow connect → login → browse → now-playing. Tools: **Compose UI Test** + Espresso.
 
 ### Minified validation — instrumented, shrunk build (post-merge)
-The same integration flow plus `MinifiedWireSmokeTest` (the wire-level mirror of
-the component layer — Moshi codegen adapters, unknown-enum fallback — which can
-never run against shrunk output from inside `core-network`, since R8 only runs at
-the app level) against the **`minified`** build type: the release R8
-configuration, debug-signed and debuggable so instrumentation can attach. Runs in
-`release-validation.yml` on every push to `main`; on success the tested APKs are
-published to a per-commit `testing-<short-sha>` pre-release (and later: the E2E
-suite is triggered).
+The same integration flow plus `MinifiedWireSmokeTest` (the wire-level mirror of the component layer — Moshi codegen adapters, unknown-enum fallback — which can never run against shrunk output from inside `core-network`, since R8 only runs at the app level) against the **`minified`** build type: the release R8 configuration, debug-signed and debuggable so instrumentation can attach. Runs in `release-validation.yml` on every push to `main`; on success the tested APKs are published to a per-commit `testing-<short-sha>` pre-release (and later: the E2E suite is triggered).
 
 ## Cross-cutting types
 
-- **Accessibility:** per-screen checks with the Accessibility Test Framework, run
-  in both light and dark themes.
-- **Security:** trust-on-first-use TLS pinning and Keystore-encrypted token
-  storage, validated on-device at the Component level.
-- **Compatibility:** the instrumented suite runs on **API 26 (minSdk)** and
-  **API 36 (target)** to catch regressions at both ends of the supported range.
+- **Accessibility:** per-screen checks with the Accessibility Test Framework, run in both light and dark themes.
+- **Security:** trust-on-first-use TLS pinning and Keystore-encrypted token storage, validated on-device at the Component level.
+- **Compatibility:** the component suite runs on **API 29** and **API 36 (target)** to catch regressions near both ends of the supported range. API 29, not minSdk 26, is the lowest level okhttp 5's `MockWebServer` survives ([square/okhttp#9523](https://github.com/square/okhttp/issues/9523)), so API 26–28 have no on-device coverage for now.
 
 ## Test tags for black-box driving
 
-Screens expose stable `Modifier.testTag`s with `testTagsAsResourceId = true` set
-high in the hierarchy. These serve the Compose integration tests here **and** are
-required by the central E2E harness (Maestro) to drive the installed `.apk`
-black-box. See the central concept's open points.
+Screens expose stable `Modifier.testTag`s with `testTagsAsResourceId = true` set high in the hierarchy. These serve the Compose integration tests here **and** are required by the central E2E harness (Maestro) to drive the installed `.apk` black-box. See the central concept's open points.
 
 ## Running
 
@@ -95,29 +58,6 @@ black-box. See the central concept's open points.
 
 The strategy above is the target. Current state:
 
-- **Present:** `core-network` unit tests (JUnit4 + MockWebServer), including the
-  TLS fingerprint/TOFU decision logic (`Fingerprints`, `PinnedTrustManager`);
-  per-screen ViewModel state-transition unit tests (`:app`, JUnit4, against a real
-  `ConnectionStore`/DataStore on the JVM and `HttpsMockServer`); JVM Compose behaviour
-  tests for the shared banner and the sign-in screen (`InlineBannerTest`,
-  `SignInScreenTest`) and the Roborazzi preview goldens, both on Robolectric; instrumented
-  component tests (auth, deserialization, error mapping, session rotation, TLS
-  pinning); the whole-app Compose integration flow (`AppFlowTest`); accessibility
-  checks across every screen (ATF, WARNING threshold incl. contrast) in **both**
-  light and dark themes — the CI script toggles `adb shell cmd uimode night no/yes`
-  around two separate `AccessibilityChecksTest` runs, the second forced with
-  `--rerun` so Gradle can't skip it as up-to-date; `testTagsAsResourceId` set high
-  in the hierarchy (`MainActivity`) so the existing `testTag`s are also visible to
-  the black-box E2E harness. The suites run as parallel per-suite CI jobs; the
-  **component** suite runs on **both API 26 (minSdk) and API 36 (target)** — the
-  layer whose behaviour diverges by API level (Conscrypt/TLS, Keystore) — while
-  the whole-app UI and accessibility suites run on **API 36 only**; the shrunk
-  build (`minified`, SPEC section 8) is validated post-merge on `main` by
-  `release-validation.yml` (AppFlowTest + MinifiedWireSmokeTest on API 36), which
-  then publishes the tested APKs to a per-commit `testing-<short-sha>` pre-release
-  (pruned by a scheduled cleanup job).
-- **To add:** running the whole-app UI and accessibility suites on API 26 too.
-  The hosted API-26 emulator can't reliably bring up the full UI / accessibility
-  stack (adb goes offline and jobs hang; the a11y service often isn't live), so
-  those suites are API-36-only for now; the component suite already covers the
-  API-26-sensitive layer.
+- **Present:** `core-network` unit tests (JUnit4 + MockWebServer), including the TLS fingerprint/TOFU decision logic (`Fingerprints`, `PinnedTrustManager`); per-screen ViewModel state-transition unit tests (`:app`, JUnit4, against a real `ConnectionStore`/DataStore on the JVM and `HttpsMockServer`); JVM Compose behaviour tests for the shared banner and the sign-in screen (`InlineBannerTest`, `SignInScreenTest`) and the Roborazzi preview goldens, both on Robolectric; instrumented component tests (auth, deserialization, error mapping, session rotation, TLS pinning); the whole-app Compose integration flow (`AppFlowTest`); accessibility checks across every screen (ATF, WARNING threshold incl. contrast) in **both** light and dark themes — the CI script toggles `adb shell cmd uimode night no/yes` around two separate `AccessibilityChecksTest` runs, the second forced with `--rerun` so Gradle can't skip it as up-to-date; `testTagsAsResourceId` set high in the hierarchy (`MainActivity`) so the existing `testTag`s are also visible to the black-box E2E harness. The suites run as parallel per-suite CI jobs; the **component** suite runs on **both API 29 and API 36 (target)** — the layer whose behaviour diverges by API level (Conscrypt/TLS, Keystore), its low end held at API 29 rather than minSdk 26 because okhttp 5's `MockWebServer` crashes on API 26–28 — while the whole-app UI and accessibility suites run on **API 36 only**; the shrunk build (`minified`, SPEC section 8) is validated post-merge on `main` by `release-validation.yml` (AppFlowTest + MinifiedWireSmokeTest on API 36), which then publishes the tested APKs to a per-commit `testing-<short-sha>` pre-release (pruned by a scheduled cleanup job).
+- **To add:** moving the component suite back to **API 26 (minSdk)** once a released okhttp carries the null guard for [square/okhttp#9523](https://github.com/square/okhttp/issues/9523); until then API 26–28 have no on-device coverage.
+- **To add:** running the whole-app UI and accessibility suites on API 26 too. The hosted API-26 emulator can't reliably bring up the full UI / accessibility stack (adb goes offline and jobs hang; the a11y service often isn't live), so those suites are API-36-only for now.

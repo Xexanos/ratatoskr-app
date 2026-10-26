@@ -2,10 +2,17 @@
 #
 # What runs where:
 #   - core-network component tests (SPEC section 9 - the real client assembly over HTTPS
-#     against MockWebServer, on the device's actual TLS/Keystore stack) run on BOTH API 26
-#     (minSdk) and API 36 (target). This is the layer whose behaviour actually diverges by
-#     API level (Conscrypt/TLS, the Keystore-backed token store), so it is the one worth
-#     verifying at both ends of the supported range.
+#     against MockWebServer, on the device's actual TLS/Keystore stack) run on BOTH API 29
+#     and API 36 (target). This is the layer whose behaviour actually diverges by API level
+#     (Conscrypt/TLS, the Keystore-backed token store), so it is the one worth verifying at
+#     both ends of the range. The low end is API 29, not minSdk 26: since okhttp 5,
+#     MockWebServer reads the server-side TLS SNI names on every request, and the platform
+#     Conscrypt of API 26-28 returns null there, which crashes the instrumentation process
+#     on the first HTTPS request (square/okhttp#9523, google/conscrypt#977; measured on
+#     local emulators - 26 and 28 crash, 29, 30 and 34 pass). Only the test server makes
+#     that call, never the app's own okhttp client, but API 26-28 stay without on-device
+#     coverage until a released okhttp carries the upstream null guard and this cell moves
+#     back to 26.
 #   - the whole-app integration flow (AppFlowTest) and the accessibility checks
 #     (AccessibilityChecksTest, run twice - light + dark, since contrast is theme-dependent)
 #     run on API 36 only. The API-26 hosted emulator cannot reliably bring up the full UI /
@@ -25,11 +32,13 @@
 #      1 avoids by warming each key exactly once before any test cell starts.
 #
 # Snapshot loading (emulator-options, set per matrix cell): API 36 loads the warmed snapshot
-# (-no-snapshot-save: load, don't re-save) and comes up clean in ~3 min. The API-26 component
-# cell cold-boots (-no-snapshot: neither load nor save): on API 26 sys.boot_completed fires
-# ~5 s in, before the framework `settings` service is up, so the warm job captures a
-# half-initialised snapshot; restoring it leaves adb permanently "offline" and the job hangs.
-# Cold-booting lets the system fully initialise before the tests attach.
+# (-no-snapshot-save: load, don't re-save) and comes up clean in ~3 min. The API-29 component
+# cell cold-boots (-no-snapshot: neither load nor save), carried over unchanged from the
+# API-26 cell it replaced: on API 26 sys.boot_completed fired ~5 s in, before the framework
+# `settings` service was up, so the warm job captured a half-initialised snapshot whose
+# restore left adb permanently "offline" and hung the job. Whether API 29's snapshot restores
+# cleanly is untested, so the cell keeps the known-safe cold boot, which lets the system fully
+# initialise before the tests attach.
 #
 # paths-ignore skips this (expensive) run when a PR changes only docs/metadata that can't
 # affect the build. Denylist, not allowlist: any other path still triggers it, so a code
@@ -54,7 +63,7 @@ concurrency:
 jobs:
   # Stage 1: populate the AVD snapshot cache for each API level. No tests run here - just
   # enough of an emulator boot to let reactivecircus/android-emulator-runner save a snapshot.
-  # API 26 is warmed too (the component cell restores its AVD from this cache, then cold-boots).
+  # API 29 is warmed too (the component cell restores its AVD from this cache, then cold-boots).
   warm-avd:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -62,7 +71,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        api-level: [26, 36]
+        api-level: [29, 36]
 
     steps:
       - name: Check out (with the contract submodule)
@@ -121,10 +130,11 @@ jobs:
       matrix:
         include:
           # core-network component suite - the API-level-sensitive layer (TLS / Keystore),
-          # so it runs at both ends of the supported range. API 26 cold-boots (-no-snapshot,
-          # see header); API 36 loads the warmed snapshot (-no-snapshot-save).
+          # so it runs at both ends of the range it can cover: API 29, the lowest level
+          # okhttp 5's MockWebServer survives (see header), cold-boots (-no-snapshot); API 36
+          # loads the warmed snapshot (-no-snapshot-save).
           - suite: component
-            api-level: 26
+            api-level: 29
             timeout: 15
             gradle: ':core-network:connectedDebugAndroidTest'
             emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
@@ -206,7 +216,7 @@ jobs:
           # locally.
           profile: pixel_6
           # Restore the cached AVD (don't recreate it); params must match warm-avd for the
-          # snapshot to load. emulator-options is per-cell (API 26 cold-boots - see header).
+          # snapshot to load. emulator-options is per-cell (API 29 cold-boots - see header).
           force-avd-creation: false
           emulator-options: ${{ matrix.emulator-options }}
           disable-animations: true
