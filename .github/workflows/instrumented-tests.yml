@@ -221,14 +221,17 @@ jobs:
           emulator-options: ${{ matrix.emulator-options }}
           disable-animations: true
           # `pre` (empty for most cells) runs before the suite - the a11y cells use it to set
-          # the ui mode. Then the gradle suite, then the crashpad reaping:
-          # on API 26 the emulator's own teardown ("emu kill") hangs on orphaned
-          # crashpad_handler crash-reporter processes, running the job to its timeout even
-          # though the tests already passed (android-emulator-runner#385). The action runs
-          # each script line as its own `sh -c` (no shared shell), so a trap won't work;
-          # instead reap crashpad_handler on the trailing lines - they run after the tests
-          # but before the action's blocking teardown, letting the emulator process tree exit
-          # cleanly. `-f` is required: "crashpad_handler" is 16 chars and pkill matches the
+          # the ui mode. The suite and the crashpad reaping then share ONE line, which is
+          # load-bearing: on API 26 the emulator's own teardown ("emu kill") hangs on orphaned
+          # crashpad_handler crash-reporter processes (android-emulator-runner#385), running
+          # the job to its timeout, so the reaping has to happen after the suite but before
+          # the action's blocking teardown. The action runs each script line as its own
+          # `sh -c` and stops at the first line that exits non-zero, so on separate lines the
+          # reaping is skipped by exactly the runs that most need the job to end promptly -
+          # the failing ones. Worse, a timed-out job is *cancelled*, not failed, which used to
+          # skip the report upload below too and left a red run with no reports at all. On one
+          # line the reaping always runs and `exit $rc` still hands the suite's own verdict to
+          # the action. `-f` is required: "crashpad_handler" is 16 chars and pkill matches the
           # 15-char-truncated comm by default (zero matches), so match the full command line.
           # The `[c]` regex trick keeps the pattern from matching pkill's own `sh -c` line
           # (which literally contains "[c]rashpad_handler", so the regex misses it) - without
@@ -236,13 +239,12 @@ jobs:
           # 1 on no match.
           script: |
             ${{ matrix.pre }}
-            ./gradlew ${{ matrix.gradle }}
-            pkill -f -SIGTERM '[c]rashpad_handler' || true
-            sleep 5
-            pkill -f -SIGKILL '[c]rashpad_handler' || true
+            ./gradlew ${{ matrix.gradle }}; rc=$?; pkill -f -SIGTERM '[c]rashpad_handler' || true; sleep 5; pkill -f -SIGKILL '[c]rashpad_handler' || true; exit $rc
 
+      # Also on cancelled(): a job that runs into its `timeout-minutes` is cancelled rather
+      # than failed, and that is precisely the run whose reports are worth having.
       - name: Upload the test reports on failure
-        if: failure()
+        if: failure() || cancelled()
         uses: ./.github/actions/upload-test-reports
         with:
           # minified-smoke produces no core-network reports; the composite's default path
