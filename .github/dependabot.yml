@@ -14,6 +14,13 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 10
+    ignore:
+      # ComposablePreviewScanner 0.10 breaks binary compatibility with Roborazzi's
+      # preview-scanner-support (built against 0.9.x): every screenshot test fails with
+      # NoSuchMethodError on ComposablePreview.invoke. Lift once a Roborazzi release
+      # supports 0.10.
+      - dependency-name: "io.github.sergio-sastre.ComposablePreviewScanner:*"
+        versions: [">= 0.10.0"]
     # Keep PR noise low: bundle non-major bumps into a single PR, majors stay separate.
     groups:
       gradle-minor-and-patch:
